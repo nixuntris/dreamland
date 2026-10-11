@@ -1,0 +1,15 @@
+BaseHeight: 100
+HeightScale: 150.0
+PostProcess: DesertRipples
+Layer: 1
+Type: Billow
+Amplitude: 1.0
+Frequency: 0.005
+Layer: 2
+Type: Billow
+Amplitude: 0.4
+Frequency: 0.0125
+Layer: 3
+Type: Billow
+Amplitude: 0.16
+Frequency: 0.03125

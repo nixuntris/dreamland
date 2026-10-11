@@ -1,0 +1,171 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="Source Files">
+      <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
+      <Extensions>cpp;c;cc;cxx;c++;cppm;ixx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
+    </Filter>
+    <Filter Include="Header Files">
+      <UniqueIdentifier>{93995380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
+      <Extensions>h;hh;hpp;hxx;h++;hm;inl;inc;ipp;xsd</Extensions>
+    </Filter>
+    <Filter Include="Resource Files">
+      <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
+      <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
+    </Filter>
+    <Filter Include="Source Files\Shaders">
+      <UniqueIdentifier>{29615db3-c359-4725-9463-724104b3fcc7}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\Shaders\Rasterizer">
+      <UniqueIdentifier>{5c65c98a-6286-46c3-9cac-6e36de3b212a}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\Shaders\Rasterizer\Software">
+      <UniqueIdentifier>{111a0ba8-f8ea-4e31-8113-d17b06bd4339}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\Shaders\Rasterizer\Hardware">
+      <UniqueIdentifier>{4a1ad81f-1b7f-4ecf-ae47-f4184ffda435}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\Shaders\Rasterizer\Software\Display Output">
+      <UniqueIdentifier>{6342455b-b947-410c-ba50-de4dfab1ec88}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\Shaders\Rasterizer\Software\Particles">
+      <UniqueIdentifier>{dfd8ff1c-82c1-4fef-ad2d-fa99cf545eb5}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\Shaders\Rasterizer\Software\Meshlets">
+      <UniqueIdentifier>{830b3d88-0d64-4f28-953e-cbdd7da0d4db}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\Shaders\Rasterizer\Software\Illumination">
+      <UniqueIdentifier>{2ee64cd7-62f8-4e5b-908f-f497cd078433}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\terrain">
+      <UniqueIdentifier>{19e452bc-7f58-48d7-a188-aa5916f2e229}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\terrain\example terrain">
+      <UniqueIdentifier>{84d25c7b-74a7-4e39-b3fb-7896cacd12b3}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\Abstraction Layer">
+      <UniqueIdentifier>{ed7593ff-b3a1-4120-8781-aad4846f76d2}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\Abstraction Layer\Anubis Opengl">
+      <UniqueIdentifier>{1d5c526d-a532-4732-8ba4-14916c168025}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\Shaders\Rasterizer\Physics">
+      <UniqueIdentifier>{c4c2dfdc-6f34-4745-9bfe-aaf4905bd93f}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\CPU Code">
+      <UniqueIdentifier>{4fd25b9d-8f9a-4458-b9e9-43b1aab2cbd1}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="AnubisOpengl.cpp">
+      <Filter>Source Files\Abstraction Layer\Anubis Opengl</Filter>
+    </ClCompile>
+    <ClCompile Include="PerlinAVX2.hpp">
+      <Filter>Source Files\Abstraction Layer</Filter>
+    </ClCompile>
+    <ClCompile Include="main.cpp">
+      <Filter>Source Files\terrain</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="SoftwareRasterizer.h">
+      <Filter>Source Files\Abstraction Layer</Filter>
+    </ClInclude>
+    <ClInclude Include="Anubis\AnubisShaders.hpp">
+      <Filter>Source Files\Abstraction Layer</Filter>
+    </ClInclude>
+    <ClInclude Include="Anubis\AnubisMath.hpp">
+      <Filter>Source Files\Abstraction Layer</Filter>
+    </ClInclude>
+    <ClInclude Include="Anubis\Anubis.hpp">
+      <Filter>Source Files\Abstraction Layer</Filter>
+    </ClInclude>
+    <ClInclude Include="NoiseGen.hpp">
+      <Filter>Source Files\CPU Code</Filter>
+    </ClInclude>
+    <ClInclude Include="Chunk.hpp">
+      <Filter>Source Files\CPU Code</Filter>
+    </ClInclude>
+    <ClInclude Include="Misc.hpp">
+      <Filter>Source Files\CPU Code</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="fes.fs">
+      <Filter>Source Files\Shaders\Rasterizer\Hardware</Filter>
+    </None>
+    <None Include="ver.vs">
+      <Filter>Source Files\Shaders\Rasterizer\Hardware</Filter>
+    </None>
+    <None Include="Anubis\BaseShaders\quad_display_shader.vs">
+      <Filter>Source Files\Shaders\Rasterizer\Software\Display Output</Filter>
+    </None>
+    <None Include="grassParticle.glsl">
+      <Filter>Source Files\Shaders\Rasterizer\Software\Particles</Filter>
+    </None>
+    <None Include="frustumCull.glsl">
+      <Filter>Source Files\Shaders\Rasterizer\Software\Meshlets</Filter>
+    </None>
+    <None Include="HizBuilder.glsl">
+      <Filter>Source Files\Shaders\Rasterizer\Software\Meshlets</Filter>
+    </None>
+    <None Include="Rasterize.glsl">
+      <Filter>Source Files\Shaders\Rasterizer\Software\Meshlets</Filter>
+    </None>
+    <None Include="renderAABB.glsl">
+      <Filter>Source Files\Shaders\Rasterizer\Software\Meshlets</Filter>
+    </None>
+    <None Include="desert.txt">
+      <Filter>Source Files\terrain\example terrain</Filter>
+    </None>
+    <None Include="quad_display_no_fxaa.glsl">
+      <Filter>Source Files\Shaders\Rasterizer\Software\Display Output</Filter>
+    </None>
+    <None Include="SecondaryRays.glsl">
+      <Filter>Source Files\Shaders\Rasterizer\Software\Illumination</Filter>
+    </None>
+    <None Include="RenderFluids.glsl">
+      <Filter>Source Files\Shaders\Rasterizer\Physics</Filter>
+    </None>
+    <None Include="SimulateFluids.glsl">
+      <Filter>Source Files\Shaders\Rasterizer\Physics</Filter>
+    </None>
+    <None Include="hwMesh.vs">
+      <Filter>Source Files\Shaders\Rasterizer\Hardware</Filter>
+    </None>
+    <None Include="tree.voxobj">
+      <Filter>Resource Files</Filter>
+    </None>
+    <None Include="quad_display_shader.fs">
+      <Filter>Source Files\Shaders\Rasterizer\Software\Display Output</Filter>
+    </None>
+    <None Include="PhysicsObject.glsl">
+      <Filter>Source Files\Shaders\Rasterizer\Software\Particles</Filter>
+    </None>
+    <None Include="ClearPhysicalObject.glsl">
+      <Filter>Source Files\Shaders\Rasterizer\Software\Particles</Filter>
+    </None>
+    <None Include="FillOutPhysicsData.glsl">
+      <Filter>Source Files\Shaders\Rasterizer\Software\Particles</Filter>
+    </None>
+    <None Include="hwMesh.fs">
+      <Filter>Source Files\Shaders\Rasterizer\Hardware</Filter>
+    </None>
+    <None Include="Clouds.glsl">
+      <Filter>Source Files\Shaders\Rasterizer\Software\Illumination</Filter>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <Image Include="mc_sheet.png">
+      <Filter>Source Files</Filter>
+    </Image>
+  </ItemGroup>
+  <ItemGroup>
+    <Text Include="caves.txt">
+      <Filter>Source Files\terrain\example terrain</Filter>
+    </Text>
+    <Text Include="mountains.txt">
+      <Filter>Source Files</Filter>
+    </Text>
+  </ItemGroup>
+</Project>
