@@ -129,18 +129,17 @@ float cloudDensity(vec3 p, float time) {
     float heightMask = smoothstep(0.0, 0.15, hf) * smoothstep(1.0, 0.55, hf);
     vec3 wind = vec3(time * 1.5, 0.0, time * 0.6);
     float n      = fbm3(p * 0.008 + wind);
-    float detail = noise3d(p * 0.06 + wind * 2.0);   // cheaper than fbm, fine for shadows
+    float detail = noise3d(p * 0.06 + wind * 2.0); 
     n -= detail * 0.25 * (1.0 - hf);
     return smoothstep(0.45, 0.75, n) * heightMask * DENSITY_SCALE;
 }
 
-// Returns sun transmittance through the cloud layer (1 = fully lit, 0 = fully shadowed)
 float cloudShadow(vec3 ro, vec3 rd, float time, float jitter) {
-    if (rd.y <= 1e-4) return 1.0;                    // ray never reaches the slab
+    if (rd.y <= 1e-4) return 1.0;              
 
     float t0 = max((CLOUD_BOTTOM - ro.y) / rd.y, 0.0);
     float t1 = min((CLOUD_TOP    - ro.y) / rd.y, MAX_DIST);
-    if (t1 <= t0) return 1.0;                        // slab is behind us
+    if (t1 <= t0) return 1.0; 
 
     float dt  = (t1 - t0) / float(SHADOW_STEPS);
     float tau = 0.0;
@@ -150,6 +149,7 @@ float cloudShadow(vec3 ro, vec3 rd, float time, float jitter) {
     }
     return exp(-tau);
 }
+uniform float timeSpeed;
 void main()
 {
     ivec2 gid = ivec2(gl_GlobalInvocationID.xy);
@@ -161,7 +161,7 @@ void main()
     if (depth[idx] == 1000000) return;
 
     vec3 origin = pos[idx];
-    float time = float(frameIndex) * 0.016;   // must match the cloud shader
+    float time = float(frameIndex) *timeSpeed;
     if (readVoxelData(ivec3(origin))==7) frame[idx] = 0;
     float radiance = 0.0;
 
@@ -174,6 +174,10 @@ void main()
         float T = 1.0;
 
         float t = 0;
+        float jitter = hash3(vec3(gid, frameIndex * 2 + d));
+        float shadow = cloudShadow(ro, rd, time, jitter);
+        shadow = mix(1.0, shadow, 0.3);
+        T *= shadow;   
         for (int i = 0; i < 64; i++)
         {
             t+=1;
@@ -191,9 +195,7 @@ void main()
             }
             if (inBounds(ivec3(p))) break;
             
-            float jitter = hash3(vec3(gid, frameIndex * 2 + d));
-            T *= cloudShadow(ro, rd, time, jitter);
-            if (readVoxelData(ivec3(p)) != 0)
+             if (readVoxelData(ivec3(p)) != 0)
             {
                 T *= 0.70;
                 break;

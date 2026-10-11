@@ -5,8 +5,8 @@
 #  define __builtin_popcount __popcnt
 #endif
 
-const int wx = 50;
-const int wz = 50;
+const int wx = 200;
+const int wz = 200;
 const int ww = wx * wz;
 const int wy = 16;
 const int chunkSize = 64;
@@ -89,3 +89,14 @@ struct GenerationData {
 		this->highestChunkY = (highestHeight / chunkSize) + 1;
 	}
 };
+float fbm3(Math::Vector3 p) {
+	float v = 0.0, a = 0.5;
+	for (int i = 0; i < 5; i++) {
+		v += a * perlin_noise_3d(p.x,p.y,p.z);
+		p.x *= 2.0;
+		p.y *= 2.0;
+		p.z *= 2.0;
+		a *= 0.5;
+	}
+	return v;
+}

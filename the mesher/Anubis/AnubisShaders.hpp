@@ -43,6 +43,52 @@ namespace Anubis {
             glBindImageTexture(spot, id, 0, GL_FALSE, 0, GL_READ_WRITE, GL_RGBA32F);
         }
     };
+    class Texture2DFloat {
+    private:
+        Math::IVector2 size;
+    public:
+        unsigned int textureID;
+        unsigned int framebufferID;
+        std::vector<float> pixels;
+        void Clear(Math::IVector2 size) {
+            pixels.resize(size.x * size.y, 1.0f);
+            this->size.x = size.x;
+            this->size.y = size.y;
+        }
+        void Upload() {
+
+            glGenTextures(1, &textureID);
+            glBindTexture(GL_TEXTURE_2D, textureID);
+            glTexImage2D(GL_TEXTURE_2D, 0, GL_R32F, this->size.x, this->size.y, 0, GL_RED, GL_FLOAT, pixels.data());
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+
+            glGenFramebuffers(1, &framebufferID);
+            glBindFramebuffer(GL_FRAMEBUFFER, framebufferID);
+
+            glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, textureID, 0);
+
+            if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
+                std::cerr << "Framebuffer is not complete! \n";
+            }
+            else {
+                std::cout << "Framebuffer is fine! This is a debug message!\n";
+            }
+            glBindFramebuffer(GL_FRAMEBUFFER, 0);
+        }
+        void BindForWriting() {
+            glBindFramebuffer(GL_FRAMEBUFFER, framebufferID);
+        }
+
+        void Unbind() {
+            glBindFramebuffer(GL_FRAMEBUFFER, 0);
+        }
+        void BindForImageAccess(unsigned int unit) {
+            glBindImageTexture(unit, textureID, 0, GL_FALSE, 0, GL_READ_WRITE, GL_R32F);
+        }
+    };
     class Texture2D {
     private:
         std::vector<uint8_t> pixels;

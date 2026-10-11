@@ -39,9 +39,11 @@ class App {
 	int grass = 0;
 	int totalMeshletCount = 0;
 	int editSize = 5;
+	Anubis::Texture2DFloat texture;
 	Settings graphicsSettings;
 	std::vector<std::unique_ptr<PhysicsObject>> physicalObjects;
 	std::vector<std::string> worlds = { "Mountains", "Desert", "Caves", "Sky" };
+	float timeSpeed = 0.0004;
 public:
 	App() {
 		//IMPLEMENT THE HARDWARE PIPELINE
@@ -836,6 +838,7 @@ public:
 				shaders.secondaryRaysRender.SetInt(wx, "wx");
 				shaders.secondaryRaysRender.SetInt(wy, "wy");
 				shaders.secondaryRaysRender.SetInt(wz, "wz");
+				shaders.secondaryRaysRender.SetFloat(timeSpeed, "timeSpeed");
 				shaders.secondaryRaysRender.SetInt(wWidth, "renderWidth");
 				shaders.secondaryRaysRender.SetInt(wHeight, "renderHeight");
 				shaders.secondaryRaysRender.SetInt(frame, "frameIndex");
@@ -850,6 +853,7 @@ public:
 				shaders.clouds.SetInt(wx, "wx");
 				shaders.clouds.SetInt(wy, "wy");
 				shaders.clouds.SetInt(wz, "wz");
+				shaders.clouds.SetFloat(timeSpeed, "timeSpeed");
 				shaders.clouds.SetInt(wWidth, "renderWidth");
 				shaders.clouds.SetInt(wHeight, "renderHeight");
 				shaders.clouds.SetInt(frame, "frameIndex");

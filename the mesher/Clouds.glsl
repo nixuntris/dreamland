@@ -170,7 +170,7 @@ float sampleCloudCoarse(vec3 p, float time)
 
     return smoothstep(0.45, 0.75, n) * heightMask;
 }
-
+uniform float timeSpeed;
 void main() {
     ivec2 gid = ivec2(gl_GlobalInvocationID.xy);
     int idx = gid.y * 3840 + gid.x;
@@ -209,7 +209,7 @@ void main() {
     float cosTheta = dot(rd, sunDir);
     float phase = mix(hgPhase(cosTheta, 0.3), hgPhase(cosTheta, -0.2), 0.3) * 4.0 * 3.14159265;
     phase = clamp(phase, 0.8, 2.0);
-    float time = float(frameIndex) * 0.016;
+    float time = float(frameIndex) * timeSpeed;
     for (int i = 0; i < 96 && t < t1; ++i)
     {
         vec3 p = ro + rd * t;
