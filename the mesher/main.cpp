@@ -14,7 +14,6 @@
 #include "Chunk.hpp"
 #include "Misc.hpp"
 
-
 class App {
 	Anubis::Window window;
 	Anubis::Camera camera;
@@ -214,6 +213,56 @@ public:
 		}
 		//std::cout << ids.size() << "\n";
 
+	}
+	
+	void GenerateDebugScene() {
+		off = (ChunkOffset*)MemAlloc(wx * wy * wz * sizeof(ChunkOffset));
+		chunks = (Chunk*)MemAlloc(wx * wz * wy * sizeof(Chunk));
+		START_TIMER(terrain)
+#pragma omp parallel for collapse(2)
+			for (int x = 0; x < wx; x++) {
+				for (int z = 0; z < wz; z++) {
+					int lod = 1;
+					float dist = Vector2Distance({ (float)x * chunkSize,(float)z * chunkSize }, { float(camera.position.x),float(camera.position.z) });
+					bool grass = false;
+
+					if (dist < 1920) grass = true;
+					if (dist > 960) lod = 2;
+					if (dist > 960 * 2) lod = 4;
+					if (dist > 960 * 4) lod = 8;
+					if (dist > 960 * 8) lod = 16;
+					if (dist > 960 * 12) lod = 32;
+					if (dist > 960 * 24) lod = 64;
+					GenerationData gen;
+					gen.highestChunkY = 6;
+
+					for (int y = 0; y < gen.highestChunkY && y < wy; y++) {
+						chunks[y * (wx * wz) + z * wx + x].GenerateDebug(&world.chunkData[y * (wx * wz) + z * wx + x], gen, x, y, z, lod, grass);
+					};
+					if (GetRandomValue(0,10)==0) {
+						for (int i = 0; i < 20; i++) {
+							world.chunkData[0 * (wx * wz) + z * wx + x].terrain[IDX(chunkSize / 2, i + 50, chunkSize / 2, chunkSize)] = 2;
+							world.chunkData[0 * (wx * wz) + z * wx + x].terrain[IDX(chunkSize / 2, i + 50, chunkSize / 2+1, chunkSize)] = 2;
+							world.chunkData[0 * (wx * wz) + z * wx + x].terrain[IDX(chunkSize / 2+1, i + 50, chunkSize / 2+1, chunkSize)] = 2;
+							world.chunkData[0 * (wx * wz) + z * wx + x].terrain[IDX(chunkSize / 2+1, i + 50, chunkSize / 2, chunkSize)] = 2;
+						}
+						if (world.lightCount < 16) {
+							world.lightPositions[world.lightCount] = { (float)chunkSize / 2 + x * 64,70,(float)chunkSize / 2 + z * 64 };
+							world.lightValues[world.lightCount] = { 1,1,1 };
+							world.lightCount++;
+							std::cout << "da\n";
+						}
+					}
+					
+					for (int y = 0; y < gen.highestChunkY && y < wy; y++) {
+						chunks[y * (wx * wz) + z * wx + x].GenerateLod(&world.chunkData[y * (wx * wz) + z * wx + x], x, y, z);
+						chunks[y * (wx * wz) + z * wx + x].Compress(&world.chunkData[y * (wx * wz) + z * wx + x]);
+
+					};
+
+				}
+			}
+		END_TIMER(terrain)
 	}
 	void GenerateTerrain() {
 
@@ -552,7 +601,7 @@ public:
 		int offfr = 0;
 		int selectedColorIndex = 0; // Keep track of selection
 		Math::Vector2 oldMouse = window.GetMousePos();
-		GenerateTerrain();
+		GenerateDebugScene();
 		MeshWorld();
 		FreeTerrain();
 		RecalculateParticles();
@@ -632,7 +681,7 @@ public:
 			int r = 0;
 			for (auto t : decals) {
 
-				Render(&shaders, camera, matView, mesh, t, frame, decalTypes[r], editSize, ColorPallete.data(), ColorPallete.size());
+				Render(&shaders, camera, matView, mesh, t, frame, decalTypes[r], editSize, ColorPallete.data(), ColorPallete.size(),wHeight);
 				r++;
 			}
 			const float radius = 0.5f;
@@ -794,6 +843,7 @@ public:
 				shaders->hwRenderForObjects.SetUIntArray(pack, packCount, "packedColors");
 				shaders->hwRenderForObjects.SetFloat(size, "size");
 				shaders->hwRenderForObjects.SetInt(frame, "frame");
+				shaders->hwRenderForObjects.SetInt(wHeight, "vHeight");
 				shaders->hwRenderForObjects.SetInt(voxelType, "voxelType");
 				shaders->hwRenderForObjects.SetUVec2(handle, "handle");
 				
@@ -810,7 +860,7 @@ public:
 				bool frontBackCollision = false;
 
 
-				if (Vector3Distance({ (float)k->position.x,(float)k->position.y,(float)k->position.z }, { (float)camera.position.x,(float)camera.position.y,(float)camera.position.z })<200) {
+				if (Vector3Distance({ (float)k->position.x,(float)k->position.y,(float)k->position.z }, { (float)camera.position.x,(float)camera.position.y,(float)camera.position.z })<20) {
 					RenderPhysicsObject(&shaders, camera, matView, k->mesh, { (float)k->position.x,(float)k->position.y,(float)k->position.z }, frame, 1, 1, ColorPallete.data(), ColorPallete.size(), k->byte.handle, { (float)k->rotation.x,(float)k->rotation.y,(float)k->rotation.z });
 
 					Anubis::SwitchShaderStage(shaders.fillOut.programID);
@@ -985,6 +1035,7 @@ public:
 			}
 
 			if (graphicsSettings.secondaryRays) {
+
 				secondaryRays.Start();
 				Anubis::SwitchShaderStage(shaders.secondaryRaysRender.programID);
 				shaders.secondaryRaysRender.SetVector3({ pos.x,pos.y,pos.z }, "camPos");
@@ -994,6 +1045,10 @@ public:
 				shaders.secondaryRaysRender.SetInt(wx, "wx");
 				shaders.secondaryRaysRender.SetInt(wy, "wy");
 				shaders.secondaryRaysRender.SetInt(wz, "wz");
+				shaders.secondaryRaysRender.SetInt(world.lightCount, "lightCount");
+				shaders.secondaryRaysRender.SetVector3Array(world.lightPositions, 16, "lightPositions");
+				shaders.secondaryRaysRender.SetVector3Array(world.lightValues, 16, "lightValues");
+
 				shaders.secondaryRaysRender.SetFloat(timeSpeed, "timeSpeed");
 				shaders.secondaryRaysRender.SetInt(wWidth, "renderWidth");
 				shaders.secondaryRaysRender.SetInt(wHeight, "renderHeight");

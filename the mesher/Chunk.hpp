@@ -221,6 +221,9 @@ struct World {
 		int type;
 	};
 	std::vector<ChunkData> chunkData;
+	int lightCount = 0;
+	Math::Vector3 lightPositions[16];
+	Math::Vector3 lightValues[16];
 	std::map<int, std::vector<VoxelObject>> models;
 	std::vector<VoxelObject> loadVoxelPositionsFromFile(const char* path, int typeOffset)
 	{
@@ -356,6 +359,61 @@ public:
 			for (uint8_t z = 0; z < chunkSize; z += 1) {
 				int terrainHeight = generationData.heightMap[x + z * chunkSize];
 				int grassLineOffset = Math::GetRandomValueStreamlined(-50, 50);
+				for (int y = chunkSize - 1; y >= 0; y -= 1) {
+					int worldY = gy * chunkSize + y;
+					if (worldY < terrainHeight - 6) {
+						chunkData->terrain[
+							IDX(x, y, z, chunkSize)
+						] = 2; // stone
+
+					}
+					else if (worldY < terrainHeight) {
+						if (worldY < 200 + grassLineOffset) {
+							chunkData->terrain[
+								IDX(x, y, z, chunkSize)
+							] = 5; //dirt
+							if (chunkData->terrain[
+								IDX(x, y + 1, z, chunkSize)
+							] == 0) {
+								if ((x + y + Math::GetRandomValueStreamlined(-1, 1)) % 2 == 0 && grass) grassList.push_back({ (float)x + gx * 64,(float)y + gy * 64,(float)z + gz * 64 });
+							}
+						}
+						else if (worldY < 400 + grassLineOffset) {
+
+							chunkData->terrain[
+								IDX(x, y, z, chunkSize)
+							] = 2; //stone
+
+						}
+						else {
+							chunkData->terrain[
+								IDX(x, y, z, chunkSize)
+							] = 6; //snow
+
+
+						}
+					}
+				}
+			}
+		}
+	}
+	void GenerateDebug(ChunkData* chunkData, GenerationData generationData, int gx, int gy, int gz, int lod = 1, bool grass = false) {
+		this->gx = gx;
+		this->gy = gy;
+		this->gz = gz;
+		START_TIMER(total)
+			this->size = chunkSize / lod;
+		chunkData->terrain = (uint16_t*)MemAlloc(chunkSize * chunkSize * chunkSize * sizeof(uint16_t));
+		this->lod = lod;
+		START_TIMER(voxel_fill)
+			if (gy * chunkSize + chunkSize< generationData.lowestChunkY * chunkSize || gy * chunkSize> generationData.highestChunkY * chunkSize) {
+				//		chunkData->skipped = true;
+						//return;
+			}
+		for (uint8_t x = 0; x < chunkSize; x += 1) {
+			for (uint8_t z = 0; z < chunkSize; z += 1) {
+				int terrainHeight = 50;
+				int grassLineOffset = 0;
 				for (int y = chunkSize - 1; y >= 0; y -= 1) {
 					int worldY = gy * chunkSize + y;
 					if (worldY < terrainHeight - 6) {

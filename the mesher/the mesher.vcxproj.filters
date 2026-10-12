@@ -25,9 +25,6 @@
     <Filter Include="Source Files\Shaders\Rasterizer\Hardware">
       <UniqueIdentifier>{4a1ad81f-1b7f-4ecf-ae47-f4184ffda435}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Source Files\Shaders\Rasterizer\Software\Display Output">
-      <UniqueIdentifier>{6342455b-b947-410c-ba50-de4dfab1ec88}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Source Files\Shaders\Rasterizer\Software\Particles">
       <UniqueIdentifier>{dfd8ff1c-82c1-4fef-ad2d-fa99cf545eb5}</UniqueIdentifier>
     </Filter>
@@ -54,6 +51,9 @@
     </Filter>
     <Filter Include="Source Files\CPU Code">
       <UniqueIdentifier>{4fd25b9d-8f9a-4458-b9e9-43b1aab2cbd1}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\Shaders\Rasterizer\Software\Display Output">
+      <UniqueIdentifier>{6342455b-b947-410c-ba50-de4dfab1ec88}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>

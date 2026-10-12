@@ -29,12 +29,15 @@ uniform uint packedColors[1024];
 uniform int voxelType;
 
 uniform int frameIndex;
+uniform int vHeight;
 void main() {
     int x = int(gl_FragCoord.x);
     int y = int(gl_FragCoord.y);
     
+    
+    if ((y + frameIndex) % 2 == 0) discard;
 
-    int idx = (1440 - 1 - y) * 3840 + x;
+    int idx = (vHeight - y) * 3840 + x;
     int dInt = int(depthr);
     uint actualOld = atomicMin(depth[idx], dInt);
     if (actualOld > uint(dInt)) {

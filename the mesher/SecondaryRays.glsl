@@ -150,6 +150,11 @@ float cloudShadow(vec3 ro, vec3 rd, float time, float jitter) {
     return exp(-tau);
 }
 uniform float timeSpeed;
+
+uniform vec3 lightPositions[16];
+uniform vec3 lightValues[16];
+uniform int lightCount;
+
 void main()
 {
     ivec2 gid = ivec2(gl_GlobalInvocationID.xy);
@@ -237,9 +242,22 @@ void main()
     float mean = radiance / 2.0;
 
     vec4 prev = unpackUnorm4x8(frame[idx]);
-
-    vec3 col = prev.rgb * mean;
-
+    float accumLightAdditional = 0;
+    for (int i = 0; i < lightCount; i++) {
+        float dist = distance(origin,lightPositions[i]);
+        vec3 lightToDir = normalize(origin-lightPositions[i]);
+        vec3 beginPos = lightPositions[i];
+        for (int d = 0; d < 40; d++) {
+            beginPos += lightToDir;
+            if (readVoxelData(ivec3(beginPos))!=0) break;
+            if (distance(beginPos,origin)<1) {
+                accumLightAdditional += 1-(dist/40);
+            }   
+        }
+    } 
+    
+    vec3 col = prev.rgb * (mean+accumLightAdditional);
+    
     uint pp = packUnorm4x8(vec4(col, 1.0));
     frame[ gid.y * 3840 + gid.x] = pp;
     frame[ gid.y * 3840 + gid.x+1] = pp;

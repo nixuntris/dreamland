@@ -47,7 +47,7 @@ inline Matrix GetStaticMVPMatrix(Vector3 position, Matrix matView) {
 	Matrix matViewProj = MatrixMultiply(matView, matProj);
 	return MatrixMultiply(matModel, matViewProj);
 }
-void Render(ShaderManager* shaders, Anubis::Camera camera, Matrix matView, Anubis::HWVIrGeomMesh& renderSphere, Vector3 vv, int frame, int voxelType, int size, uint32_t* pack, int packCount,Math::Vector3 offsetPos={0,0,0}) {
+void Render(ShaderManager* shaders, Anubis::Camera camera, Matrix matView, Anubis::HWVIrGeomMesh& renderSphere, Vector3 vv, int frame, int voxelType, int size, uint32_t* pack, int packCount, int vHeight) {
 
 	Anubis::SwitchShaderStage(shaders->hwRender.shaderId);
 
@@ -61,6 +61,7 @@ void Render(ShaderManager* shaders, Anubis::Camera camera, Matrix matView, Anubi
 	shaders->hwRender.SetFloat(size, "size");
 	shaders->hwRender.SetInt(frame, "frame");
 	shaders->hwRender.SetInt(voxelType, "voxelType");
+	shaders->hwRender.SetInt(vHeight, "vHeight");
 	shaders->hwRender.SetVector3({ 1,0,1 }, "colorr");
 	shaders->hwRender.SetMatrix({ m.m0 ,m.m1,m.m2,m.m3,m.m4,m.m5,m.m6,m.m7,m.m8,m.m9,m.m10,m.m11,m.m12,m.m13,m.m14,m.m15 }, "MVP");
 	shaders->hwRender.Use();
