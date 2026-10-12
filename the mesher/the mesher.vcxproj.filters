@@ -154,7 +154,7 @@
     <None Include="Clouds.glsl">
       <Filter>Source Files\Shaders\Rasterizer\Software\Illumination</Filter>
     </None>
-    <None Include="readme.md" />
+    <None Include="..\readme.md" />
   </ItemGroup>
   <ItemGroup>
     <Image Include="mc_sheet.png">
