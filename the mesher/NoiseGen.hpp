@@ -5,10 +5,10 @@
 #  define __builtin_popcount __popcnt
 #endif
 
-const int wx = 200;
-const int wz = 200;
-const int ww = wx * wz;
-const int wy = 16;
+int wx = 50;
+int wz = 50;
+int ww = wx * wz;
+int wy = 16;
 const int chunkSize = 64;
 #include "PerlinAVX2.hpp"
 struct GenerationData {

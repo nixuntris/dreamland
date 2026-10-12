@@ -73,6 +73,7 @@ struct Settings {
 		int height;
 		std::string name;
 	};
+	bool renderClouds = true;
 	bool grassRender = true;
 	bool secondaryRays = true;
 	bool simulatePhysics = true;

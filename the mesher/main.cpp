@@ -44,6 +44,7 @@ class App {
 	std::vector<std::unique_ptr<PhysicsObject>> physicalObjects;
 	std::vector<std::string> worlds = { "Mountains", "Desert", "Caves", "Sky" };
 	float timeSpeed = 0.0004;
+	bool mainMenu = false;
 public:
 	App() {
 		//IMPLEMENT THE HARDWARE PIPELINE
@@ -54,8 +55,9 @@ public:
 		wHeight = graphicsSettings.resolutions[currentResolutionWindow].height;
 		window.Init(wWidth,wHeight,4,6,"software rasterization", 100);
 		window.DisableCursor();
+		window.Resize(600, 800);
+		
 		omp_set_num_threads(32);
-		camera.position = {(double)wx*32,200,(double)wz*32};
 		camera.target = { 0,1,0 };
 		SetRandomSeed(100);
 		shaders.Load();
@@ -73,7 +75,6 @@ public:
 		glEnable(GL_CULL_FACE);
 		glCullFace(GL_BACK);
 		glFrontFace(GL_CCW);
-		world.Setup();
 
 	}
 	void Update() {
@@ -357,6 +358,161 @@ public:
 			(static_cast<uint32_t>(g) << 8) |
 			(static_cast<uint32_t>(b) << 16) |
 			(static_cast<uint32_t>(a) << 24);
+	}
+	void MainMenu() {
+		
+		ImGuiStyle& style = ImGui::GetStyle();
+		style.WindowRounding = 8.0f;
+		style.FrameRounding = 6.0f;
+		style.GrabRounding = 6.0f;
+		style.ItemSpacing = ImVec2(10, 10);
+		style.WindowPadding = ImVec2(16, 16);
+		Math::Vector2 oldMouse;
+		auto DrawBackground = [&](ImDrawList* dl, ImVec2 size) {
+			ImU32 top = IM_COL32(20, 24, 34, 255);
+			ImU32 bottom = IM_COL32(8, 10, 16, 255);
+			dl->AddRectFilledMultiColor(
+				ImVec2(0, 0), size,
+				top, top, bottom, bottom
+			);
+			ImVec2 c = ImVec2(size.x * 0.5f, size.y * 0.55f);
+			for (int i = 12; i >= 0; --i) {
+				float r = size.y * (0.25f + i * 0.05f);
+				ImU32 col = IM_COL32(60, 90, 140, (int)(4 * i));
+				dl->AddCircle(c, r, col, 96, 2.0f);
+			}
+			};
+		int menuResolutionIndex = 0;
+		int worldSize = 0;
+		bool running = true;
+		while (running && window.IsOpen()) {
+			window.EnableCursor();
+			oldMouse = window.GetMousePos();
+
+			ImGui_ImplOpenGL3_NewFrame();
+			ImGui_ImplGlfw_NewFrame();
+			ImGui::NewFrame();
+
+			ImGuiIO& io = ImGui::GetIO();
+			ImVec2 screen = ImGui::GetIO().DisplaySize;
+			ImGui::SetNextWindowPos(ImVec2(0, 0));
+			ImGui::SetNextWindowSize(screen);
+			ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
+			ImGui::Begin("##bg", nullptr,
+				ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |
+				ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoScrollbar |
+				ImGuiWindowFlags_NoBringToFrontOnFocus);
+			DrawBackground(ImGui::GetWindowDrawList(), screen);
+			ImGui::End();
+			ImGui::PopStyleVar();
+
+			const float menuW = 420.0f;
+			ImGui::SetNextWindowPos(
+				ImVec2(screen.x * 0.5f - menuW * 0.5f, screen.y * 0.20f),
+				ImGuiCond_Always);
+			ImGui::SetNextWindowSize(ImVec2(menuW, 0), ImGuiCond_Always);
+			ImGui::Begin("Voxel Engine", nullptr,
+				ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove |
+				ImGuiWindowFlags_NoCollapse);
+
+			ImGui::TextColored(ImVec4(0.6f, 0.85f, 1.0f, 1.0f), "Voxel Engine");
+			ImGui::Separator();
+
+			ImGui::Text("World Size");
+			const char* worldSizes[] = { "10x10", "50x50", "100x100", "200x200", "300x300" };
+			for (int i = 0; i < 5; ++i) {
+				bool selected = (worldSize == i);
+				char label[128];
+				snprintf(label, sizeof(label), "%s",
+					worldSizes[i]);
+
+				if (selected) ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.2f, 0.55f, 0.9f, 1.0f));
+				if (ImGui::Button(label, ImVec2(-1, 0))) {
+					worldSize = i;
+				}
+				if (selected) ImGui::PopStyleColor();
+			}
+
+
+			ImGui::Spacing();
+			ImGui::Text("Resolution");
+			const char* resNames[] = { "Low", "Medium", "High", "Ultra", "Native" };
+			for (int i = 0; i < 5; ++i) {
+				bool selected = (menuResolutionIndex == i);
+				char label[128];
+				snprintf(label, sizeof(label), "%s  (%dx%d)",
+					resNames[i],
+					graphicsSettings.resolutions[i].width,
+					graphicsSettings.resolutions[i].height);
+
+				if (selected) ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.2f, 0.55f, 0.9f, 1.0f));
+				if (ImGui::Button(label, ImVec2(-1, 0))) {
+					menuResolutionIndex = i;
+				}
+				if (selected) ImGui::PopStyleColor();
+			}
+
+			ImGui::Spacing();
+			if (ImGui::Button("Randomize seed")) {
+			}
+
+			ImGui::Spacing();
+			if (ImGui::CollapsingHeader("Advanced")) {
+			}
+
+			ImGui::Spacing();
+			ImGui::Separator();
+			ImGui::Spacing();
+
+			ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.15f, 0.65f, 0.25f, 1.0f));
+			ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.20f, 0.80f, 0.30f, 1.0f));
+			if (ImGui::Button("Play", ImVec2(-1, 40))) {
+				running = false;
+				switch (worldSize) {
+				case 0:
+					wx = 10;
+					wz = 10;
+					break;
+				case 1:
+					wx = 50;
+					wz = 50;
+					break;
+				case 2:
+					wx = 100;
+					wz = 100;
+					break;
+				case 3:
+					wx = 200;
+					wz = 200;
+					break;
+				case 4:
+					wx = 300;
+					wz = 300;
+					break;
+				}
+
+				currentResolutionWindow = menuResolutionIndex;
+				wWidth = graphicsSettings.resolutions[currentResolutionWindow].width;
+				wHeight = graphicsSettings.resolutions[currentResolutionWindow].height;
+				window.Resize(wWidth,wHeight);
+				world.Setup();
+				camera.position = { (double)wx * 32,200,(double)wz * 32 };
+				Run();
+				
+			}
+			ImGui::PopStyleColor(2);
+
+			if (ImGui::Button("Quit", ImVec2(-1, 30))) {
+				running = false;
+			}
+
+			ImGui::End();
+
+			window.Clear();
+			ImGui::Render();
+			ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+			window.UpdateBuffer();
+		}
 	}
 	void Run() {
 		const std::vector<Color> palette = {
@@ -845,6 +1001,9 @@ public:
 				shaders.secondaryRaysRender.Use(wWidth / 32, wHeight / 32, 1);
 				shaders.secondaryRaysRender.SetUIntArray(ColorPallete.data(), ColorPallete.size(), "packedColors");
 
+			}
+			if (graphicsSettings.renderClouds) {
+
 				Anubis::SwitchShaderStage(shaders.clouds.programID);
 				shaders.clouds.SetVector3({ pos.x,pos.y,pos.z }, "camPos");
 				shaders.clouds.SetVector3({ forward.x,forward.y,forward.z }, "camForward");
@@ -859,7 +1018,6 @@ public:
 				shaders.clouds.SetInt(frame, "frameIndex");
 				shaders.clouds.Use(wWidth / 32, wHeight / 32, 1);
 			}
-
 			for (auto& k : physicalObjects) {
 				bool downardsCollision = false;
 				bool rightLeftCollision = false;
@@ -1153,6 +1311,10 @@ public:
 			ImGui_ImplOpenGL3_NewFrame();
 			ImGui_ImplGlfw_NewFrame();
 			ImGui::NewFrame();
+			if (window.GetKeyPressed(KEY_F)) {
+				world.Save();
+			}
+
 			if (window.GetKeyPressed(KEY_K) && releasedMenu) {
 				menuOpen = !menuOpen;
 				releasedMenu = false;
@@ -1212,6 +1374,7 @@ public:
 				CustomToggle("God mode", &graphicsSettings.godMode);
 				CustomToggle("Simulate Physics", &graphicsSettings.simulatePhysics);
 				CustomToggle("Render Fluids", &graphicsSettings.renderFluids);
+				CustomToggle("Render Clouds", &graphicsSettings.renderClouds);
 
 				if (ImGui::Button("Reset entities")) {
 				}
@@ -1287,5 +1450,6 @@ public:
 int main() {
 	
 	App* app = new App;
-	app->Run();
+	app->MainMenu();
+
 }
