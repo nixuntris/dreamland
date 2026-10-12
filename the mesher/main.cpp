@@ -245,12 +245,21 @@ public:
 							world.chunkData[0 * (wx * wz) + z * wx + x].terrain[IDX(chunkSize / 2, i + 50, chunkSize / 2+1, chunkSize)] = 2;
 							world.chunkData[0 * (wx * wz) + z * wx + x].terrain[IDX(chunkSize / 2+1, i + 50, chunkSize / 2+1, chunkSize)] = 2;
 							world.chunkData[0 * (wx * wz) + z * wx + x].terrain[IDX(chunkSize / 2+1, i + 50, chunkSize / 2, chunkSize)] = 2;
+						
 						}
 						if (world.lightCount < 16) {
 							world.lightPositions[world.lightCount] = { (float)chunkSize / 2 + x * 64,70,(float)chunkSize / 2 + z * 64 };
 							world.lightValues[world.lightCount] = { 1,1,1 };
 							world.lightCount++;
-							std::cout << "da\n";
+							for (int i = 0; i < 16; i++) {
+								if (world.handle.handle[0 * (wx * wz) + z * wx + x].lightIds[i] == -1) {
+									world.handle.handle[0 * (wx * wz) + z * wx + x].lightIds[i] = world.lightCount-1;
+
+									std::cout << "a\n";
+									break;
+								}
+							}
+							
 						}
 					}
 					

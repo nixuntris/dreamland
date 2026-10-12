@@ -40,6 +40,7 @@ vec3 sunDir = normalize(vec3(0.0, 1.0, 0.0));
 struct Region {
     uvec2 handle;
     int lod;
+    int lightIds[16];
 };
 layout(std430, binding = 3) buffer BitHandles {
     Region handles[];

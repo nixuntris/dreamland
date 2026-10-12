@@ -169,6 +169,7 @@ bool TriangleInFrustum(vec3 v1, vec3 v2, vec3 v3) {
 struct Region {
     uvec2 handle;
     int lod;
+    int lightIds[16];
 };
 layout(std430, binding = 3) buffer BitHandles {
     Region handles[];

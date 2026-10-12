@@ -47,6 +47,7 @@ uint packRGBA8(vec4 color)
 struct Region {
     uvec2 handle;
     int lod;
+    int lightIds[16];
 };
 layout(std430, binding = 3) buffer BitHandles {
     Region handles[];

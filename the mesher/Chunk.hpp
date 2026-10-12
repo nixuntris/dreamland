@@ -201,7 +201,7 @@ struct PhysicsAccelerationChunk {
 	bool allocated=false;
 };
 const int mwx = 300;
-const int mwy = 300;
+const int mwy = 16;
 const int mwz = 300;
 
 struct World {
@@ -210,6 +210,12 @@ struct World {
 		struct Region {
 			GLuint64 handle;
 			int lod;
+			int lightIds[16];
+			Region() {
+				for (int i = 0; i < 16; i++)
+					lightIds[i] = -1;
+
+			}
 		};
 		Region handle[mwx * mwy * mwz];
 	};
@@ -312,6 +318,10 @@ struct World {
 	void Setup() {
 		chunkData.resize(wx * wz * wy);
 		memset(handle.handle, 0, wx * wy * wz * sizeof(GLuint64));
+		for (int i = 0; i < wx * wy * wz; i++) {
+			for (int d = 0; d < 16; d++) handle.handle[i].lightIds[d] = -1;
+
+		}
 		physicsAccelerationChunks = (PhysicsAccelerationChunk*)MemAlloc(wx * wy * wz * sizeof(PhysicsAccelerationChunk));
 	}
 	~World() {

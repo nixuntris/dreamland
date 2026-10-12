@@ -40,6 +40,7 @@ vec3 sunDir = normalize(vec3(0.0, 1.0, 0.0));
 struct Region {
     uvec2 handle;
     int lod;
+    int lightIds[16];
 };
 layout(std430, binding = 3) buffer BitHandles {
     Region handles[];
@@ -243,10 +244,18 @@ void main()
 
     vec4 prev = unpackUnorm4x8(frame[idx]);
     float accumLightAdditional = 0;
+    
+    ivec3 chunk = ivec3(origin/64);
+    
+    uvec2 handle = handles[chunk.y * (wx * wz) + chunk.z * wx + chunk.x].handle;
+    
     for (int i = 0; i < lightCount; i++) {
-        float dist = distance(origin,lightPositions[i]);
-        vec3 lightToDir = normalize(origin-lightPositions[i]);
-        vec3 beginPos = lightPositions[i];
+        if (handles[chunk.y * (wx * wz) + chunk.z * wx + chunk.x].lightIds[i]==-1) break;
+        int id = handles[chunk.y * (wx * wz) + chunk.z * wx + chunk.x].lightIds[i];
+
+        float dist = distance(origin,lightPositions[id]);
+        vec3 lightToDir = normalize(origin-lightPositions[id]);
+        vec3 beginPos = lightPositions[id];
         for (int d = 0; d < 40; d++) {
             beginPos += lightToDir;
             if (readVoxelData(ivec3(beginPos))!=0) break;
@@ -255,6 +264,7 @@ void main()
             }   
         }
     } 
+    
     
     vec3 col = prev.rgb * (mean+accumLightAdditional);
     

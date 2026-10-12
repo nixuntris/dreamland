@@ -1206,37 +1206,28 @@ namespace Anubis {
         }
         void CreateSSBO(int bufferIndex, size_t size)
         {
-            // ---- Query limits (do this once in real code, cache it) ----
             GLint maxBindings = 0;
             GLint maxBlockSize = 0;
 
             glGetIntegerv(GL_MAX_SHADER_STORAGE_BUFFER_BINDINGS, &maxBindings);
             glGetIntegerv(GL_MAX_SHADER_STORAGE_BLOCK_SIZE, &maxBlockSize);
-
-            // ---- Validate index ----
             if (bufferIndex < 0 || bufferIndex >= maxBindings)
             {
                 std::cerr << "SSBO ERROR: bufferIndex " << bufferIndex
                     << " exceeds max bindings (" << maxBindings << ")\n";
                 return;
             }
-
-            // ---- Validate size ----
             if (size <= 0 || size > (size_t)maxBlockSize)
             {
                 std::cerr << "SSBO ERROR: size " << size
                     << " invalid or exceeds max block size (" << maxBlockSize << ")\n";
                 return;
             }
-
-            // ---- Validate your arrays ----
             if (bufferIndex >= ssboIds.size() || bufferIndex >= inUsessbo.size())
             {
                 std::cerr << "SSBO ERROR: bufferIndex out of bounds for internal arrays\n";
                 return;
             }
-
-            // ---- Create buffer ----
             GLuint id = 0;
             glGenBuffers(1, &id);
 
