@@ -151,11 +151,44 @@ float cloudShadow(vec3 ro, vec3 rd, float time, float jitter) {
     return exp(-tau);
 }
 uniform float timeSpeed;
-
+uniform float timeOfDay;
 uniform vec3 lightPositions[16];
 uniform vec3 lightValues[16];
+uniform int lightRadiusList[16];
 uniform int lightCount;
 
+
+const vec3 DAY_ZENITH   = vec3(0.529, 0.808, 0.922);
+const vec3 DAY_HORIZON  = vec3(0.780, 0.900, 0.960);
+const vec3 ORANGE       = vec3(1.000, 0.550, 0.200);
+const vec3 DEEP_ORANGE  = vec3(0.600, 0.180, 0.080);
+const vec3 NIGHT        = vec3(0.0);
+
+const float DAY_LENGTH  = 120.0;
+const float ATMOS_SCALE = 500.0;
+const vec2 RESOLUTION   = vec2(3840.0, 2160.0);
+const float FOV_Y       = 1.0471976;
+
+vec3 sunDirection(float totalTime)
+{
+    float p = fract(totalTime / DAY_LENGTH);
+    float a = 6.2831853 * (p - 0.2);
+    return normalize(vec3(sin(a), cos(a), 0.3));
+}
+
+float calculateLightStrength(int frameIndex)
+{
+    float totalTime = float(frameIndex) / 60.0;
+    
+    vec3 sun = sunDirection(totalTime);
+    float sunY = sun.y;
+    float daylight = smoothstep(-0.15, 0.15, sunY);
+    float twilight = smoothstep(-0.25, 0.0, sunY) * (1.0 - smoothstep(0.0, 0.35, sunY));
+    
+    float lightStrength = clamp(daylight + twilight * 0.35, 0.0, 1.0);
+    
+    return lightStrength;
+}
 void main()
 {
     ivec2 gid = ivec2(gl_GlobalInvocationID.xy);
@@ -243,30 +276,31 @@ void main()
     float mean = radiance / 2.0;
 
     vec4 prev = unpackUnorm4x8(frame[idx]);
-    float accumLightAdditional = 0;
     
     ivec3 chunk = ivec3(origin/64);
     
     uvec2 handle = handles[chunk.y * (wx * wz) + chunk.z * wx + chunk.x].handle;
-    
-    for (int i = 0; i < lightCount; i++) {
+    vec3 accumLightAdditional = vec3(0.0);
+    for (int i = 0; i < 16; i++) {
         if (handles[chunk.y * (wx * wz) + chunk.z * wx + chunk.x].lightIds[i]==-1) break;
         int id = handles[chunk.y * (wx * wz) + chunk.z * wx + chunk.x].lightIds[i];
 
         float dist = distance(origin,lightPositions[id]);
         vec3 lightToDir = normalize(origin-lightPositions[id]);
         vec3 beginPos = lightPositions[id];
-        for (int d = 0; d < 40; d++) {
+        float radius = float(lightRadiusList[id]);
+        for (int d = 0; d < int(radius); d++) {
             beginPos += lightToDir;
             if (readVoxelData(ivec3(beginPos))!=0) break;
             if (distance(beginPos,origin)<1) {
-                accumLightAdditional += 1-(dist/40);
+                accumLightAdditional += vec3(1-(dist/radius))*lightValues[id];
+                
             }   
         }
     } 
     
     
-    vec3 col = prev.rgb * (mean+accumLightAdditional);
+    vec3 col = prev.rgb * (mean*calculateLightStrength(frameIndex))+accumLightAdditional;
     
     uint pp = packUnorm4x8(vec4(col, 1.0));
     frame[ gid.y * 3840 + gid.x] = pp;

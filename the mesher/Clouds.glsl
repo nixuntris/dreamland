@@ -172,6 +172,38 @@ float sampleCloudCoarse(vec3 p, float time)
     return smoothstep(0.45, 0.75, n) * heightMask;
 }
 uniform float timeSpeed;
+
+const vec3 DAY_ZENITH   = vec3(0.529, 0.808, 0.922);
+const vec3 DAY_HORIZON  = vec3(0.780, 0.900, 0.960);
+const vec3 ORANGE       = vec3(1.000, 0.550, 0.200);
+const vec3 DEEP_ORANGE  = vec3(0.600, 0.180, 0.080);
+const vec3 NIGHT        = vec3(0.0);
+
+const float DAY_LENGTH  = 120.0;
+const float ATMOS_SCALE = 500.0;
+const vec2 RESOLUTION   = vec2(3840.0, 2160.0);
+const float FOV_Y       = 1.0471976;
+
+vec3 sunDirection(float totalTime)
+{
+    float p = fract(totalTime / DAY_LENGTH);
+    float a = 6.2831853 * (p - 0.2);
+    return normalize(vec3(sin(a), cos(a), 0.3));
+}
+
+float calculateLightStrength(int frameIndex)
+{
+    float totalTime = float(frameIndex) / 60.0;
+    
+    vec3 sun = sunDirection(totalTime);
+    float sunY = sun.y;
+    float daylight = smoothstep(-0.15, 0.15, sunY);
+    float twilight = smoothstep(-0.25, 0.0, sunY) * (1.0 - smoothstep(0.0, 0.35, sunY));
+    
+    float lightStrength = clamp(daylight + twilight * 0.35, 0.0, 1.0);
+    
+    return lightStrength;
+}
 void main() {
     ivec2 gid = ivec2(gl_GlobalInvocationID.xy);
     int idx = gid.y * 3840 + gid.x;
@@ -252,12 +284,12 @@ void main() {
 
         t += stepLen*4;
     }
-
     if (transmittance < 0.999) {
-        
-        if ((gid.y*2 + frameIndex) % 2 != 0) frame[(gid.y*2) * 3840 + gid.x*2] = packRGBA8(vec4((scatteredLight + unpackRGBA8(frame[(gid.y*2) * 3840 + gid.x*2]).rgb * transmittance), 1.0));
-        if ((gid.y*2+1 + frameIndex) % 2 != 0) frame[(gid.y*2+1) * 3840 + gid.x*2] = packRGBA8(vec4((scatteredLight + unpackRGBA8(frame[(gid.y*2+1) * 3840 + gid.x*2]).rgb * transmittance), 1.0));
-        if ((gid.y*2+1 + frameIndex) % 2 != 0) frame[(gid.y*2+1) * 3840 + gid.x*2+1] = packRGBA8(vec4((scatteredLight + unpackRGBA8(frame[(gid.y*2+1) * 3840 + gid.x*2+1]).rgb * transmittance), 1.0));
-        if ((gid.y*2 + frameIndex) % 2 != 0) frame[(gid.y*2) * 3840 + gid.x*2+1] = packRGBA8(vec4((scatteredLight + unpackRGBA8(frame[(gid.y*2) * 3840 + gid.x*2+1]).rgb * transmittance), 1.0));
+        vec3 strength = vec3(calculateLightStrength(frameIndex));
+      
+        if ((gid.y*2 + frameIndex) % 2 != 0) frame[(gid.y*2) * 3840 + gid.x*2] = packRGBA8(vec4((scatteredLight*strength + unpackRGBA8(frame[(gid.y*2) * 3840 + gid.x*2]).rgb * transmittance*strength), 1.0));
+        if ((gid.y*2+1 + frameIndex) % 2 != 0) frame[(gid.y*2+1) * 3840 + gid.x*2] = packRGBA8(vec4((scatteredLight*strength + unpackRGBA8(frame[(gid.y*2+1) * 3840 + gid.x*2]).rgb * transmittance*strength), 1.0));
+        if ((gid.y*2+1 + frameIndex) % 2 != 0) frame[(gid.y*2+1) * 3840 + gid.x*2+1] = packRGBA8(vec4((scatteredLight*strength + unpackRGBA8(frame[(gid.y*2+1) * 3840 + gid.x*2+1]).rgb * transmittance*strength), 1.0));
+        if ((gid.y*2 + frameIndex) % 2 != 0) frame[(gid.y*2) * 3840 + gid.x*2+1] = packRGBA8(vec4((scatteredLight*strength + unpackRGBA8(frame[(gid.y*2) * 3840 + gid.x*2+1]).rgb * transmittance*strength), 1.0));
     }
 }

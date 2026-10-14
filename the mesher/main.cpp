@@ -13,6 +13,43 @@
 #include "NoiseGen.hpp"
 #include "Chunk.hpp"
 #include "Misc.hpp"
+#include <thread>
+#include <chrono>
+
+struct Particle {
+	Math::Vector3 position;
+	Math::Vector3 color;
+	void (*update)(Particle&);
+};
+void ExampleUpdate(Particle& p) {
+	p.position.y -= 0.16f;
+}
+const int MAX_PARTICLES = 1000000;
+class ParticleRender {
+public:
+	Particle *particles;
+	int renderQueue;
+	void Create() {
+		renderQueue = 0;
+		particles = new Particle[MAX_PARTICLES];
+	}
+	void PushRenderParticle(Math::Vector3 position, Math::Vector3 color, void (*update)(Particle&)) {
+		Particle particle;
+		particle.position = position;
+		particle.color = color;
+		particle.update = update;
+		particles[renderQueue++] = particle;
+	}
+	void Update() {
+		for (int i = 0; i < renderQueue; i++) {
+			particles[i].update(particles[i]);
+		}
+	}
+	~ParticleRender() {
+		delete[] particles;
+	}
+	
+};
 
 class App {
 	Anubis::Window window;
@@ -52,7 +89,7 @@ public:
 		//478476 - triangles
 		wWidth = graphicsSettings.resolutions[currentResolutionWindow].width;
 		wHeight = graphicsSettings.resolutions[currentResolutionWindow].height;
-		window.Init(wWidth,wHeight,4,6,"software rasterization", 100);
+		window.Init(wWidth,wHeight,4,6,"software rasterization");
 		window.DisableCursor();
 		window.Resize(600, 800);
 		
@@ -234,12 +271,13 @@ public:
 					if (dist > 960 * 12) lod = 32;
 					if (dist > 960 * 24) lod = 64;
 					GenerationData gen;
+					gen.GenerateMountains(x, z);
 					gen.highestChunkY = 6;
 
 					for (int y = 0; y < gen.highestChunkY && y < wy; y++) {
-						chunks[y * (wx * wz) + z * wx + x].GenerateDebug(&world.chunkData[y * (wx * wz) + z * wx + x], gen, x, y, z, lod, grass);
+						chunks[y * (wx * wz) + z * wx + x].GenerateDesert(&world.chunkData[y * (wx * wz) + z * wx + x], gen, x, y, z, lod, grass);
 					};
-					if (GetRandomValue(0,10)==0) {
+					if (x==wx/2 && z==wz/2) {
 						for (int i = 0; i < 20; i++) {
 							world.chunkData[0 * (wx * wz) + z * wx + x].terrain[IDX(chunkSize / 2, i + 50, chunkSize / 2, chunkSize)] = 2;
 							world.chunkData[0 * (wx * wz) + z * wx + x].terrain[IDX(chunkSize / 2, i + 50, chunkSize / 2+1, chunkSize)] = 2;
@@ -249,17 +287,35 @@ public:
 						}
 						if (world.lightCount < 16) {
 							world.lightPositions[world.lightCount] = { (float)chunkSize / 2 + x * 64,70,(float)chunkSize / 2 + z * 64 };
-							world.lightValues[world.lightCount] = { 1,1,1 };
-							world.lightCount++;
-							for (int i = 0; i < 16; i++) {
-								if (world.handle.handle[0 * (wx * wz) + z * wx + x].lightIds[i] == -1) {
-									world.handle.handle[0 * (wx * wz) + z * wx + x].lightIds[i] = world.lightCount-1;
+							float t = float(GetRandomValue(0, 100)) / 100.0f;
 
-									std::cout << "a\n";
-									break;
+							float r = 1.0f;
+							float g = 0.15f + 0.35f * t; 
+							float b = 0.0f + 0.05f * t; 
+
+							int radius = 90 * (0.75f + 0.35f * t);
+							world.lightValues[world.lightCount] = { r, g, b };
+							world.lightRadiusList[world.lightCount] = radius;
+							int offset = (radius + chunkSize - 1) / chunkSize;
+
+							for (int dx = -offset-1; dx <= offset+1; dx++) {
+								for (int dy = -offset-1; dy <= offset+1; dy++) {
+									for (int dz = -offset-1; dz <= offset+1; dz++) {
+
+										for (int i = 0; i < 16; i++) {
+											if (dy<0 || z+dz<0 || x+dz < 0 || x+dx>wx || dy>wy || z+dz>wz) continue;
+											if (world.handle.handle[(0+dy) * (wx * wz) + (z+dz) * wx + (x+dx)].lightIds[i] == -1) {
+												world.handle.handle[(0 + dy) * (wx * wz) + (z + dz) * wx + (x + dx)].lightIds[i] = world.lightCount ;
+
+												std::cout << "a\n";
+												break;
+											}
+										}
+									}
 								}
 							}
-							
+							world.lightCount++;
+
 						}
 					}
 					
@@ -628,6 +684,7 @@ public:
 		mesh.Create(Anubis::cubeVertices, floatCount);
 		bool preallocated = false;
 		while (window.IsOpen()) {
+			double frameStart = glfwGetTime(); 
 			CheckLodsToUpdate();
 			Anubis::DisplayShader* shader = &shaders.display;
 			if (graphicsSettings.FXAA) {
@@ -816,16 +873,19 @@ public:
 									b->velocity.x += nx * impulse * 0.75f;
 									b->velocity.y += ny * impulse * 0.75f;
 									b->velocity.z += nz * impulse * 0.75f;
-									
-									
-									
 								}
 							}
 						}
 					}
 				}
 			}
+			float t = 0.5f + 0.5f * sinf((float)GetTime() * 2.0f);
+			t *= t;
 
+			world.lightValues[0] = { 1.0f,  0.15f + 0.35f * t, 0.0f + 0.05f * t };
+			world.lightRadiusList[0] = 90 * (0.75f + 0.35f * t);
+
+						
 			for (size_t i = 0; i < physicalObjects.size(); i++) {
 				auto& a = physicalObjects[i];
 				int chunkX = int(floor(a->position.x / chunkSize));
@@ -1057,6 +1117,7 @@ public:
 				shaders.secondaryRaysRender.SetInt(world.lightCount, "lightCount");
 				shaders.secondaryRaysRender.SetVector3Array(world.lightPositions, 16, "lightPositions");
 				shaders.secondaryRaysRender.SetVector3Array(world.lightValues, 16, "lightValues");
+				shaders.secondaryRaysRender.SetIntArray(world.lightRadiusList, 16, "lightRadiusList");
 
 				shaders.secondaryRaysRender.SetFloat(timeSpeed, "timeSpeed");
 				shaders.secondaryRaysRender.SetInt(wWidth, "renderWidth");
@@ -1495,6 +1556,7 @@ public:
 			else {
 				window.DisableCursor();
 			}
+			std::cout << window.getFPS() << "\n";
 			ImGui::Render();
 			ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 			window.UpdateBuffer();
@@ -1507,6 +1569,13 @@ public:
 			shaders.hizBuilder.SetMatrix({ matProj.m0,matProj.m1,matProj.m2,matProj.m3,matProj.m4,matProj.m5,matProj.m6,matProj.m7,matProj.m8,matProj.m9,matProj.m10,matProj.m11,matProj.m12,matProj.m13,matProj.m14,matProj.m15 }, "matProj");
 
 			shaders.hizBuilder.Use(wWidth / 32, 1, wHeight / 32);
+
+			double elapsed = glfwGetTime() - frameStart;
+			double remaining = (1.0 / 75.0) - elapsed;
+			if (remaining > 0.0) {
+				std::this_thread::sleep_for(std::chrono::duration<double>(remaining));
+			}
+
 			frame++;
 		}
 	}

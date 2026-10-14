@@ -230,6 +230,7 @@ struct World {
 	int lightCount = 0;
 	Math::Vector3 lightPositions[16];
 	Math::Vector3 lightValues[16];
+	int lightRadiusList[16];
 	std::map<int, std::vector<VoxelObject>> models;
 	std::vector<VoxelObject> loadVoxelPositionsFromFile(const char* path, int typeOffset)
 	{
@@ -256,6 +257,11 @@ struct World {
 		return positions;
 	}
 	PhysicsAccelerationChunk* physicsAccelerationChunks;
+	void GenerateBiomeMap() {
+		//Generate heat map
+		//Generate moisture map
+		//Generate elevation map
+	}
 	void Save() {
 		std::cout << "Save\n";
 		FILE* f = fopen("world.bin", "wb");
@@ -352,6 +358,37 @@ public:
 	bool hwOrSoftwareRaster = false;
 	CPUMesh cpumesh;
 
+	void GenerateDesert(ChunkData* chunkData, GenerationData generationData, int gx, int gy, int gz, int lod = 1, bool grass = false) {
+		this->gx = gx;
+		this->gy = gy;
+		this->gz = gz;
+		START_TIMER(total)
+			this->size = chunkSize / lod;
+		chunkData->terrain = (uint16_t*)MemAlloc(chunkSize * chunkSize * chunkSize * sizeof(uint16_t));
+		this->lod = lod;
+		START_TIMER(voxel_fill)
+		if ((gy  + 1< generationData.lowestChunkY)/5 || (gy > generationData.highestChunkY)/5) {
+			chunkData->skipped = true;
+			return;
+		}
+		for (uint8_t x = 0; x < chunkSize; x += 1) {
+			for (uint8_t z = 0; z < chunkSize; z += 1) {
+				int terrainHeight = generationData.heightMap[x + z * chunkSize]/5;
+				int grassLineOffset = Math::GetRandomValueStreamlined(-50, 50);
+				for (int y = chunkSize - 1; y >= 0; y -= 1) {
+					int worldY = gy * chunkSize + y;
+					if (worldY < terrainHeight - 6) {
+						chunkData->terrain[
+							IDX(x, y, z, chunkSize)
+						] = 9; // sand
+						if (Math::GetRandomValueStreamlined(0, 100) == 0) {
+							if ((x + y + Math::GetRandomValueStreamlined(-1, 1)) % 2 == 0 && grass) grassList.push_back({ (float)x + gx * 64,(float)y + gy * 64,(float)z + gz * 64 });
+						}
+					}
+				}
+			}
+		}
+	}
 	void GenerateMountains(ChunkData* chunkData, GenerationData generationData, int gx, int gy, int gz, int lod = 1, bool grass = false) {
 		this->gx = gx;
 		this->gy = gy;

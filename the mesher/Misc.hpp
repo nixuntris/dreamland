@@ -18,6 +18,7 @@ struct ShaderManager {
 	Anubis::ComputeShader fluidSim;
 	Anubis::ComputeShader fillOut;
 	Anubis::ComputeShader clouds;
+	Anubis::ComputeShader bilboards;
 
 	Anubis::ComputeShader renderPhysicalObjects;
 	Anubis::ComputeShader clearPhysicalObjects;
@@ -38,6 +39,7 @@ struct ShaderManager {
 		renderPhysicalObjects.Setup("PhysicsObject.glsl");
 		clearPhysicalObjects.Setup("ClearPhysicalObject.glsl");
 		clouds.Setup("Clouds.glsl");
+		bilboards.Setup("bilboard.glsl");
 	}
 
 };

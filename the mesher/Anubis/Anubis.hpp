@@ -335,21 +335,74 @@ namespace Anubis {
     }
     class Window {
     private:
-        GLFWwindow* window;
-        double lastTime;
+        GLFWwindow* window = nullptr;
+        double lastTime = 0.0;
         int frameCount = 0;
+        float cachedFPS = 0.0f;
+
     public:
+        Math::Vector2 size;
+
+        inline void Init(int width = 1280, int height = 720,int major = 4, int minor = 6,const char* caption = "caption") {
+            if (!glfwInit()) {
+                std::cerr << "Failed to initialize GLFW\n";
+                return;
+            }
+            size.x = (float)width;
+            size.y = (float)height;
+
+            glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, major);
+            glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, minor);
+            glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+            glfwWindowHint(GLFW_RESIZABLE, false);
+            glfwWindowHint(GLFW_OPENGL_DEBUG_CONTEXT, GL_TRUE);
+
+            window = glfwCreateWindow(width, height, caption, nullptr, nullptr);
+            if (!window) {
+                std::cerr << "Failed to create GLFW window\n";
+                glfwTerminate();
+                return;
+            }
+
+            glfwMakeContextCurrent(window);
+            glfwSwapInterval(0);
+
+            if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress)) {
+                std::cerr << "Failed to initialize GLAD\n";
+                return;
+            }
+
+            lastTime = glfwGetTime(); 
+        }
+
+        inline float getFPS() {
+            frameCount++;
+            double now = glfwGetTime();
+            double delta = now - lastTime;
+            if (delta >= 1.0) {
+                cachedFPS = (float)(frameCount / delta);
+                frameCount = 0;
+                lastTime = now;
+            }
+            return cachedFPS;
+        }
+
+        inline Math::Vector2 GetMousePos() {
+            double mx = 0.0, my = 0.0;
+            glfwGetCursorPos(window, &mx, &my);
+            return Math::Vector2{ (float)mx, (float)(size.y - my) };
+        }
+
         inline void DisableCursor() {
             glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
         }
         inline void EnableCursor() {
             glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
         }
-        Math::Vector2 size;
         inline GLFWwindow* GetWindowHandle() {
             return window;
         }
-        
+
         inline Math::Vector2 GetMousePosition() {
             double mx;
             double my;
@@ -377,52 +430,12 @@ namespace Anubis {
         inline void Clear() {
             glClear(GL_COLOR_BUFFER_BIT);
         }
-        //need vulkan alternative
-        inline void Init(int width=1280, int height=720, int major = 4, int minor = 6, const char *caption="caption", int fps=75) {
-            if (!glfwInit()) {
-                std::cerr << "Failed to initialize GLFW" << std::endl;
-                return;
-            }
-            size.x = width;
-            size.y = height;
-            
-            glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, major);
-            glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, minor);
-            glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
-            glfwWindowHint(GLFW_RESIZABLE, false);
-            glfwWindowHint(GLFW_OPENGL_DEBUG_CONTEXT, GL_TRUE);
-            window = glfwCreateWindow(width, height, caption, nullptr, nullptr);
-            if (!window) {
-                std::cerr << "Failed to create GLFW window" << std::endl;
-                glfwTerminate();
-                return;
-            }
-
-            glfwMakeContextCurrent(window);
-            if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress)) {
-                std::cerr << "Failed to initialize GLAD" << std::endl;
-                return;
-            }
-        }inline void Resize(int width, int height) {
+        inline void Resize(int width, int height) {
             if (!window) return;
             size.x = static_cast<float>(width);
             size.y = static_cast<float>(height);
             glfwSetWindowSize(window, width, height);
             glViewport(0, 0, width, height);
-        }
-        inline float getFPS() {
-
-            frameCount++;
-            double currentTime = glfwGetTime();
-            double deltaTime = currentTime - lastTime;
-
-            if (deltaTime >= 1.0) {
-                float fps = frameCount / deltaTime;
-                frameCount = 0;  // Reset frame count for the next second
-                lastTime = currentTime;  // Update the lastTime to the current time
-                return fps;
-            }
-
         }
         inline bool IsOpen() {
             return !glfwWindowShouldClose(window);
@@ -437,18 +450,7 @@ namespace Anubis {
             glfwDestroyWindow(window);
             glfwTerminate();
         }
-        inline Math::Vector2 GetMousePos() { 
-            Math::Vector2 pos;
-
-            glfwGetCursorPos(window, &pos.x, &pos.y);
-            Math::Vector2 pos2;
-            pos2.x = pos.x;
-
-            pos2.y = size.y - pos.y;
-            return pos2;
-        }
     };
-
     class Camera {
     public:
         Math::Vector3 position;

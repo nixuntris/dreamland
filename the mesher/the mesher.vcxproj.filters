@@ -52,7 +52,7 @@
     <Filter Include="Source Files\CPU Code">
       <UniqueIdentifier>{4fd25b9d-8f9a-4458-b9e9-43b1aab2cbd1}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Source Files\Shaders\Rasterizer\Software\Display Output">
+    <Filter Include="Source Files\Shaders\Rasterizer\Software\Illumination\Display Output">
       <UniqueIdentifier>{6342455b-b947-410c-ba50-de4dfab1ec88}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
@@ -98,7 +98,7 @@
       <Filter>Source Files\Shaders\Rasterizer\Hardware</Filter>
     </None>
     <None Include="Anubis\BaseShaders\quad_display_shader.vs">
-      <Filter>Source Files\Shaders\Rasterizer\Software\Display Output</Filter>
+      <Filter>Source Files\Shaders\Rasterizer\Software\Illumination\Display Output</Filter>
     </None>
     <None Include="grassParticle.glsl">
       <Filter>Source Files\Shaders\Rasterizer\Software\Particles</Filter>
@@ -119,7 +119,7 @@
       <Filter>Source Files\terrain\example terrain</Filter>
     </None>
     <None Include="quad_display_no_fxaa.glsl">
-      <Filter>Source Files\Shaders\Rasterizer\Software\Display Output</Filter>
+      <Filter>Source Files\Shaders\Rasterizer\Software\Illumination\Display Output</Filter>
     </None>
     <None Include="SecondaryRays.glsl">
       <Filter>Source Files\Shaders\Rasterizer\Software\Illumination</Filter>
@@ -137,7 +137,7 @@
       <Filter>Resource Files</Filter>
     </None>
     <None Include="quad_display_shader.fs">
-      <Filter>Source Files\Shaders\Rasterizer\Software\Display Output</Filter>
+      <Filter>Source Files\Shaders\Rasterizer\Software\Illumination\Display Output</Filter>
     </None>
     <None Include="PhysicsObject.glsl">
       <Filter>Source Files\Shaders\Rasterizer\Software\Particles</Filter>
@@ -155,6 +155,9 @@
       <Filter>Source Files\Shaders\Rasterizer\Software\Illumination</Filter>
     </None>
     <None Include="..\readme.md" />
+    <None Include="bilboard.glsl">
+      <Filter>Source Files\Shaders\Rasterizer\Software\Meshlets</Filter>
+    </None>
   </ItemGroup>
   <ItemGroup>
     <Image Include="mc_sheet.png">

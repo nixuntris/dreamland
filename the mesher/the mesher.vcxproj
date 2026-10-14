@@ -148,6 +148,7 @@
   <ItemGroup>
     <None Include="..\readme.md" />
     <None Include="Anubis\BaseShaders\quad_display_shader.vs" />
+    <None Include="bilboard.glsl" />
     <None Include="ClearPhysicalObject.glsl" />
     <None Include="Clouds.glsl" />
     <None Include="desert.txt" />
