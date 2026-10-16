@@ -100,3 +100,12 @@ float fbm3(Math::Vector3 p) {
 	}
 	return v;
 }
+
+static inline uint32_t SavHash(int x, int z, uint32_t seed) {
+	uint32_t h = (uint32_t)x * 374761393u + (uint32_t)z * 668265263u + seed * 2246822519u;
+	h = (h ^ (h >> 13)) * 1274126177u;
+	return h ^ (h >> 16);
+}
+static inline float SavRand01(int x, int z, uint32_t seed) {
+	return (SavHash(x, z, seed) & 0xFFFFu) / 65535.0f;
+}

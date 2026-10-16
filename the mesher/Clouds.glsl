@@ -207,7 +207,6 @@ float calculateLightStrength(int frameIndex)
 void main() {
     ivec2 gid = ivec2(gl_GlobalInvocationID.xy);
     int idx = gid.y * 3840 + gid.x;
-
     vec3 ro = camPos;
     if (pos[(gid.y*2+1) * 3840 + gid.x*2] != vec3(-1000000.0) ||
     pos[(gid.y*2+1) * 3840 + gid.x*2+1] != vec3(-1000000.0) ||

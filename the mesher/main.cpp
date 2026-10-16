@@ -18,33 +18,87 @@
 
 struct Particle {
 	Math::Vector3 position;
-	Math::Vector3 color;
+	uint32_t color;
 	void (*update)(Particle&);
 };
 void ExampleUpdate(Particle& p) {
-	p.position.y -= 0.16f;
+//	p.position.y -= 0.16f;
 }
 const int MAX_PARTICLES = 1000000;
+
 class ParticleRender {
 public:
 	Particle *particles;
 	int renderQueue;
+	
 	void Create() {
 		renderQueue = 0;
 		particles = new Particle[MAX_PARTICLES];
 	}
-	void PushRenderParticle(Math::Vector3 position, Math::Vector3 color, void (*update)(Particle&)) {
+	
+	void PushRenderParticle(Math::Vector3 position, Color color, void (*update)(Particle&)) {
 		Particle particle;
 		particle.position = position;
-		particle.color = color;
+		particle.color = PackRGBA8(color);
 		particle.update = update;
 		particles[renderQueue++] = particle;
 	}
+	
+	void Render(ShaderManager *shaders, Matrix matView, Matrix matProj, Vector3 forward, Vector3 pos, int wWidth, int wHeight, int frameIndex) {
+		Math::Vector3 billboardPoses[1024];
+		int renderPassAmount = 0;
+		for (int i = 0; i <renderQueue; i++) {
+			billboardPoses[renderPassAmount] = particles[i].position;
+			renderPassAmount++;
+			if (renderPassAmount == 1024-1) {
+
+				Anubis::SwitchShaderStage(shaders->bilboards.programID);
+				shaders->bilboards.SetVector3({ pos.x,pos.y,pos.z }, "camPos");
+				shaders->bilboards.SetVector3({ forward.x,forward.y,forward.z }, "camForward");
+				shaders->bilboards.SetMatrix({ matView.m0,matView.m1,matView.m2,matView.m3,matView.m4,matView.m5,matView.m6,matView.m7,matView.m8,matView.m9,matView.m10,matView.m11,matView.m12,matView.m13,matView.m14,matView.m15 }, "matView");
+				shaders->bilboards.SetMatrix({ matProj.m0,matProj.m1,matProj.m2,matProj.m3,matProj.m4,matProj.m5,matProj.m6,matProj.m7,matProj.m8,matProj.m9,matProj.m10,matProj.m11,matProj.m12,matProj.m13,matProj.m14,matProj.m15 }, "matProj");
+				shaders->bilboards.SetInt(wx, "wx");
+				shaders->bilboards.SetInt(wy, "wy");
+				shaders->bilboards.SetInt(wz, "wz");
+				shaders->bilboards.SetInt(wWidth, "renderWidth");
+				shaders->bilboards.SetInt(wHeight, "renderHeight");
+				shaders->bilboards.SetVector3Array(billboardPoses, renderPassAmount, "billboards");
+				shaders->bilboards.SetInt(frameIndex, "frameIndex");
+				shaders->bilboards.SetFloat(1, "billboardSize");
+				shaders->bilboards.SetInt(PackRGBA8({0,0,0,0}), "billboardColor");
+				shaders->bilboards.Use(renderQueue / 64, 1, 1);
+				renderPassAmount = 0;
+				//dispatch
+			}
+		}
+		if (renderPassAmount > 0) {
+			//dispatch
+
+			Anubis::SwitchShaderStage(shaders->bilboards.programID);
+			shaders->bilboards.SetVector3({ pos.x,pos.y,pos.z }, "camPos");
+			shaders->bilboards.SetVector3({ forward.x,forward.y,forward.z }, "camForward");
+			shaders->bilboards.SetMatrix({ matView.m0,matView.m1,matView.m2,matView.m3,matView.m4,matView.m5,matView.m6,matView.m7,matView.m8,matView.m9,matView.m10,matView.m11,matView.m12,matView.m13,matView.m14,matView.m15 }, "matView");
+			shaders->bilboards.SetMatrix({ matProj.m0,matProj.m1,matProj.m2,matProj.m3,matProj.m4,matProj.m5,matProj.m6,matProj.m7,matProj.m8,matProj.m9,matProj.m10,matProj.m11,matProj.m12,matProj.m13,matProj.m14,matProj.m15 }, "matProj");
+			shaders->bilboards.SetInt(wx, "wx");
+			shaders->bilboards.SetInt(wy, "wy");
+			shaders->bilboards.SetInt(wz, "wz");
+			shaders->bilboards.SetInt(wWidth, "renderWidth");
+			shaders->bilboards.SetInt(wHeight, "renderHeight");
+			shaders->bilboards.SetVector3Array(billboardPoses, renderPassAmount, "billboards");
+			shaders->bilboards.SetInt(frameIndex, "frameIndex");
+			shaders->bilboards.SetInt(PackRGBA8({ 0,0,0,0 }), "billboardColor");
+			shaders->bilboards.SetFloat(1, "billboardSize");;
+
+			shaders->bilboards.Use(renderQueue/64, 1, 1);
+		}
+	}
+	
 	void Update() {
 		for (int i = 0; i < renderQueue; i++) {
 			particles[i].update(particles[i]);
 		}
 	}
+	
 	~ParticleRender() {
 		delete[] particles;
 	}
@@ -81,6 +135,7 @@ class App {
 	std::vector<std::string> worlds = { "Mountains", "Desert", "Caves", "Sky" };
 	float timeSpeed = 0.0004;
 	bool mainMenu = false;
+	ParticleRender particleRenderer;
 public:
 	App() {
 		//IMPLEMENT THE HARDWARE PIPELINE
@@ -111,7 +166,6 @@ public:
 		glEnable(GL_CULL_FACE);
 		glCullFace(GL_BACK);
 		glFrontFace(GL_CCW);
-
 	}
 	void Update() {
 		START_TIMER(triangle_counter);
@@ -250,8 +304,7 @@ public:
 		}
 		//std::cout << ids.size() << "\n";
 
-	}
-	
+	}	
 	void GenerateDebugScene() {
 		off = (ChunkOffset*)MemAlloc(wx * wy * wz * sizeof(ChunkOffset));
 		chunks = (Chunk*)MemAlloc(wx * wz * wy * sizeof(Chunk));
@@ -272,11 +325,36 @@ public:
 					if (dist > 960 * 24) lod = 64;
 					GenerationData gen;
 					gen.GenerateMountains(x, z);
-					gen.highestChunkY = 6;
-
+					float n = perlin_noise_2d((x + 0.5f) * 0.05f, (z + 0.5f) * 0.05f);
+					std::cout << n << "\n";
 					for (int y = 0; y < gen.highestChunkY && y < wy; y++) {
-						chunks[y * (wx * wz) + z * wx + x].GenerateDesert(&world.chunkData[y * (wx * wz) + z * wx + x], gen, x, y, z, lod, grass);
-					};
+
+						world.chunkData[y * (wx * wz) + z * wx + x].skipped = true;
+					}
+					if (n < -0.2f) {
+						// Desert
+						std::cout << "Desert\n";
+						for (int y = 0; y < gen.highestChunkY && y < wy; y++) {
+							world.chunkData[y * (wx * wz) + z * wx + x].skipped = false;
+							chunks[y * (wx * wz) + z * wx + x].GenerateDesert(&world.chunkData[y * (wx * wz) + z * wx + x], gen, x, y, z, lod, grass);
+						};
+					}
+					else if (n < 0.2f) {
+						std::cout << "Savanna\n";
+						// Savanna
+						for (int y = 0; y < gen.highestChunkY && y < wy; y++) {
+							world.chunkData[y * (wx * wz) + z * wx + x].skipped = false;
+							chunks[y * (wx * wz) + z * wx + x].GenerateSavanna(&world.chunkData[y * (wx * wz) + z * wx + x], gen, x, y, z, lod, grass);
+						};
+					}
+					else {
+						std::cout << "Mountains\n";
+						// Mountains
+						for (int y = 0; y < gen.highestChunkY && y < wy; y++) {
+							world.chunkData[y * (wx * wz) + z * wx + x].skipped = false;
+							chunks[y * (wx * wz) + z * wx + x].GenerateMountains(&world.chunkData[y * (wx * wz) + z * wx + x], gen, x, y, z, lod, grass);
+						};
+					}
 					if (x==wx/2 && z==wz/2) {
 						for (int i = 0; i < 20; i++) {
 							world.chunkData[0 * (wx * wz) + z * wx + x].terrain[IDX(chunkSize / 2, i + 50, chunkSize / 2, chunkSize)] = 2;
@@ -314,7 +392,7 @@ public:
 									}
 								}
 							}
-							world.lightCount++;
+						//	world.lightCount++;
 
 						}
 					}
@@ -605,6 +683,10 @@ public:
 					break;
 				}
 
+				particleRenderer.Create();
+				for (int i = 0; i < 10000; i++) {
+				//	particleRenderer.PushRenderParticle({ (float)GetRandomValue(wx * 32 + 32, wx * 32 - 32),100,(float)GetRandomValue(wx * 32 + 32, wx * 32 - 32) }, { 255,255,255,255 }, ExampleUpdate);
+				}
 				currentResolutionWindow = menuResolutionIndex;
 				wWidth = graphicsSettings.resolutions[currentResolutionWindow].width;
 				wHeight = graphicsSettings.resolutions[currentResolutionWindow].height;
@@ -974,7 +1056,6 @@ public:
 	
 				}
 			}
-			std::cout<<count<<' '<<totalMeshletCount<< '\n';
 			if (graphicsSettings.hardwareSoftwareRendering && triangleCount>0) {
 				Anubis::GpuTimer raster;
 				raster.Start();
@@ -1102,7 +1183,21 @@ public:
 				
 				physicalObjects.push_back(std::move(pp));
 			}
+			/*
+			Anubis::SwitchShaderStage(shaders.fluidRender.programID);
+			shaders.fluidRender.SetVector3({ pos.x,pos.y,pos.z }, "camPos");
+			shaders.fluidRender.SetVector3({ forward.x,forward.y,forward.z }, "camForward");
+			shaders.fluidRender.SetMatrix({ matView.m0,matView.m1,matView.m2,matView.m3,matView.m4,matView.m5,matView.m6,matView.m7,matView.m8,matView.m9,matView.m10,matView.m11,matView.m12,matView.m13,matView.m14,matView.m15 }, "matView");
+			shaders.fluidRender.SetMatrix({ matProj.m0,matProj.m1,matProj.m2,matProj.m3,matProj.m4,matProj.m5,matProj.m6,matProj.m7,matProj.m8,matProj.m9,matProj.m10,matProj.m11,matProj.m12,matProj.m13,matProj.m14,matProj.m15 }, "matProj");
+			shaders.fluidRender.SetInt(wx, "wx");
+			shaders.fluidRender.SetInt(wy, "wy");
+			shaders.fluidRender.SetInt(wz, "wz");
 
+			shaders.fluidRender.SetFloat(timeSpeed, "timeSpeed");
+			shaders.fluidRender.SetInt(wWidth, "renderWidth");
+			shaders.fluidRender.SetInt(wHeight, "renderHeight");
+			shaders.fluidRender.SetInt(frame, "frameIndex");
+			shaders.fluidRender.Use(wx, wy, wz);*/
 			if (graphicsSettings.secondaryRays) {
 
 				secondaryRays.Start();
@@ -1289,8 +1384,6 @@ public:
 			
 			}
 
-
-	//		Render(&shaders, camera, matView, mesh, rayCastPos, frame, 4, editSize, ColorPallete.data(), ColorPallete.size());
 			if (window.GetMouseButtonPressed(0) && !menuOpen && selectedColorIndex>=0) {
 
 				Vector3 ppp = rayCastPos;
@@ -1432,7 +1525,9 @@ public:
 				decalTypes.resize(0);
 				shaders.display.UpdateSSBO(3, &world.handle, sizeof(world.handle), 0);
 			}
-			
+
+			particleRenderer.Update();
+			particleRenderer.Render(&shaders, matView, matProj, forward, pos, wWidth, wHeight, frame);
 			ImGui_ImplOpenGL3_NewFrame();
 			ImGui_ImplGlfw_NewFrame();
 			ImGui::NewFrame();

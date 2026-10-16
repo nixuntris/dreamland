@@ -115,9 +115,6 @@
     <None Include="renderAABB.glsl">
       <Filter>Source Files\Shaders\Rasterizer\Software\Meshlets</Filter>
     </None>
-    <None Include="desert.txt">
-      <Filter>Source Files\terrain\example terrain</Filter>
-    </None>
     <None Include="quad_display_no_fxaa.glsl">
       <Filter>Source Files\Shaders\Rasterizer\Software\Illumination\Display Output</Filter>
     </None>
@@ -157,6 +154,9 @@
     <None Include="..\readme.md" />
     <None Include="bilboard.glsl">
       <Filter>Source Files\Shaders\Rasterizer\Software\Meshlets</Filter>
+    </None>
+    <None Include="desert.txt">
+      <Filter>Source Files\terrain\example terrain</Filter>
     </None>
   </ItemGroup>
   <ItemGroup>

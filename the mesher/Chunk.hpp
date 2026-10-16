@@ -338,6 +338,7 @@ struct World {
 };
 long globalMemUsage = 0;
 long afterGlobalMemUsage = 0;
+
 class Chunk {
 	int tallestY = 0;
 public:
@@ -357,7 +358,79 @@ public:
 	Anubis::HWVIrGeomMesh hwvMesh;
 	bool hwOrSoftwareRaster = false;
 	CPUMesh cpumesh;
+	void GenerateSavanna(ChunkData* chunkData, GenerationData generationData, int gx, int gy, int gz, int lod = 1, bool grass = false) {
+		this->gx = gx;
+		this->gy = gy;
+		this->gz = gz;
+		this->size = chunkSize / lod;
+		this->lod = lod;
+		chunkData->terrain = (uint16_t*)MemAlloc(chunkSize * chunkSize * chunkSize * sizeof(uint16_t));
 
+		const int maxSavannaY = 250;
+		if (gy * chunkSize > maxSavannaY) {
+			chunkData->skipped = true;
+			return;
+		}
+
+		const int baseWX = gx * chunkSize;
+		const int baseWY = gy * chunkSize;
+		const int baseWZ = gz * chunkSize;
+
+		auto setVoxel = [&](int wxp, int wyp, int wzp, uint16_t v) {
+			int lx = wxp - baseWX, ly = wyp - baseWY, lz = wzp - baseWZ;
+			if (lx < 0 || ly < 0 || lz < 0 || lx >= chunkSize || ly >= chunkSize || lz >= chunkSize) return;
+			chunkData->terrain[IDX(lx, ly, lz, chunkSize)] = v;
+		};
+		for (int x = 0; x < chunkSize; x++) {
+			for (int z = 0; z < chunkSize; z++) {
+				float wxf = (float)(baseWX + x);
+				float wzf = (float)(baseWZ + z);
+				float broad = perlin_noise_2d(wxf * 0.004f, wzf * 0.004f) * 10.0f;
+				float small = perlin_noise_2d(wxf * 0.020f, wzf * 0.020f) * 2.5f; 
+				int terrainHeight = 135 + (int)(broad + small) + 17;
+
+				float dryness = perlin_noise_2d(wxf * 0.03f, wzf * 0.03f);
+				float redPatch = perlin_noise_2d(wxf * 0.012f + 50.0f, wzf * 0.012f + 50.0f);
+				float fine = SavRand01(baseWX + x, baseWZ + z, 7);
+
+				uint16_t topBlock;
+				if (redPatch > 0.45f) topBlock = 18;
+				else if (dryness > 0.15f) topBlock = (fine > 0.8f ? 10 : 9);
+				else topBlock = (fine > 0.7f ? 9 : 10);
+
+				for (int y = chunkSize - 1; y >= 0; y--) {
+					int worldY = baseWY + y;
+					if (worldY >= terrainHeight) continue;
+
+					uint16_t v;
+					if (worldY == terrainHeight - 1) v = topBlock;
+					else if (worldY >= terrainHeight - 4) v = 18;
+					else if (worldY >= terrainHeight - 7) v = 4;
+					else v = 2;
+
+					chunkData->terrain[IDX(x, y, z, chunkSize)] = v;
+				}
+
+				int tuftY = terrainHeight - baseWY;
+				if (tuftY >= 0 && tuftY < chunkSize - 2 && topBlock != 18) {
+					float r = SavRand01(baseWX + x, baseWZ + z, 31);
+					if (r < 0.14f) {
+						int h = 1 + (int)(SavRand01(baseWX + x, baseWZ + z, 32) * 2.0f);
+						for (int t = 0; t < h; t++)
+							chunkData->terrain[IDX(x, tuftY + t, z, chunkSize)] = (r < 0.05f ? 9 : 8);
+					}
+					else if (r > 0.995f) {
+						chunkData->terrain[IDX(x, tuftY, z, chunkSize)] = 21;
+						if (x + 1 < chunkSize) chunkData->terrain[IDX(x + 1, tuftY, z, chunkSize)] = 27;
+						chunkData->terrain[IDX(x, tuftY + 1, z, chunkSize)] = 20;
+					}
+				}
+			}
+		}
+
+			
+		
+	}
 	void GenerateDesert(ChunkData* chunkData, GenerationData generationData, int gx, int gy, int gz, int lod = 1, bool grass = false) {
 		this->gx = gx;
 		this->gy = gy;
@@ -373,7 +446,7 @@ public:
 		}
 		for (uint8_t x = 0; x < chunkSize; x += 1) {
 			for (uint8_t z = 0; z < chunkSize; z += 1) {
-				int terrainHeight = generationData.heightMap[x + z * chunkSize]/5;
+				int terrainHeight = generationData.heightMap[x + z * chunkSize]/5+125;
 				int grassLineOffset = Math::GetRandomValueStreamlined(-50, 50);
 				for (int y = chunkSize - 1; y >= 0; y -= 1) {
 					int worldY = gy * chunkSize + y;
@@ -381,8 +454,8 @@ public:
 						chunkData->terrain[
 							IDX(x, y, z, chunkSize)
 						] = 9; // sand
-						if (Math::GetRandomValueStreamlined(0, 100) == 0) {
-							if ((x + y + Math::GetRandomValueStreamlined(-1, 1)) % 2 == 0 && grass) grassList.push_back({ (float)x + gx * 64,(float)y + gy * 64,(float)z + gz * 64 });
+						if (chunkData->terrain[IDX(x, y + 1, z,chunkSize)] == 0) {
+							if ((x + y + Math::GetRandomValueStreamlined(-1, 1)) % 2 == 0 && grass && Math::GetRandomValueStreamlined(0,1000)==150) grassList.push_back({ (float)x + gx * 64,(float)y + gy * 64,(float)z + gz * 64 });
 						}
 					}
 				}

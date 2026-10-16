@@ -16,8 +16,8 @@ uniform mat4 matView;
 uniform mat4 matProj;
 uniform int frameIndex;
 uniform float billboardSize;
-
-uniform vec3 billboards[512];
+uniform int billboardColor;
+uniform vec3 billboards[1024];
 
 uint packRGBA8(vec4 color)
 {
@@ -99,17 +99,13 @@ void DrawQuadSoftwareCS(
                 if (w2 > 0.0 || (w2 == 0.0 && !tl2)) continue;
                 if (w3 > 0.0 || (w3 == 0.0 && !tl3)) continue;
             }
-
+            
             int idx = y * 3840 + x;
 
-            uint prevDepth = depth[idx];
-            if (uint(quadDepth) >= prevDepth) continue;
-
-            uint actualOldDepth = atomicMin(depth[idx], int(quadDepth));
-            if (actualOldDepth > uint(quadDepth)) {
-                frame[idx]   = color;
-                pos[idx]     = quadPos;
-                voxelId[idx] = id;
+            if (depth[idx] > quadDepth) {
+                depth[idx] = quadDepth;
+                frame[idx] = color;
+                pos[idx] = quadPos;
             }
         }
     }
@@ -119,9 +115,7 @@ void main()
 {
     int billboardId = int(gl_GlobalInvocationID.x);
     if (billboardId >= 512) return;
-
-    vec3 bbPos   = billboards[billboardId * 2 + 0];
-    vec3 bbColor = billboards[billboardId * 2 + 1];
+    vec3 bbPos = billboards[billboardId];
 
     vec3 toBB = bbPos - camPos;
     float distAlongForward = dot(toBB, camForward);
@@ -153,7 +147,6 @@ void main()
         return;
 
     int depthVal = int(distAlongForward);
-    uint color = packRGBA8(vec4(bbColor, 1.0));
 
-    DrawQuadSoftwareCS(s0, s1, s2, s3, color, depthVal, bbPos, billboardId);
+    DrawQuadSoftwareCS(s0, s1, s2, s3, uint(billboardColor), depthVal, bbPos, billboardId);
 }
