@@ -326,21 +326,18 @@ public:
 					GenerationData gen;
 					gen.GenerateMountains(x, z);
 					float n = perlin_noise_2d((x + 0.5f) * 0.05f, (z + 0.5f) * 0.05f);
-					std::cout << n << "\n";
 					for (int y = 0; y < gen.highestChunkY && y < wy; y++) {
 
 						world.chunkData[y * (wx * wz) + z * wx + x].skipped = true;
 					}
 					if (n < -0.2f) {
 						// Desert
-						std::cout << "Desert\n";
 						for (int y = 0; y < gen.highestChunkY && y < wy; y++) {
 							world.chunkData[y * (wx * wz) + z * wx + x].skipped = false;
 							chunks[y * (wx * wz) + z * wx + x].GenerateDesert(&world.chunkData[y * (wx * wz) + z * wx + x], gen, x, y, z, lod, grass);
 						};
 					}
 					else if (n < 0.2f) {
-						std::cout << "Savanna\n";
 						// Savanna
 						for (int y = 0; y < gen.highestChunkY && y < wy; y++) {
 							world.chunkData[y * (wx * wz) + z * wx + x].skipped = false;
@@ -348,7 +345,6 @@ public:
 						};
 					}
 					else {
-						std::cout << "Mountains\n";
 						// Mountains
 						for (int y = 0; y < gen.highestChunkY && y < wy; y++) {
 							world.chunkData[y * (wx * wz) + z * wx + x].skipped = false;
@@ -1059,6 +1055,22 @@ public:
 			if (graphicsSettings.hardwareSoftwareRendering && triangleCount>0) {
 				Anubis::GpuTimer raster;
 				raster.Start();
+
+				Anubis::SwitchShaderStage(shaders.fluidRender.programID);
+				shaders.fluidRender.SetVector3({ pos.x,pos.y,pos.z }, "camPos");
+				shaders.fluidRender.SetVector3({ forward.x,forward.y,forward.z }, "camForward");
+				shaders.fluidRender.SetMatrix({ matView.m0,matView.m1,matView.m2,matView.m3,matView.m4,matView.m5,matView.m6,matView.m7,matView.m8,matView.m9,matView.m10,matView.m11,matView.m12,matView.m13,matView.m14,matView.m15 }, "matView");
+				shaders.fluidRender.SetMatrix({ matProj.m0,matProj.m1,matProj.m2,matProj.m3,matProj.m4,matProj.m5,matProj.m6,matProj.m7,matProj.m8,matProj.m9,matProj.m10,matProj.m11,matProj.m12,matProj.m13,matProj.m14,matProj.m15 }, "matProj");
+				shaders.fluidRender.SetInt(wx, "wx");
+				shaders.fluidRender.SetInt(wy, "wy");
+				shaders.fluidRender.SetInt(wz, "wz");
+
+				shaders.fluidRender.SetFloat(timeSpeed, "timeSpeed");
+				shaders.fluidRender.SetInt(wWidth, "renderWidth");
+				shaders.fluidRender.SetInt(wHeight, "renderHeight");
+				shaders.fluidRender.SetInt(frame, "frameIndex");
+				shaders.fluidRender.Use(wx, 6, wz);
+
 				Anubis::SwitchShaderStage(shaders.rasterizer.programID);
 				shaders.rasterizer.SetVector3({ pos.x,pos.y,pos.z }, "camPos");
 				shaders.rasterizer.SetVector3({ forward.x,forward.y,forward.z }, "camForward");
@@ -1073,7 +1085,7 @@ public:
 				shaders.rasterizer.SetInt(frame, "frameIndex");
 				shaders.rasterizer.SetInt(0, "offset");
 				
-				shaders.rasterizer.Use(floor(triangleCount), 1, 1);
+//				shaders.rasterizer.Use(floor(triangleCount), 1, 1);
 				rasterTimeMs = raster.Stop(); // This will block until raster is done
 				trianglesRendered = triangleCount;
 			}
@@ -1183,21 +1195,7 @@ public:
 				
 				physicalObjects.push_back(std::move(pp));
 			}
-			/*
-			Anubis::SwitchShaderStage(shaders.fluidRender.programID);
-			shaders.fluidRender.SetVector3({ pos.x,pos.y,pos.z }, "camPos");
-			shaders.fluidRender.SetVector3({ forward.x,forward.y,forward.z }, "camForward");
-			shaders.fluidRender.SetMatrix({ matView.m0,matView.m1,matView.m2,matView.m3,matView.m4,matView.m5,matView.m6,matView.m7,matView.m8,matView.m9,matView.m10,matView.m11,matView.m12,matView.m13,matView.m14,matView.m15 }, "matView");
-			shaders.fluidRender.SetMatrix({ matProj.m0,matProj.m1,matProj.m2,matProj.m3,matProj.m4,matProj.m5,matProj.m6,matProj.m7,matProj.m8,matProj.m9,matProj.m10,matProj.m11,matProj.m12,matProj.m13,matProj.m14,matProj.m15 }, "matProj");
-			shaders.fluidRender.SetInt(wx, "wx");
-			shaders.fluidRender.SetInt(wy, "wy");
-			shaders.fluidRender.SetInt(wz, "wz");
-
-			shaders.fluidRender.SetFloat(timeSpeed, "timeSpeed");
-			shaders.fluidRender.SetInt(wWidth, "renderWidth");
-			shaders.fluidRender.SetInt(wHeight, "renderHeight");
-			shaders.fluidRender.SetInt(frame, "frameIndex");
-			shaders.fluidRender.Use(wx, wy, wz);*/
+			
 			if (graphicsSettings.secondaryRays) {
 
 				secondaryRays.Start();

@@ -7,13 +7,11 @@ uniform int wx;
 uniform int wy;
 uniform int wz;
 
-layout(std430, binding = 0) buffer GBufferEx {
+layout(std430, binding = 0) buffer GBuffer {
     uint frame[3840 * 2160];
     vec3 pos[3840*2160];
     int depth[3840* 2160];
-    int voxelId[3840*2160];
 };
-
 uint packRGBA8(vec4 color)
 {
    vec4 c = clamp(color, 0.0, 1.0);
@@ -40,21 +38,15 @@ uniform int frameIndex;
 
 bool GetWorldToScreenClipped(vec3 position, out vec2 outScreen)
 {
-    vec4 clipPos;
-
-    clipPos.x = (matView[0][0] * position.x + matView[2][0] * position.z + matView[3][0]) * matProj[0][0];
-    clipPos.y = (matView[0][1] * position.x + matView[1][1] * position.y + matView[2][1] * position.z + matView[3][1]) * matProj[1][1];
-    clipPos.z = (matView[0][2] * position.x + matView[1][2] * position.y + matView[2][2] * position.z + matView[3][2]);
-    clipPos.w = matProj[2][3] * clipPos.z;
-    clipPos.z = matProj[2][2] * clipPos.z + matProj[3][2] * matView[3][3];
+    vec4 clipPos = matProj * matView * vec4(position, 1.0);
 
     if (clipPos.w <= 0.0)
         return false;
-    clipPos.y *= -1;
+
     vec3 ndc = clipPos.xyz / clipPos.w;
-    outScreen = ndc.xy+1.0;
-    outScreen *= vec2(halfW,halfH);
-    
+
+    outScreen = (ndc.xy * vec2(1.0, -1.0) + 1.0)
+              * vec2(halfW, halfH);
 
     return true;
 }
@@ -203,15 +195,13 @@ vec4 debugColors[12] = vec4[](
     vec4(0.5, 0.0, 0.0, 1.0), // Dark Red
     vec4(0.0, 0.0, 0.5, 1.0)  // Dark Blue
 );
-const vec3 verticesr[8] = vec3[8](
-    vec3(0.0, 0.0, 0.0), // 0
-    vec3(0.0, 0.0, 1.0), // 1
-    vec3(0.0, 1.0, 0.0), // 2
-    vec3(0.0, 1.0, 1.0), // 3
-    vec3(1.0, 0.0, 0.0), // 4
-    vec3(1.0, 0.0, 1.0), // 5
-    vec3(1.0, 1.0, 0.0), // 6
-    vec3(1.0, 1.0, 1.0)  // 7
+const int faceVertices[6][4] = int[6][4](
+    int[4](0, 4, 6, 2), // z-
+    int[4](5, 1, 3, 7), // z+
+    int[4](1, 0, 2, 3), // x-
+    int[4](4, 5, 7, 6), // x+
+    int[4](2, 6, 7, 3), // y+
+    int[4](0, 1, 5, 4)  // y-
 );
 
 // Triangle indices
@@ -224,12 +214,12 @@ const int tris[6][6] = int[6][6](
     int[6](4, 5, 1, 4, 1, 0)
 );
 const ivec3 faceOffsets[6] = ivec3[6](
-    ivec3( 0,  0,  -1), // FRONT
-    ivec3( 0,  0, 1), // BACK
-    ivec3(-1,  0,  0), // LEFT
-    ivec3( 1,  0,  0), // RIGHT
-    ivec3( 0,  1,  0), // TOP
-    ivec3( 0, -1,  0)  // BOTTOM
+    ivec3( 0,  0, -1), //fine
+    ivec3( 0,  0,  1), //fine
+    ivec3(-1,  0,  0),
+    ivec3( 1,  0,  0),
+    ivec3( 0,  1,  0),
+    ivec3( 0, -1,  0)
 );
 
 const vec4 colorr[10] = vec4[10](
@@ -262,10 +252,6 @@ VoxelMeta UnpackMetaData(uint m)
     return meta;
 }
 
-layout(std430, binding = 7) buffer AABBBuffer {
-    float AABBCorners[];
-};
-
 struct Region {
     uvec2 handle;
     int lod;
@@ -279,7 +265,7 @@ uint readVoxelData(ivec3 pos) {
     ivec3 chunk = pos/64;
     
     uvec2 handle = handles[chunk.y * (wx * wz) + chunk.z * wx + chunk.x].handle;
-
+    if (handles[chunk.y * (wx * wz) + chunk.z * wx + chunk.x].lod==0) return 1;
     if (handle != uvec2(0))
     {
         uimage3D fluidMap = uimage3D(handle);
@@ -291,67 +277,65 @@ uint readVoxelData(ivec3 pos) {
     return 0;
 
 }
+const vec3 verticesr[8] = vec3[8](
+    vec3(0.0, 0.0, 0.0), // 0
+    vec3(0.0, 0.0, 1.0), // 1
+    vec3(0.0, 1.0, 0.0), // 2
+    vec3(0.0, 1.0, 1.0), // 3
+    vec3(1.0, 0.0, 0.0), // 4
+    vec3(1.0, 0.0, 1.0), // 5
+    vec3(1.0, 1.0, 0.0), // 6
+    vec3(1.0, 1.0, 1.0)  // 7
+);
 void main()
 {
 
     float m15reproc = 1.0 / matView[3][3];
+    ivec3 chunk = ivec3(gl_WorkGroupID.xyz);
+    if (handles[chunk.y * (wx * wz) + chunk.z * wx + chunk.x].lod == 0) return;
+
     for (int x = 0; x < voxelAmountPerThreads; x++) {
         for (int y =0 ; y < voxelAmountPerThreads; y++) {
             for (int z = 0; z < voxelAmountPerThreads; z++) {
                 
-                ivec3 pos = ivec3(gl_GlobalInvocationID.xyz)*voxelAmountPerThreads + ivec3(x, y, z);
+                ivec3 pos = ivec3(gl_WorkGroupID.xyz)*64+ivec3(gl_LocalInvocationID.xyz)*voxelAmountPerThreads + ivec3(x, y, z);
                 uint value = readVoxelData(ivec3(pos));
                 if (value==0) continue;
                 
                 for (int i = 0; i < 6; i++) {
                     ivec3 neighbor = ivec3(pos) + faceOffsets[i];
-
-                    vec3 v1 = pos+verticesr[tris[i][0]];
-                    vec3 v2 = pos+verticesr[tris[i][1]];
-                    vec3 v3 = pos+verticesr[tris[i][2]];
-                    vec3 v4 = pos+verticesr[tris[i][3]];
-                    vec3 v5 = pos+verticesr[tris[i][4]];
-                    vec3 v6 = pos+verticesr[tris[i][5]];
-    
+                    uint type = readVoxelData(neighbor);
+                    if (type != 0) continue;
+                    vec3 v1 = pos + verticesr[faceVertices[i][0]];
+                    vec3 v2 = pos + verticesr[faceVertices[i][1]];
+                    vec3 v3 = pos + verticesr[faceVertices[i][2]];
+                    vec3 v4 = pos + verticesr[faceVertices[i][3]];
+                    
                     vec3 c = vec3(
                         (v1+v2+v3)/3.0f
                     );
                     vec3 edge1 = v2 - v1;
                     vec3 edge2 = v3 - v1;
                     vec3 faceNormal = normalize(cross(edge1, edge2));
-
-                    if (dot(faceNormal, camPos - c) <= 0.0 && c.y<camPos.y)
-                        continue;
+                    //if (dot(faceNormal, camPos - c) <= 0.0)
+//                         continue;
                     vec3 toC = c - camPos;
                     float distance = dot(toC, camForward);
 
+                    vec2 p1, p2, p3, p4;
 
-                    vec3 toV1 = v1 - camPos;
-                    vec3 toV2 = v2 - camPos;
-                    vec3 toV3 = v3 - camPos;
-
-                    float z1 = dot(toV1, camForward);
-                    float z2 = dot(toV2, camForward);
-                    float z3 = dot(toV3, camForward);
-
-                    if (z1 <= 0 && z2 <= 0 && z3 <= 0)
-                        continue;
-
-                    vec2 p1, p2, p3,p6;
                     if (!GetWorldToScreenClipped(v1, p1) ||
                         !GetWorldToScreenClipped(v2, p2) ||
                         !GetWorldToScreenClipped(v3, p3) ||
-                        !GetWorldToScreenClipped(v6, p6))
+                        !GetWorldToScreenClipped(v4, p4))
                         continue;
 
-                    vec2 SCREEN_MIN = vec2(0.0, 0.0);
-                    vec2 SCREEN_MAX = vec2(float(renderWidth), float(renderHeight));
-    
-                    if ((p1.x < SCREEN_MIN.x && p2.x < SCREEN_MIN.x && p3.x < SCREEN_MIN.x) || 
-                        (p1.x >= SCREEN_MAX.x && p2.x >= SCREEN_MAX.x && p3.x >= SCREEN_MAX.x) || 
-                        (p1.y < SCREEN_MIN.y && p2.y < SCREEN_MIN.y && p3.y < SCREEN_MIN.y) ||
-                        (p1.y >= SCREEN_MAX.y && p2.y >= SCREEN_MAX.y && p3.y >= SCREEN_MAX.y)) continue;
-                    DrawQuadSoftwareCS(p1, p2, p6, p3,packRGBA8(colorr[9]), int(distance), c);
+                    DrawQuadSoftwareCS(
+                        p1, p2, p3, p4,
+                        packRGBA8(colorr[(pos.x + pos.y + pos.z) % 4]),
+                        int(distance),
+                        c
+                    );
                 }
             }
         }

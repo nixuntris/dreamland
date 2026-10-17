@@ -19,7 +19,6 @@ struct ShaderManager {
 	Anubis::ComputeShader fillOut;
 	Anubis::ComputeShader clouds;
 	Anubis::ComputeShader bilboards;
-
 	Anubis::ComputeShader renderPhysicalObjects;
 	Anubis::ComputeShader clearPhysicalObjects;
 	void Load() {
