@@ -368,8 +368,8 @@ public:
 
 		const int maxSavannaY = 250;
 		if (gy * chunkSize > maxSavannaY) {
-			chunkData->skipped = true;
-			return;
+			//chunkData->skipped = true;
+			//return;
 		}
 
 		const int baseWX = gx * chunkSize;
@@ -441,8 +441,8 @@ public:
 		this->lod = lod;
 		START_TIMER(voxel_fill)
 		if ((gy  + 1< generationData.lowestChunkY)/5 || (gy > generationData.highestChunkY)/5) {
-			chunkData->skipped = true;
-			return;
+		//	chunkData->skipped = true;
+		//	return;
 		}
 		for (uint8_t x = 0; x < chunkSize; x += 1) {
 			for (uint8_t z = 0; z < chunkSize; z += 1) {
@@ -663,7 +663,7 @@ public:
 	}
 	void GenerateLod(ChunkData* chunkData, int gx, int gy, int gz) {
 		voxelCount = 0;
-		for (int i = 0; i < 64 * 64 * 64; i++) {
+		for (int i = 0; i < chunkSize * chunkSize * chunkSize; i++) {
 			if (chunkData->compressed) {
 				voxelCount += chunkData->compressedTerrain[i] != 0;
 			}

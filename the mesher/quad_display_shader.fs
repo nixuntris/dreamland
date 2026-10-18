@@ -46,6 +46,9 @@ layout(std430, binding = 9) buffer MeshletCounter {
     int meshletCounter;
 };
 
+layout(std430, binding = 10) buffer GPUBatch {
+    ivec3 gpuBatch[1024*1024];
+};
 uint packRGBA8(vec4 color)
 {
    vec4 c = clamp(color, 0.0, 1.0);

@@ -5,11 +5,11 @@
 #  define __builtin_popcount __popcnt
 #endif
 
-int wx = 50;
-int wz = 50;
+int wx = 100;
+int wz = 100;
 int ww = wx * wz;
 int wy = 16;
-const int chunkSize = 64;
+const int chunkSize = 32;
 #include "PerlinAVX2.hpp"
 struct GenerationData {
 	uint16_t* heightMap;

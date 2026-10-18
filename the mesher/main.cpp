@@ -104,7 +104,7 @@ public:
 	}
 	
 };
-
+const int maxGPUBatch = 1024 * 1024;
 class App {
 	Anubis::Window window;
 	Anubis::Camera camera;
@@ -129,6 +129,7 @@ class App {
 	int grass = 0;
 	int totalMeshletCount = 0;
 	int editSize = 5;
+	Math::IVector3* vv;
 	Anubis::Texture2DFloat texture;
 	Settings graphicsSettings;
 	std::vector<std::unique_ptr<PhysicsObject>> physicalObjects;
@@ -157,7 +158,12 @@ public:
 		glGetIntegerv(GL_MAX_SHADER_STORAGE_BUFFER_BINDINGS, &maxSSBOCount);
 		std::cout << maxSSBOCount << "\n";
 		Anubis::DebugMode();
-		shaders.display.CreateSSBO(9, sizeof(int)*2);
+		if (gpuMeshing) {
+			shaders.display.CreateSSBO(9, sizeof(int) * 2);
+			shaders.display.CreateSSBO(9, sizeof(int) * 2);
+			shaders.display.CreateSSBO(10, maxGPUBatch * sizeof(Math::IVector3));
+			vv = (Math::IVector3*)(MemAlloc(1024 * 1024 * sizeof(Math::IVector3)));
+		}
 		IMGUI_CHECKVERSION();
 		ImGui::CreateContext();
 		ImGuiIO& io = ImGui::GetIO();
@@ -362,7 +368,7 @@ public:
 							world.chunkData[y * (wx * wz) + z * wx + x].skipped = false;
 							chunks[y * (wx * wz) + z * wx + x].GenerateSavanna(&world.chunkData[y * (wx * wz) + z * wx + x], gen, x, y, z, lod, grass);
 						};
-					}
+				 }
 					else {
 						// Mountains
 						for (int y = 0; y < gen.highestChunkY && y < wy; y++) {
@@ -713,7 +719,7 @@ public:
 				wHeight = graphicsSettings.resolutions[currentResolutionWindow].height;
 				window.Resize(wWidth,wHeight);
 				world.Setup();
-				camera.position = { (double)wx * 32,200,(double)wz * 32 };
+				camera.position = { (double)wx * chunkSize/2,200,(double)wz * chunkSize / 2 };
 				Run();
 				
 			}
@@ -773,8 +779,8 @@ public:
 		MeshWorld();
 		FreeTerrain();
 		if (!gpuMeshing) {
-			RecalculateParticles();
-
+			//RecalculateParticles();
+			
 			Update();
 
 		}
@@ -864,9 +870,9 @@ public:
 
 			for (size_t i = 0; i < physicalObjects.size(); i++) {
 				auto& a = physicalObjects[i];
-				int offx = ceil((a->size.x/2)/64)+1;
-				int offy = ceil((a->size.y/2)/64)+1;
-				int offz = ceil((a->size.z/2)/64)+1;
+				int offx = ceil((a->size.x/2)/ chunkSize)+1;
+				int offy = ceil((a->size.y/2)/ chunkSize)+1;
+				int offz = ceil((a->size.z/2)/ chunkSize)+1;
 				for (int x = -offx; x <= offx; x++) {
 					for (int y = -offy; y <= offy; y++) {
 						for (int z = -offz; z <= offz; z++) {
@@ -1087,21 +1093,6 @@ public:
 			Anubis::GpuTimer raster;
 			raster.Start();
 			if (graphicsSettings.hardwareSoftwareRendering && triangleCount>0) {
-				Anubis::SwitchShaderStage(shaders.meshletRenderer.programID);
-				shaders.meshletRenderer.SetVector3({ pos.x,pos.y,pos.z }, "camPos");
-				shaders.meshletRenderer.SetVector3({ forward.x,forward.y,forward.z }, "camForward");
-				shaders.meshletRenderer.SetMatrix({ matView.m0,matView.m1,matView.m2,matView.m3,matView.m4,matView.m5,matView.m6,matView.m7,matView.m8,matView.m9,matView.m10,matView.m11,matView.m12,matView.m13,matView.m14,matView.m15 }, "matView");
-				shaders.meshletRenderer.SetMatrix({ matProj.m0,matProj.m1,matProj.m2,matProj.m3,matProj.m4,matProj.m5,matProj.m6,matProj.m7,matProj.m8,matProj.m9,matProj.m10,matProj.m11,matProj.m12,matProj.m13,matProj.m14,matProj.m15 }, "matProj");
-				shaders.meshletRenderer.SetInt(wx, "wx");
-				shaders.meshletRenderer.SetInt(wy, "wy");
-				shaders.meshletRenderer.SetInt(wz, "wz");
-				shaders.meshletRenderer.SetUIntArray(ColorPallete.data(), ColorPallete.size(), "packedColors");
-				shaders.meshletRenderer.SetInt(wWidth, "renderWidth");
-				shaders.meshletRenderer.SetInt(wHeight, "renderHeight");
-				shaders.meshletRenderer.SetInt(frame, "frameIndex");
-				shaders.meshletRenderer.SetInt(0, "offset");
-
-				shaders.meshletRenderer.Use(floor(triangleCount), 1, 1);
 				Anubis::SwitchShaderStage(shaders.rasterizer.programID);
 				shaders.rasterizer.SetVector3({ pos.x,pos.y,pos.z }, "camPos");
 				shaders.rasterizer.SetVector3({ forward.x,forward.y,forward.z }, "camForward");
@@ -1191,30 +1182,35 @@ public:
 					shaders.display.UpdateSSBO(9, 0, sizeof(int), 0);
 					Anubis::GpuTimer gpu;
 					gpu.Start();
-					Math::Vector3 batch[512];
-					int chunkWithVoxelDataCount = 0;
+					int dd = 0;
+
 					for (int i = 0; i < wx * wy * wz; i++) {
-						batch[chunkWithVoxelDataCount].x = chunks[i].gx;
-						batch[chunkWithVoxelDataCount].y = chunks[i].gy;
-						batch[chunkWithVoxelDataCount].z = chunks[i].gz;
-						chunkWithVoxelDataCount += world.chunkData[i].voxelCount != 0;
+						vv[chunkWithVoxelDataCount].x = chunks[i].gx;
+						vv[chunkWithVoxelDataCount].y = chunks[i].gy;
+						vv[chunkWithVoxelDataCount].z = chunks[i].gz;
+						
+						
+						dd += world.chunkData[i].voxelCount != 0;
+					}
+					if (dd > 0) {
+						shaders.display.UpdateSSBO(10, vv, dd*sizeof(Math::IVector3), 0);
+
+						Anubis::SwitchShaderStage(shaders.fluidRender.programID);
+						shaders.fluidRender.SetVector3({ pos.x,pos.y,pos.z }, "camPos");
+						shaders.fluidRender.SetVector3({ forward.x,forward.y,forward.z }, "camForward");
+						shaders.fluidRender.SetMatrix({ matView.m0,matView.m1,matView.m2,matView.m3,matView.m4,matView.m5,matView.m6,matView.m7,matView.m8,matView.m9,matView.m10,matView.m11,matView.m12,matView.m13,matView.m14,matView.m15 }, "matView");
+						shaders.fluidRender.SetMatrix({ matProj.m0,matProj.m1,matProj.m2,matProj.m3,matProj.m4,matProj.m5,matProj.m6,matProj.m7,matProj.m8,matProj.m9,matProj.m10,matProj.m11,matProj.m12,matProj.m13,matProj.m14,matProj.m15 }, "matProj");
+						shaders.fluidRender.SetInt(wx, "wx");
+						shaders.fluidRender.SetInt(wy, "wy");
+						shaders.fluidRender.SetInt(wz, "wz");
+						shaders.fluidRender.SetFloat(timeSpeed, "timeSpeed");
+						shaders.fluidRender.SetInt(wWidth, "renderWidth");
+						shaders.fluidRender.SetInt(wHeight, "renderHeight");
+						shaders.fluidRender.SetInt(frame, "frameIndex");
+						shaders.fluidRender.Use(dd, 1, 1);
 					}
 
-					Anubis::SwitchShaderStage(shaders.fluidRender.programID);
-					shaders.fluidRender.SetVector3({ pos.x,pos.y,pos.z }, "camPos");
-					shaders.fluidRender.SetVector3({ forward.x,forward.y,forward.z }, "camForward");
-					shaders.fluidRender.SetMatrix({ matView.m0,matView.m1,matView.m2,matView.m3,matView.m4,matView.m5,matView.m6,matView.m7,matView.m8,matView.m9,matView.m10,matView.m11,matView.m12,matView.m13,matView.m14,matView.m15 }, "matView");
-					shaders.fluidRender.SetMatrix({ matProj.m0,matProj.m1,matProj.m2,matProj.m3,matProj.m4,matProj.m5,matProj.m6,matProj.m7,matProj.m8,matProj.m9,matProj.m10,matProj.m11,matProj.m12,matProj.m13,matProj.m14,matProj.m15 }, "matProj");
-					shaders.fluidRender.SetInt(wx, "wx");
-					shaders.fluidRender.SetInt(wy, "wy");
-					shaders.fluidRender.SetInt(wz, "wz");
-					shaders.fluidRender.SetVector3Array(batch, chunkWithVoxelDataCount, "batch");
-					shaders.fluidRender.SetFloat(timeSpeed, "timeSpeed");
-					shaders.fluidRender.SetInt(wWidth, "renderWidth");
-					shaders.fluidRender.SetInt(wHeight, "renderHeight");
-					shaders.fluidRender.SetInt(frame, "frameIndex");
-					shaders.fluidRender.Use(chunkWithVoxelDataCount, 1, 1);
-					
+					std::cout << dd << " total \n";
 					Anubis::SwitchShaderStage(shaders.display.shaderId);
 					glBindBuffer(GL_SHADER_STORAGE_BUFFER, shaders.display.ssboIds[9]);
 
@@ -1226,6 +1222,7 @@ public:
 				}
 			}
 			offfr++;
+			/*
 			if (window.GetMouseButtonPressed(1) && offfr>5) {
 				offfr = 0;
 				Math::Vector3 angularVelocity = Math::NormalizeVector3(Math::SubtractVector3(camera.target, camera.position));
@@ -1267,7 +1264,7 @@ public:
 				
 				physicalObjects.push_back(std::move(pp));
 			}
-			
+			*/
 			if (graphicsSettings.secondaryRays) {
 
 				secondaryRays.Start();
@@ -1439,6 +1436,7 @@ public:
 			quad.Create();
 			window.DrawQuad(quad);
 			Vector3 rayCastPos = pos;
+			/*
 			for (int i = 0; i < 100; i++) {
 				rayCastPos.x += forward.x * 2;
 				rayCastPos.y += forward.y * 2;
@@ -1448,7 +1446,8 @@ public:
 				int z = rayCastPos.z / chunkSize;
 
 				int id = y * (wx * wz) + z * wx + x;
-				if (chunks[id].ReadVoxel(&world.chunkData[id], (int)rayCastPos.x % chunkSize, (int)rayCastPos.y % chunkSize, (int)rayCastPos.z%chunkSize) != 0) {
+				
+				if (chunks[id].ReadVoxel(&world.chunkData[id], (int)rayCastPos.x % (chunkSize/ chunks[id].lod), (int)rayCastPos.y % (chunkSize/ chunks[id].lod), (int)rayCastPos.z%(chunkSize/ chunks[id].lod)) != 0) {
 					break;
 				}
 			
@@ -1595,7 +1594,7 @@ public:
 				decalTypes.resize(0);
 				shaders.display.UpdateSSBO(3, &world.handle, sizeof(world.handle), 0);
 			}
-
+			*/
 			particleRenderer.Update();
 			particleRenderer.Render(&shaders, matView, matProj, forward, pos, wWidth, wHeight, frame);
 			ImGui_ImplOpenGL3_NewFrame();

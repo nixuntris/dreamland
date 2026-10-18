@@ -66,16 +66,16 @@ const vec3 bounceDirs[4] = vec3[](
     vec3( 0.2, 0.6,-0.3),
     vec3(-0.2, 0.9,-0.1)
 );
-
+int chunkSize = 32;
 uint readVoxelData(ivec3 pos) {
-    ivec3 chunk = pos/64;
+    ivec3 chunk = pos/chunkSize;
     
     uvec2 handle = handles[chunk.y * (wx * wz) + chunk.z * wx + chunk.x].handle;
 
     if (handle != uvec2(0))
     {
         uimage3D fluidMap = uimage3D(handle);
-        ivec3 lp = ivec3(mod(pos, 64.0));
+        ivec3 lp = ivec3(mod(pos, float(chunkSize)));
                     
         lp/=handles[chunk.y * (wx * wz) + chunk.z * wx + chunk.x].lod;
         return imageLoad(fluidMap,lp).x;
@@ -86,9 +86,9 @@ uint readVoxelData(ivec3 pos) {
 bool inBounds(ivec3 p) {
     
     
-    return (p.x < 0 || p.x >= wx *64||
-        p.y < 0 || p.y >= wy*64 ||
-        p.z < 0 || p.z >= wz*64);
+    return (p.x < 0 || p.x >= wx *chunkSize||
+        p.y < 0 || p.y >= wy*chunkSize ||
+        p.z < 0 || p.z >= wz*chunkSize);
 
 }
 
@@ -223,11 +223,11 @@ void main()
             vec3 p = ro + rd * t;
 
             
-            ivec3 chunk = ivec3(p/64);
+            ivec3 chunk = ivec3(p/chunkSize);
     
             uvec2 handle = handles[chunk.y * (wx * wz) + chunk.z * wx + chunk.x].handle;
             if (handle==uvec2(0)) {                        // empty chunk: jump to its exit
-                vec3 bmin = vec3(chunk << 6), bmax = bmin + 64.0;
+                vec3 bmin = vec3(chunk << 6), bmax = bmin + chunkSize;
                 vec3 tFar = max((bmin - ro) * invD, (bmax - ro) * invD);
                 t = min(min(tFar.x, tFar.y), tFar.z) + 1e-3;
                 continue;
@@ -277,7 +277,7 @@ void main()
 
     vec4 prev = unpackUnorm4x8(frame[idx]);
     
-    ivec3 chunk = ivec3(origin/64);
+    ivec3 chunk = ivec3(origin/chunkSize);
     
     uvec2 handle = handles[chunk.y * (wx * wz) + chunk.z * wx + chunk.x].handle;
     vec3 accumLightAdditional = vec3(0.0);
