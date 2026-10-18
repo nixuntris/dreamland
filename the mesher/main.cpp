@@ -351,31 +351,27 @@ public:
 					GenerationData gen;
 					gen.GenerateMountains(x, z);
 					float n = perlin_noise_2d((x + 0.5f) * 0.05f, (z + 0.5f) * 0.05f);
-					for (int y = 0; y < gen.highestChunkY && y < wy; y++) {
-
-						world.chunkData[y * (wx * wz) + z * wx + x].skipped = true;
-					}
+					gen.highestChunkY *= 2;
 					if (n < -0.2f) {
 						// Desert
 						for (int y = 0; y < gen.highestChunkY && y < wy; y++) {
-							world.chunkData[y * (wx * wz) + z * wx + x].skipped = false;
 							chunks[y * (wx * wz) + z * wx + x].GenerateDesert(&world.chunkData[y * (wx * wz) + z * wx + x], gen, x, y, z, lod, grass);
 						};
 					}
-					else if (n < 0.2f) {
+					else {
+					//	else if (n < 0.2f) {
 						// Savanna
 						for (int y = 0; y < gen.highestChunkY && y < wy; y++) {
-							world.chunkData[y * (wx * wz) + z * wx + x].skipped = false;
 							chunks[y * (wx * wz) + z * wx + x].GenerateSavanna(&world.chunkData[y * (wx * wz) + z * wx + x], gen, x, y, z, lod, grass);
 						};
 				 }
-					else {
+				//	else {
 						// Mountains
-						for (int y = 0; y < gen.highestChunkY && y < wy; y++) {
-							world.chunkData[y * (wx * wz) + z * wx + x].skipped = false;
-							chunks[y * (wx * wz) + z * wx + x].GenerateMountains(&world.chunkData[y * (wx * wz) + z * wx + x], gen, x, y, z, lod, grass);
-						};
-					}
+					//	for (int y = 0; y < gen.highestChunkY && y < wy; y++) {
+//							world.chunkData[y * (wx * wz) + z * wx + x].skipped = false;
+	//						chunks[y * (wx * wz) + z * wx + x].GenerateMountains(&world.chunkData[y * (wx * wz) + z * wx + x], gen, x, y, z, lod, grass);
+		//				};
+			//		}
 					if (x==wx/2 && z==wz/2) {
 						for (int i = 0; i < 20; i++) {
 							world.chunkData[0 * (wx * wz) + z * wx + x].terrain[IDX(chunkSize / 2, i + 50, chunkSize / 2, chunkSize)] = 2;
@@ -1178,6 +1174,7 @@ public:
 				preallocated = true;
 
 				if (gpuMeshing) {
+					//the slow down is caused not by meshing itself but rather the batching
 					Anubis::SwitchShaderStage(shaders.display.shaderId);
 					shaders.display.UpdateSSBO(9, 0, sizeof(int), 0);
 					Anubis::GpuTimer gpu;
@@ -1185,9 +1182,9 @@ public:
 					int dd = 0;
 
 					for (int i = 0; i < wx * wy * wz; i++) {
-						vv[chunkWithVoxelDataCount].x = chunks[i].gx;
-						vv[chunkWithVoxelDataCount].y = chunks[i].gy;
-						vv[chunkWithVoxelDataCount].z = chunks[i].gz;
+						vv[dd].x = chunks[i].gx;
+						vv[dd].y = chunks[i].gy;
+						vv[dd].z = chunks[i].gz;
 						
 						
 						dd += world.chunkData[i].voxelCount != 0;
@@ -1208,17 +1205,17 @@ public:
 						shaders.fluidRender.SetInt(wHeight, "renderHeight");
 						shaders.fluidRender.SetInt(frame, "frameIndex");
 						shaders.fluidRender.Use(dd, 1, 1);
+						std::cout << dd << " total \n";
+						Anubis::SwitchShaderStage(shaders.display.shaderId);
+						glBindBuffer(GL_SHADER_STORAGE_BUFFER, shaders.display.ssboIds[9]);
+
+						glGetBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, sizeof(int), &totalMeshletCount);
+						glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
+						totalTriangleCount = totalMeshletCount * 64 + 64;
+						std::cout << gpu.Stop() << " meshing time \n";
+						std::cout << totalMeshletCount << "adada \n";
 					}
 
-					std::cout << dd << " total \n";
-					Anubis::SwitchShaderStage(shaders.display.shaderId);
-					glBindBuffer(GL_SHADER_STORAGE_BUFFER, shaders.display.ssboIds[9]);
-
-					glGetBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, sizeof(int), &totalMeshletCount);
-					glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
-					totalTriangleCount = totalMeshletCount * 64 + 64;
-					std::cout<<gpu.Stop()<<" meshing time \n";
-					std::cout << totalMeshletCount << "adada \n";
 				}
 			}
 			offfr++;
