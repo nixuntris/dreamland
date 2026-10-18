@@ -1,7 +1,7 @@
 #version 460
 #extension GL_ARB_bindless_texture : require
-const int voxelAmountPerThreads = 8;
-layout (local_size_x = 1, local_size_y = 1, local_size_z = 1) in;
+const int groupSize = 8;
+layout (local_size_x = groupSize , local_size_y = groupSize , local_size_z = groupSize ) in;
 
 uniform int wx;
 uniform int wy;
@@ -182,10 +182,15 @@ struct Region {
 layout(std430, binding = 3) buffer BitHandles {
     Region handles[];
 };
-
+uniform vec3 batch[512];
 uint readVoxelData(ivec3 pos) {
     ivec3 chunk = pos/64;
     
+    if (any(lessThan(pos, ivec3(0))) ||
+        pos.x >= wx * 64 ||
+        pos.y >= wy * 64 ||
+        pos.z >= wz * 64)
+        return 0;
     uvec2 handle = handles[chunk.y * (wx * wz) + chunk.z * wx + chunk.x].handle;
     if (handles[chunk.y * (wx * wz) + chunk.z * wx + chunk.x].lod==0) return 1;
     if (handle != uvec2(0))
@@ -222,83 +227,113 @@ uint PackMetaData(uint mask, uint lod, uint type)
          | ((uint(lod)  & 0x3Fu) << 6)
          | ((uint(type) & 0xFFFFu) << 12);
 }
+
 void main()
 {
+    ivec3 chunk = ivec3(batch[int(gl_WorkGroupID.x)]);
+    int chunkIndex = chunk.y * (wx * wz) + chunk.z * wx + chunk.x;
 
-    float m15reproc = 1.0 / matView[3][3];
-    ivec3 chunk = ivec3(gl_GlobalInvocationID.xyz);
-    
-    if (handles[chunk.y * (wx * wz) + chunk.z * wx + chunk.x].lod == 0) return;
-    uint voxels[4096];
-    ivec3 poses[4096];
-    int vCount = 0;
-    for (int x = 0; x < 64; x++) {
-        for (int y =0 ; y < 64; y++) {
-            for (int z = 0; z < 64; z++) {
+    int lod = handles[chunkIndex].lod;
+    if (lod == 0) return;
+
+    int voxelCount = 0;
+    int offsetx = int(gl_LocalInvocationID.x)*(64/groupSize);
+    int offsety = int(gl_LocalInvocationID.y)*(64/groupSize);
+    int offsetz = int(gl_LocalInvocationID.z)*(64/groupSize);
+    for (int x = offsetx; x < (64/groupSize)+offsetx; x++) {
+        for (int y = offsety; y < (64/groupSize)+offsety; y++) {
+            for (int z = offsetz; z < (64/groupSize)+offsetz; z++) {
                 
-                ivec3 pos = ivec3(gl_GlobalInvocationID.xyz)*64+ivec3(x,y,z);
-                uint value = readVoxelData(ivec3(pos));
-                if (value==0) continue;
-                uint mask = 0;
+                ivec3 p = chunk * 64 + ivec3(x, y, z);
 
-                for (int i = 0; i < 6; i++) {
-                    ivec3 neighbor = ivec3(pos) + faceOffsets[i];
-                    uint type = readVoxelData(neighbor);
-                    if (type == 0) {
-                        mask|= (1u << i);
+                uint value = readVoxelData(p);
+                if (value == 0) continue;
+
+                bool exposed = false;
+
+                for (int f = 0; f < 6; f++) {
+                    if (readVoxelData(p + faceOffsets[f]) == 0) {
+                        exposed = true;
+                        break;
                     }
                 }
-                uint voxelPoint = PackMetaData(mask,handles[chunk.y * (wx * wz) + chunk.z * wx + chunk.x].lod, value);
-                voxels[vCount] = voxelPoint;
-                poses[vCount] = pos;
-                if (mask!=0 && value!=0) vCount+=1;
 
+                if (exposed) voxelCount++;
             }
         }
     }
-    int meshletCount = int(ceil(float(vCount) / 64.0f));
+
+    if (voxelCount == 0) return;
+
+    int meshletCount = (voxelCount + 63) / 64;
     int beginningId = atomicAdd(meshletCounter, meshletCount);
 
-    for (int i = 0; i < meshletCount; i++) {
+    uint batchMeta[64];
+    ivec3 batchPos[64];
 
-        ivec3 minXYZ = ivec3(100000000); //AABB corners
-        ivec3 maxXYZ = ivec3(-100000000);
-        for (int id = i*64; id < i*64+64 && id<vCount; id++) {
-            if (id>vCount) break;
-            ivec3 pos = poses[id];
-            if (pos.x>maxXYZ.x) maxXYZ.x = pos.x;
-            if (pos.y>maxXYZ.y) maxXYZ.y = pos.y;
-            if (pos.z>maxXYZ.z) maxXYZ.z = pos.z;
-            if (pos.x<minXYZ.x) minXYZ.x = pos.x;
-            if (pos.y<minXYZ.y) minXYZ.y = pos.y;
-            if (pos.z<minXYZ.z) minXYZ.z = pos.z;
-        }
-        int aabbBase = (beginningId + i) * 6;
-        if (minXYZ.x>maxXYZ.x || minXYZ.y>maxXYZ.y || minXYZ.z>maxXYZ.z) {
-            minXYZ = ivec3(0);
-            maxXYZ = ivec3(1000);
-        }
-        AABBCorners[aabbBase] = float(minXYZ.x);
-        AABBCorners[aabbBase+1] = float(minXYZ.y);
-        AABBCorners[aabbBase+2] = float(minXYZ.z);
-        AABBCorners[aabbBase+3] = float(maxXYZ.x);
-        AABBCorners[aabbBase+4] = float(maxXYZ.y);
-        AABBCorners[aabbBase+5] = float(maxXYZ.z);
-        for (int id = i*64; id < i*64+64 && id<vCount; id++) {
-            if (id>vCount) break;
-            poses[id] -= minXYZ;
-        }
-        for (int id = i*64; id < i*64+64 && id<vCount; id++) {
-            if (id>vCount) break;
-            poses[id] = clamp(poses[id],ivec3(0),ivec3(1024));
-            
-		    uint pp1 = uint(poses[id].x) & 0x3FF;
-		    uint pp2 = uint(poses[id].y) & 0x3FF;
-		    uint pp3 = uint(poses[id].z) & 0x3FF;
-            uint packedVertex = pp1 | (pp2<<10) | (pp3<<20);
-            int voxelId = (beginningId+i)*64+int(mod(id,64));
-            colors[voxelId] = voxels[id];
-            vertices[voxelId] = packedVertex;
+    int count = 0;
+    int meshletIndex = 0;
+    
+    for (int x = offsetx; x < (64/groupSize)+offsetx; x++) {
+        for (int y = offsety; y < (64/groupSize)+offsety; y++) {
+            for (int z = offsetz; z < (64/groupSize)+offsetz; z++) {
+                ivec3 p = chunk * 64 + ivec3(x, y, z);
+
+                uint value = readVoxelData(p);
+                if (value == 0) continue;
+
+                uint mask = 0u;
+
+                for (int f = 0; f < 6; f++) {
+                    if (readVoxelData(p + faceOffsets[f]) == 0)
+                        mask |= 1u << f;
+                }
+
+                if (mask == 0u) continue;
+
+                batchMeta[count] =
+                    PackMetaData(mask, uint(lod), value);
+
+                batchPos[count] = p;
+                count++;
+
+                if (count == 64 || voxelCount == meshletIndex * 64 + count) {
+                    ivec3 minXYZ = batchPos[0];
+                    ivec3 maxXYZ = batchPos[0];
+
+                    for (int i = 1; i < count; i++) {
+                        minXYZ = min(minXYZ, batchPos[i]);
+                        maxXYZ = max(maxXYZ, batchPos[i]);
+                    }
+
+                    int outputMeshlet = beginningId + meshletIndex;
+                    int aabbBase = outputMeshlet * 6;
+
+                    AABBCorners[aabbBase]     = float(minXYZ.x);
+                    AABBCorners[aabbBase + 1] = float(minXYZ.y);
+                    AABBCorners[aabbBase + 2] = float(minXYZ.z);
+                    AABBCorners[aabbBase + 3] = float(maxXYZ.x);
+                    AABBCorners[aabbBase + 4] = float(maxXYZ.y);
+                    AABBCorners[aabbBase + 5] = float(maxXYZ.z);
+
+                    for (int i = 0; i < count; i++) {
+                        ivec3 localPos = batchPos[i] - minXYZ;
+
+                        uint packedVertex =
+                            (uint(localPos.x) & 0x3FFu) |
+                            ((uint(localPos.y) & 0x3FFu) << 10) |
+                            ((uint(localPos.z) & 0x3FFu) << 20);
+
+                        int outputIndex = outputMeshlet * 64 + i;
+
+                        colors[outputIndex] = batchMeta[i];
+                        vertices[outputIndex] = packedVertex;
+                    }
+
+                    meshletIndex++;
+                    count = 0;
+                }
+            }
         }
     }
 }

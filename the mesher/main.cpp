@@ -1189,6 +1189,16 @@ public:
 				if (gpuMeshing) {
 					Anubis::SwitchShaderStage(shaders.display.shaderId);
 					shaders.display.UpdateSSBO(9, 0, sizeof(int), 0);
+					Anubis::GpuTimer gpu;
+					gpu.Start();
+					Math::Vector3 batch[512];
+					int chunkWithVoxelDataCount = 0;
+					for (int i = 0; i < wx * wy * wz; i++) {
+						batch[chunkWithVoxelDataCount].x = chunks[i].gx;
+						batch[chunkWithVoxelDataCount].y = chunks[i].gy;
+						batch[chunkWithVoxelDataCount].z = chunks[i].gz;
+						chunkWithVoxelDataCount += world.chunkData[i].voxelCount != 0;
+					}
 
 					Anubis::SwitchShaderStage(shaders.fluidRender.programID);
 					shaders.fluidRender.SetVector3({ pos.x,pos.y,pos.z }, "camPos");
@@ -1198,19 +1208,20 @@ public:
 					shaders.fluidRender.SetInt(wx, "wx");
 					shaders.fluidRender.SetInt(wy, "wy");
 					shaders.fluidRender.SetInt(wz, "wz");
-
+					shaders.fluidRender.SetVector3Array(batch, chunkWithVoxelDataCount, "batch");
 					shaders.fluidRender.SetFloat(timeSpeed, "timeSpeed");
 					shaders.fluidRender.SetInt(wWidth, "renderWidth");
 					shaders.fluidRender.SetInt(wHeight, "renderHeight");
 					shaders.fluidRender.SetInt(frame, "frameIndex");
-					shaders.fluidRender.Use(wx, wy, wz);
-
+					shaders.fluidRender.Use(chunkWithVoxelDataCount, 1, 1);
+					
 					Anubis::SwitchShaderStage(shaders.display.shaderId);
 					glBindBuffer(GL_SHADER_STORAGE_BUFFER, shaders.display.ssboIds[9]);
 
 					glGetBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, sizeof(int), &totalMeshletCount);
 					glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
 					totalTriangleCount = totalMeshletCount * 64 + 64;
+					std::cout<<gpu.Stop()<<" meshing time \n";
 					std::cout << totalMeshletCount << "adada \n";
 				}
 			}
