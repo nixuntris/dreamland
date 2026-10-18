@@ -8,6 +8,9 @@ layout(std430, binding = 0) buffer GBufferEx {
     int voxelId[3840*2160];
 };
 
+layout(std430, binding = 9) buffer MeshletCounter {
+    int meshletCounter;
+};
 uniform int renderWidth;
 uniform int renderHeight;
 uniform vec3 camPos;

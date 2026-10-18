@@ -5,6 +5,9 @@ layout (local_size_x = 8, local_size_y = 8, local_size_z = 8) in;
 
 
 
+layout(std430, binding = 9) buffer MeshletCounter {
+    int meshletCounter;
+};
 layout(std430, binding = 0) buffer GBufferEx {
     uint frame[3840 * 2160];
     vec3 pos[3840*2160];

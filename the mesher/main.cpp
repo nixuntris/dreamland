@@ -15,7 +15,7 @@
 #include "Misc.hpp"
 #include <thread>
 #include <chrono>
-
+const bool gpuMeshing = true;
 struct Particle {
 	Math::Vector3 position;
 	uint32_t color;
@@ -153,12 +153,30 @@ public:
 		SetRandomSeed(100);
 		shaders.Load();
 		shaders.display.CreateSSBO(0, sizeof(uint32_t) * 3840 * 2160 *6);
+		int maxSSBOCount = 0;
+		glGetIntegerv(GL_MAX_SHADER_STORAGE_BUFFER_BINDINGS, &maxSSBOCount);
+		std::cout << maxSSBOCount << "\n";
+		Anubis::DebugMode();
+		shaders.display.CreateSSBO(9, sizeof(int)*2);
 		IMGUI_CHECKVERSION();
 		ImGui::CreateContext();
 		ImGuiIO& io = ImGui::GetIO();
 		io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
 		ImGui::StyleColorsDark();
 
+		if (firstGen && gpuMeshing) {
+			std::cout << "gpu meshing on\n";
+			totalTriangleCount = 59259259;
+			totalMeshletCount = totalTriangleCount/64;
+			if ((totalMeshletCount + 1) * sizeof(int) * 8 <= 0 || totalTriangleCount * sizeof(uint32_t) * 8 <= 0 || totalTriangleCount * sizeof(uint32_t) * 8 <= 0 || totalMeshletCount * 6 * sizeof(float) * 8 <= 0) {
+				"Pre allocation for gpu meshing is failing";
+			}
+			shaders.display.CreatePersistentSSBO(5, (totalMeshletCount + 1) * sizeof(int) * 8);
+			shaders.display.CreatePersistentSSBO(2, totalTriangleCount * sizeof(uint32_t) * 8);
+			shaders.display.CreatePersistentSSBO(6, totalTriangleCount * sizeof(uint32_t) * 8);
+			shaders.display.CreatePersistentSSBO(7, totalMeshletCount * 6 * sizeof(float) * 8);
+			firstGen = false;
+		}
 		ImGui_ImplGlfw_InitForOpenGL(window.GetWindowHandle(), true);
 		ImGui_ImplOpenGL3_Init("#version 460");
 		glEnable(GL_DEBUG_OUTPUT);
@@ -205,6 +223,7 @@ public:
 		END_TIMER(triangle_counter);
 
 		if (firstGen) {
+			if (totalMeshletCount <= 0 || totalTriangleCount <= 0) std::cout << "First gen of software meshing is failing\n";
 			shaders.display.CreatePersistentSSBO(5, (totalMeshletCount + 1) * sizeof(int)*8);
 			shaders.display.CreatePersistentSSBO(2, totalTriangleCount * sizeof(uint32_t)*8);
 			shaders.display.CreatePersistentSSBO(6, totalTriangleCount * sizeof(uint32_t)*8);
@@ -380,8 +399,6 @@ public:
 											if (dy<0 || z+dz<0 || x+dz < 0 || x+dx>wx || dy>wy || z+dz>wz) continue;
 											if (world.handle.handle[(0+dy) * (wx * wz) + (z+dz) * wx + (x+dx)].lightIds[i] == -1) {
 												world.handle.handle[(0 + dy) * (wx * wz) + (z + dz) * wx + (x + dx)].lightIds[i] = world.lightCount ;
-
-												std::cout << "a\n";
 												break;
 											}
 										}
@@ -442,6 +459,7 @@ public:
 
 	}
 	void MeshWorld() {
+		int meshletCountSoftwareRendered = 0;
 		START_TIMER(mesher)
 #pragma omp parallel for collapse(2)
 			for (int x = 0; x < wx; x++) {
@@ -461,16 +479,20 @@ public:
 						//}
 						//else {
 							//std::cout << "d\n";
+						if (!gpuMeshing) {
 							chunks[index].hwOrSoftwareRaster = true;
 							chunks[index].SoftwareMesher(&world, x, y, z);
 							chunks[index].updated = true;
+
+						}
 						//}
-						
+						meshletCountSoftwareRendered++;
 						
 					}
 				}
 			}
 		END_TIMER(mesher)
+		std::cout << meshletCountSoftwareRendered << " proper meshlet count \n";
 	}
 	void FreeTerrain() {
 
@@ -522,9 +544,12 @@ public:
 				}
 			}
 		}
-		shaders.display.CreateSSBO(20, grass * 3 * sizeof(float));
+		if (grass > 0) {
 
-		shaders.display.UpdateSSBO(20, particles, grass * 3 * sizeof(float), 0);
+			shaders.display.CreateSSBO(20, grass * 3 * sizeof(float));
+
+			shaders.display.UpdateSSBO(20, particles, grass * 3 * sizeof(float), 0);
+		}
 		free(particles);
 	}
 	bool CustomToggle(const char* label, bool* value) {
@@ -747,8 +772,12 @@ public:
 		GenerateDebugScene();
 		MeshWorld();
 		FreeTerrain();
-		RecalculateParticles();
-		Update();
+		if (!gpuMeshing) {
+			RecalculateParticles();
+
+			Update();
+
+		}
 		const ImVec4 clearColor = { 0.1f, 0.1f, 0.12f, 1.0f };
 		bool menuOpen = false;
 		bool releasedMenu = false;
@@ -761,6 +790,7 @@ public:
 		size_t floatCount = sizeof(Anubis::cubeVertices) / sizeof(float);
 		mesh.Create(Anubis::cubeVertices, floatCount);
 		bool preallocated = false;
+		bool generatedMesh = false;
 		while (window.IsOpen()) {
 			double frameStart = glfwGetTime(); 
 			CheckLodsToUpdate();
@@ -799,6 +829,7 @@ public:
 			Anubis::GpuTimer timerFrustum;
 			Anubis::GpuTimer secondaryRays;
 			timerFrustum.Start();
+
 			if (totalMeshletCount > 0) {
 
 				Anubis::SwitchShaderStage(shaders.frustumCull.programID);
@@ -822,6 +853,7 @@ public:
 			glDeleteSync(fence);
 			int triangleCount = *p_triangleCounter;
 
+			std::cout << triangleCount << " "<<totalMeshletCount / 32 << " frust \n";
 			int r = 0;
 			for (auto t : decals) {
 
@@ -1052,25 +1084,24 @@ public:
 	
 				}
 			}
+			Anubis::GpuTimer raster;
+			raster.Start();
 			if (graphicsSettings.hardwareSoftwareRendering && triangleCount>0) {
-				Anubis::GpuTimer raster;
-				raster.Start();
+				Anubis::SwitchShaderStage(shaders.meshletRenderer.programID);
+				shaders.meshletRenderer.SetVector3({ pos.x,pos.y,pos.z }, "camPos");
+				shaders.meshletRenderer.SetVector3({ forward.x,forward.y,forward.z }, "camForward");
+				shaders.meshletRenderer.SetMatrix({ matView.m0,matView.m1,matView.m2,matView.m3,matView.m4,matView.m5,matView.m6,matView.m7,matView.m8,matView.m9,matView.m10,matView.m11,matView.m12,matView.m13,matView.m14,matView.m15 }, "matView");
+				shaders.meshletRenderer.SetMatrix({ matProj.m0,matProj.m1,matProj.m2,matProj.m3,matProj.m4,matProj.m5,matProj.m6,matProj.m7,matProj.m8,matProj.m9,matProj.m10,matProj.m11,matProj.m12,matProj.m13,matProj.m14,matProj.m15 }, "matProj");
+				shaders.meshletRenderer.SetInt(wx, "wx");
+				shaders.meshletRenderer.SetInt(wy, "wy");
+				shaders.meshletRenderer.SetInt(wz, "wz");
+				shaders.meshletRenderer.SetUIntArray(ColorPallete.data(), ColorPallete.size(), "packedColors");
+				shaders.meshletRenderer.SetInt(wWidth, "renderWidth");
+				shaders.meshletRenderer.SetInt(wHeight, "renderHeight");
+				shaders.meshletRenderer.SetInt(frame, "frameIndex");
+				shaders.meshletRenderer.SetInt(0, "offset");
 
-				Anubis::SwitchShaderStage(shaders.fluidRender.programID);
-				shaders.fluidRender.SetVector3({ pos.x,pos.y,pos.z }, "camPos");
-				shaders.fluidRender.SetVector3({ forward.x,forward.y,forward.z }, "camForward");
-				shaders.fluidRender.SetMatrix({ matView.m0,matView.m1,matView.m2,matView.m3,matView.m4,matView.m5,matView.m6,matView.m7,matView.m8,matView.m9,matView.m10,matView.m11,matView.m12,matView.m13,matView.m14,matView.m15 }, "matView");
-				shaders.fluidRender.SetMatrix({ matProj.m0,matProj.m1,matProj.m2,matProj.m3,matProj.m4,matProj.m5,matProj.m6,matProj.m7,matProj.m8,matProj.m9,matProj.m10,matProj.m11,matProj.m12,matProj.m13,matProj.m14,matProj.m15 }, "matProj");
-				shaders.fluidRender.SetInt(wx, "wx");
-				shaders.fluidRender.SetInt(wy, "wy");
-				shaders.fluidRender.SetInt(wz, "wz");
-
-				shaders.fluidRender.SetFloat(timeSpeed, "timeSpeed");
-				shaders.fluidRender.SetInt(wWidth, "renderWidth");
-				shaders.fluidRender.SetInt(wHeight, "renderHeight");
-				shaders.fluidRender.SetInt(frame, "frameIndex");
-				shaders.fluidRender.Use(wx, 6, wz);
-
+				shaders.meshletRenderer.Use(floor(triangleCount), 1, 1);
 				Anubis::SwitchShaderStage(shaders.rasterizer.programID);
 				shaders.rasterizer.SetVector3({ pos.x,pos.y,pos.z }, "camPos");
 				shaders.rasterizer.SetVector3({ forward.x,forward.y,forward.z }, "camForward");
@@ -1085,10 +1116,10 @@ public:
 				shaders.rasterizer.SetInt(frame, "frameIndex");
 				shaders.rasterizer.SetInt(0, "offset");
 				
-//				shaders.rasterizer.Use(floor(triangleCount), 1, 1);
-				rasterTimeMs = raster.Stop(); // This will block until raster is done
+				shaders.rasterizer.Use(floor(triangleCount), 1, 1);
 				trianglesRendered = triangleCount;
 			}
+			rasterTimeMs = raster.Stop(); // This will block until raster is done
 
 			Anubis::GpuTimer grassT;
 			grassT.Start();
@@ -1149,9 +1180,39 @@ public:
 						}
 					}
 				}
+				Anubis::SwitchShaderStage(shaders.display.shaderId);
 				shaders.display.CreateSSBO(3, sizeof(world.handle));
+				std::cout << "size of handle: "<<sizeof(world.handle) << "\n";
 				shaders.display.UpdateSSBO(3, &world.handle, sizeof(world.handle), 0);
 				preallocated = true;
+
+				if (gpuMeshing) {
+					Anubis::SwitchShaderStage(shaders.display.shaderId);
+					shaders.display.UpdateSSBO(9, 0, sizeof(int), 0);
+
+					Anubis::SwitchShaderStage(shaders.fluidRender.programID);
+					shaders.fluidRender.SetVector3({ pos.x,pos.y,pos.z }, "camPos");
+					shaders.fluidRender.SetVector3({ forward.x,forward.y,forward.z }, "camForward");
+					shaders.fluidRender.SetMatrix({ matView.m0,matView.m1,matView.m2,matView.m3,matView.m4,matView.m5,matView.m6,matView.m7,matView.m8,matView.m9,matView.m10,matView.m11,matView.m12,matView.m13,matView.m14,matView.m15 }, "matView");
+					shaders.fluidRender.SetMatrix({ matProj.m0,matProj.m1,matProj.m2,matProj.m3,matProj.m4,matProj.m5,matProj.m6,matProj.m7,matProj.m8,matProj.m9,matProj.m10,matProj.m11,matProj.m12,matProj.m13,matProj.m14,matProj.m15 }, "matProj");
+					shaders.fluidRender.SetInt(wx, "wx");
+					shaders.fluidRender.SetInt(wy, "wy");
+					shaders.fluidRender.SetInt(wz, "wz");
+
+					shaders.fluidRender.SetFloat(timeSpeed, "timeSpeed");
+					shaders.fluidRender.SetInt(wWidth, "renderWidth");
+					shaders.fluidRender.SetInt(wHeight, "renderHeight");
+					shaders.fluidRender.SetInt(frame, "frameIndex");
+					shaders.fluidRender.Use(wx, wy, wz);
+
+					Anubis::SwitchShaderStage(shaders.display.shaderId);
+					glBindBuffer(GL_SHADER_STORAGE_BUFFER, shaders.display.ssboIds[9]);
+
+					glGetBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, sizeof(int), &totalMeshletCount);
+					glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
+					totalTriangleCount = totalMeshletCount * 64 + 64;
+					std::cout << totalMeshletCount << "adada \n";
+				}
 			}
 			offfr++;
 			if (window.GetMouseButtonPressed(1) && offfr>5) {

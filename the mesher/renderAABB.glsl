@@ -24,11 +24,13 @@ layout(std430, binding = 7) buffer AABBBuffer {
 };
 uniform vec3 planeNormals[6];
 uniform float planeDs[6];
+uniform int renderWidth;
+uniform int renderHeight;
 
-const float halfW = 1920.0 / 2.0;
-const float halfH = 1080.0 / 2.0;
-const float reprocOfhalfW = 1.0 / halfW;
-const float reprocOfhalfH = 1.0 / halfH;
+float halfW = float(renderWidth) / 2.0;
+float halfH = float(renderHeight) / 2.0;
+float reprocOfhalfW = 1.0 / halfW;
+float reprocOfhalfH = 1.0 / halfH;
 uniform mat4 matView;
 uniform mat4 matProj;
 bool TriangleInFrustum(vec3 v1, vec3 v2, vec3 v3) {
@@ -126,8 +128,8 @@ void RenderAABBOutline(vec3 bMin, vec3 bMax, uint color)
             for (int x = 0; x < 2; x++) {
                 for (int y = 0; y < 2; y++) {
                 
-                    int pixelIdx = int(screen[a].y+y) * 1920 + int(screen[a].x+x);
-                    if (int(screen[a].y+y)>0 && int(screen[a].y+y)<1080 && int(screen[a].x+x)>0 && int(screen[a].x+x)<1920) {
+                    int pixelIdx = int(screen[a].y+y) * 3840 + int(screen[a].x+x);
+                    if (int(screen[a].y+y)>0 && int(screen[a].y+y)<renderHeight && int(screen[a].x+x)>0 && int(screen[a].x+x)<renderWidth) {
                 
                         frame[pixelIdx] = color;
                     }
@@ -138,8 +140,8 @@ void RenderAABBOutline(vec3 bMin, vec3 bMax, uint color)
             for (int x = 0; x < 2; x++) {
                 for (int y = 0; y < 2; y++) {
                 
-                    int pixelIdx = int(screen[b].y+y) * 1920 + int(screen[b].x+x);
-                    if (int(screen[a].y+y)>0 && int(screen[a].y+y)<1080 && int(screen[a].x+x)>0 && int(screen[a].x+x)<1920) {
+                    int pixelIdx = int(screen[b].y+y) * 3840 + int(screen[b].x+x);
+                    if (int(screen[a].y+y)>0 && int(screen[a].y+y)<renderHeight && int(screen[a].x+x)>0 && int(screen[a].x+x)<renderWidth) {
                         frame[pixelIdx] = color;
                     }
                 }

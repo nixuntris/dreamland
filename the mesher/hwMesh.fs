@@ -25,6 +25,9 @@ uint packRGBA8(vec4 color)
         ( bytes.b << 16 ) |
         ( bytes.a << 24 );
 }
+layout(std430, binding = 2) buffer VerticesBuffer {
+    uint vertices[];
+};
 uniform uint packedColors[1024];
 uniform int voxelType;
 

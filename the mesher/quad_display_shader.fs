@@ -42,6 +42,9 @@ layout(std430, binding = 7) buffer AABBBuffer {
     float AABBCorners[];
 };
 
+layout(std430, binding = 9) buffer MeshletCounter {
+    int meshletCounter;
+};
 
 uint packRGBA8(vec4 color)
 {

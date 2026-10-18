@@ -51,6 +51,9 @@ vec3 viewRay(vec3 forward, vec2 fragCoord, vec2 resolution, float fovY)
     return normalize(f + r * (uv.x * t) + u * (uv.y * t));
 }
 
+layout(std430, binding = 9) buffer MeshletCounter {
+    int meshletCounter;
+};
 vec4 getSkyColor(float totalTime, vec3 cPos, vec3 cForward, vec2 fragCoord)
 {
     vec3 rd  = viewRay(cForward, fragCoord, RESOLUTION, FOV_Y);

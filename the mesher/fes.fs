@@ -8,6 +8,9 @@ uniform int offsetInt;
 in float depthr;
 
 
+layout(std430, binding = 2) buffer VerticesBuffer {
+    uint vertices[];
+};
 layout(std430, binding = 0) buffer GBufferEx {
     uint frame[3840 * 2160];
     vec3 pos[3840*2160];

@@ -25,6 +25,9 @@ layout(std430, binding = 5) buffer BoolBuffer {
 layout(std430, binding = 7) buffer AABBBuffer {
     float AABBCorners[];
 };
+layout(std430, binding = 9) buffer MeshletCounter {
+    int meshletCounter;
+};
 uniform vec3 planeNormals[6];
 uniform float planeDs[6];
 

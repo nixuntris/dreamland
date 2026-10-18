@@ -1247,17 +1247,13 @@ namespace Anubis {
                 nullptr,
                 GL_DYNAMIC_DRAW
             );
-
-            // ---- Check GL error after allocation ----
             GLenum err = glGetError();
             if (err != GL_NO_ERROR)
             {
-                std::cerr << "SSBO ERROR: glBufferData failed (error " << err << ")\n";
+                std::cerr << "SSBO ERROR: glBufferData failed (error " << err << ")"<<" "<<bufferIndex << "\n";
                 glDeleteBuffers(1, &id);
                 return;
             }
-
-            // ---- Bind to slot ----
             glBindBufferBase(
                 GL_SHADER_STORAGE_BUFFER,
                 bufferIndex,
@@ -1274,7 +1270,6 @@ namespace Anubis {
 
             inUsessbo[bufferIndex] = true;
 
-            // Optional: unbind to avoid accidental state bugs
             glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
         }
         void CreatePersistentSSBO(int bufferIndex, size_t size)
