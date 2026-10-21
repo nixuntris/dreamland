@@ -171,9 +171,6 @@
     <None Include="ver.vs" />
   </ItemGroup>
   <ItemGroup>
-    <Image Include="mc_sheet.png" />
-  </ItemGroup>
-  <ItemGroup>
     <Text Include="mountains.txt" />
     <Text Include="caves.txt" />
   </ItemGroup>

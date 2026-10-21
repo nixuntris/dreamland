@@ -6,11 +6,12 @@
 layout (local_size_x = 16, local_size_y = 16, local_size_z = 1) in;
 
 
-
-layout(std430, binding = 0) buffer GBuffer {
+//This shader somewhere has a bug causing any chunk over wy 0 to have bugged lighting
+layout(std430, binding = 0) buffer GBufferEx {
     uint frame[3840 * 2160];
     vec3 pos[3840*2160];
     int depth[3840* 2160];
+    int voxelId[3840*2160];
 };
 
 uint packRGBA8(vec4 color)
@@ -71,12 +72,13 @@ uint readVoxelData(ivec3 pos) {
     ivec3 chunk = pos/chunkSize;
     
     uvec2 handle = handles[chunk.y * (wx * wz) + chunk.z * wx + chunk.x].handle;
+    if (handles[chunk.y * (wx * wz) + chunk.z * wx + chunk.x].lod==0) return 1;
 
     if (handle != uvec2(0))
     {
         uimage3D fluidMap = uimage3D(handle);
         ivec3 lp = ivec3(mod(pos, float(chunkSize)));
-                    
+        
         lp/=handles[chunk.y * (wx * wz) + chunk.z * wx + chunk.x].lod;
         return imageLoad(fluidMap,lp).x;
     }
@@ -189,6 +191,10 @@ float calculateLightStrength(int frameIndex)
     
     return lightStrength;
 }
+bool outOfBounds(ivec3 p) {
+    return any(lessThan(p, ivec3(0))) ||
+           any(greaterThanEqual(p, ivec3(wx, wy, wz) * chunkSize));
+}
 void main()
 {
     ivec2 gid = ivec2(gl_GlobalInvocationID.xy);
@@ -217,29 +223,14 @@ void main()
         float shadow = cloudShadow(ro, rd, time, jitter);
         shadow = mix(1.0, shadow, 0.3);
         T *= shadow;   
-        for (int i = 0; i < 64; i++)
-        {
-            t+=1;
-            vec3 p = ro + rd * t;
+        for (int i = 0; i < 64; i++) {
+            t += 1.0;
+            ivec3 ip = ivec3(floor(ro + rd * t));
+            if (outOfBounds(ip)) break; 
 
-            
-            ivec3 chunk = ivec3(p/chunkSize);
-    
-            uvec2 handle = handles[chunk.y * (wx * wz) + chunk.z * wx + chunk.x].handle;
-            if (handle==uvec2(0)) {                        // empty chunk: jump to its exit
-                vec3 bmin = vec3(chunk << 6), bmax = bmin + chunkSize;
-                vec3 tFar = max((bmin - ro) * invD, (bmax - ro) * invD);
-                t = min(min(tFar.x, tFar.y), tFar.z) + 1e-3;
-                continue;
-            }
-            if (inBounds(ivec3(p))) break;
-            
-             if (readVoxelData(ivec3(p)) != 0)
-            {
-                T *= 0.70;
-                break;
-                
-            }
+            ivec3 chunk = ip / chunkSize;
+            int ci = chunk.y * (wx * wz) + chunk.z * wx + chunk.x;
+            if (readVoxelData(ip) != 0) { T *= 0.70; break; }
         }
 
         float bounceLight = 0.0;

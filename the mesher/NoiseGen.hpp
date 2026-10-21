@@ -8,7 +8,7 @@
 int wx = 100;
 int wz = 100;
 int ww = wx * wz;
-int wy = 16;
+int wy = 32;
 const int chunkSize = 32;
 #include "PerlinAVX2.hpp"
 struct GenerationData {

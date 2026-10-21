@@ -33,7 +33,7 @@ void main() {
     uimage3D fluidMap = uimage3D(fluidHandle);
     ivec3 p = ivec3(gl_GlobalInvocationID.xyz);
     
-    if (any(greaterThanEqual(p, ivec3(64))) || any(lessThan(p, ivec3(0)))) return;
+    if (any(greaterThanEqual(p, ivec3(32))) || any(lessThan(p, ivec3(0)))) return;
     
     uint fluidVal = imageLoad(fluidMap, p)[0];
     if (fluidVal == 0 || fluidVal == 255) return;

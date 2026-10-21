@@ -201,7 +201,7 @@ struct PhysicsAccelerationChunk {
 	bool allocated=false;
 };
 const int mwx = 300;
-const int mwy = 16;
+const int mwy = 32;
 const int mwz = 300;
 
 struct World {
@@ -455,7 +455,7 @@ public:
 							IDX(x, y, z, chunkSize)
 						] = 9; // sand
 						if (chunkData->terrain[IDX(x, y + 1, z,chunkSize)] == 0) {
-							if ((x + y + Math::GetRandomValueStreamlined(-1, 1)) % 2 == 0 && grass && Math::GetRandomValueStreamlined(0,1000)==150) grassList.push_back({ (float)x + gx * 64,(float)y + gy * 64,(float)z + gz * 64 });
+							if ((x + y + Math::GetRandomValueStreamlined(-1, 1)) % 2 == 0 && grass && Math::GetRandomValueStreamlined(0,1000)==150) grassList.push_back({ (float)x + gx * chunkSize,(float)y + gy * chunkSize,(float)z + gz * chunkSize});
 						}
 					}
 				}
@@ -495,7 +495,7 @@ public:
 							if (chunkData->terrain[
 								IDX(x, y + 1, z, chunkSize)
 							] == 0) {
-								if ((x + y + Math::GetRandomValueStreamlined(-1, 1)) % 2 == 0 && grass) grassList.push_back({ (float)x + gx * 64,(float)y + gy * 64,(float)z + gz * 64 });
+								if ((x + y + Math::GetRandomValueStreamlined(-1, 1)) % 2 == 0 && grass) grassList.push_back({ (float)x + gx * chunkSize,(float)y + gy * chunkSize,(float)z + gz * chunkSize });
 							}
 						}
 						else if (worldY < 400 + grassLineOffset) {
@@ -550,7 +550,7 @@ public:
 							if (chunkData->terrain[
 								IDX(x, y + 1, z, chunkSize)
 							] == 0) {
-								if ((x + y + Math::GetRandomValueStreamlined(-1, 1)) % 2 == 0 && grass) grassList.push_back({ (float)x + gx * 64,(float)y + gy * 64,(float)z + gz * 64 });
+								if ((x + y + Math::GetRandomValueStreamlined(-1, 1)) % 2 == 0 && grass) grassList.push_back({ (float)x + gx * chunkSize,(float)y + gy * chunkSize,(float)z + gz * chunkSize });
 							}
 						}
 						else if (worldY < 400 + grassLineOffset) {
@@ -800,7 +800,7 @@ public:
 	inline bool ReadBitMap(ChunkData* chunkdata, int x, int y, int z) {
 		if (chunkdata->skipped) return true;
 		if (chunkdata->voxelCount == 0) return false;
-		int ss = 64 / chunkdata->lod;
+		int ss = chunkSize / chunkdata->lod;
 		if (ss * ss * ss == chunkdata->voxelCount) return true;
 		if (chunkdata->lod == lod) {
 			int id = x + (y * size) + (z * size * size);

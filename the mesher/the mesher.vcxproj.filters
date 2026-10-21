@@ -160,11 +160,6 @@
     </None>
   </ItemGroup>
   <ItemGroup>
-    <Image Include="mc_sheet.png">
-      <Filter>Source Files</Filter>
-    </Image>
-  </ItemGroup>
-  <ItemGroup>
     <Text Include="caves.txt">
       <Filter>Source Files\terrain\example terrain</Filter>
     </Text>

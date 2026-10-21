@@ -157,7 +157,7 @@ public:
 		int maxSSBOCount = 0;
 		glGetIntegerv(GL_MAX_SHADER_STORAGE_BUFFER_BINDINGS, &maxSSBOCount);
 		std::cout << maxSSBOCount << "\n";
-		Anubis::DebugMode();
+		//Anubis::DebugMode();
 		if (gpuMeshing) {
 			shaders.display.CreateSSBO(9, sizeof(int) * 2);
 			shaders.display.CreateSSBO(9, sizeof(int) * 2);
@@ -354,23 +354,23 @@ public:
 					gen.highestChunkY *= 2;
 					if (n < -0.2f) {
 						// Desert
-						for (int y = 0; y < gen.highestChunkY && y < wy; y++) {
-							chunks[y * (wx * wz) + z * wx + x].GenerateDesert(&world.chunkData[y * (wx * wz) + z * wx + x], gen, x, y, z, lod, grass);
-						};
+//						for (int y = 0; y < gen.highestChunkY && y < wy; y++) {
+	//						chunks[y * (wx * wz) + z * wx + x].GenerateDesert(&world.chunkData[y * (wx * wz) + z * wx + x], gen, x, y, z, lod, grass);
+		//				};
 					}
 					else {
 					//	else if (n < 0.2f) {
 						// Savanna
-						for (int y = 0; y < gen.highestChunkY && y < wy; y++) {
-							chunks[y * (wx * wz) + z * wx + x].GenerateSavanna(&world.chunkData[y * (wx * wz) + z * wx + x], gen, x, y, z, lod, grass);
-						};
+			//			for (int y = 0; y < gen.highestChunkY && y < wy; y++) {
+				//			chunks[y * (wx * wz) + z * wx + x].GenerateSavanna(&world.chunkData[y * (wx * wz) + z * wx + x], gen, x, y, z, lod, grass);
+					//	};
 				 }
 				//	else {
 						// Mountains
-					//	for (int y = 0; y < gen.highestChunkY && y < wy; y++) {
-//							world.chunkData[y * (wx * wz) + z * wx + x].skipped = false;
-	//						chunks[y * (wx * wz) + z * wx + x].GenerateMountains(&world.chunkData[y * (wx * wz) + z * wx + x], gen, x, y, z, lod, grass);
-		//				};
+						for (int y = 0; y < gen.highestChunkY && y < wy; y++) {
+					//		world.chunkData[y * (wx * wz) + z * wx + x].skipped = false;
+							chunks[y * (wx * wz) + z * wx + x].GenerateMountains(&world.chunkData[y * (wx * wz) + z * wx + x], gen, x, y, z, lod, grass);
+						};
 			//		}
 					if (x==wx/2 && z==wz/2) {
 						for (int i = 0; i < 20; i++) {
@@ -381,7 +381,7 @@ public:
 						
 						}
 						if (world.lightCount < 16) {
-							world.lightPositions[world.lightCount] = { (float)chunkSize / 2 + x * 64,70,(float)chunkSize / 2 + z * 64 };
+							world.lightPositions[world.lightCount] = { (float)chunkSize / 2 + x * chunkSize,70,(float)chunkSize / 2 + z * chunkSize };
 							float t = float(GetRandomValue(0, 100)) / 100.0f;
 
 							float r = 1.0f;
@@ -774,8 +774,8 @@ public:
 		GenerateDebugScene();
 		MeshWorld();
 		FreeTerrain();
+		RecalculateParticles();
 		if (!gpuMeshing) {
-			//RecalculateParticles();
 			
 			Update();
 

@@ -63,7 +63,6 @@ uint readVoxelData(ivec3 pos) {
     int index = chunk.y * (wx * wz) + chunk.z * wx + chunk.x;
     int regionLod = handles[index].lod;
 
-    if (regionLod == 0) return 1u;
 
     uvec2 handle = handles[index].handle;
     if (handle != uvec2(0)) {

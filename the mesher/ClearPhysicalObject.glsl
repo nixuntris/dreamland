@@ -167,14 +167,14 @@ layout(std430, binding = 3) buffer BitHandles {
     Region handles[];
 };
 uint readVoxelData(ivec3 pos) {
-    ivec3 chunk = pos/64;
+    ivec3 chunk = pos/32;
     
     uvec2 handle = handles[chunk.y * (wx * wz) + chunk.z * wx + chunk.x].handle;
 
     if (handle != uvec2(0))
     {
         uimage3D fluidMap = uimage3D(handle);
-        ivec3 lp = ivec3(mod(floor(pos), 64.0));
+        ivec3 lp = ivec3(mod(floor(pos), 32.0));
                     
         lp/=handles[chunk.y * (wx * wz) + chunk.z * wx + chunk.x].lod;
         return imageLoad(fluidMap,lp).x;
@@ -183,14 +183,14 @@ uint readVoxelData(ivec3 pos) {
 
 }
 void setVoxelData(ivec3 pos, uint value) {
-    ivec3 chunk = pos / 64;
+    ivec3 chunk = pos / 32;
     
     uvec2 handle = handles[chunk.y * (wx * wz) + chunk.z * wx + chunk.x].handle;
 
     if (handle != uvec2(0))
     {
         uimage3D fluidMap = uimage3D(handle);
-        ivec3 lp = ivec3(mod(pos, 64.0));
+        ivec3 lp = ivec3(mod(pos, 32.0));
         lp /= handles[chunk.y * (wx * wz) + chunk.z * wx + chunk.x].lod;
         imageStore(fluidMap, lp, uvec4(value, 0, 0, 0));
     }
