@@ -1555,7 +1555,6 @@ namespace Anubis {
             GLuint64 startTime = 0, endTime = 0;
             GLint done = 0;
 
-            // Wait until results are ready (non-blocking if results are already available)
             while (!done) {
                 glGetQueryObjectiv(queryEnd, GL_QUERY_RESULT_AVAILABLE, &done);
             }

@@ -984,6 +984,7 @@ public:
 				};
 			START_TIMER(physicsAllocator)
 			if (!preallocated) {
+				auto allocateStart = std::chrono::high_resolution_clock::now();
 
 				for (int x = 0; x < wx; x++) {
 					for (int y = 0; y < wx; y++) {
@@ -994,30 +995,40 @@ public:
 						}
 					}
 				}
+				auto allocateEnd = std::chrono::high_resolution_clock::now();
+
+				std::cout << "Data upload: "
+					<< std::chrono::duration<double, std::milli>(allocateEnd - allocateStart).count()
+					<< " ms\n";
+
 				Anubis::SwitchShaderStage(shaders.display.shaderId);
 				shaders.display.CreateSSBO(3, sizeof(world.handle));
 				std::cout << "size of handle: "<<sizeof(world.handle) << "\n";
 				shaders.display.UpdateSSBO(3, &world.handle, sizeof(world.handle), 0);
 				preallocated = true;
-
+				
 				if (gpuMeshing) {
-					//the slow down is caused not by meshing itself but rather the batching
 					Anubis::SwitchShaderStage(shaders.display.shaderId);
 					shaders.display.UpdateSSBO(9, 0, sizeof(int), 0);
-					Anubis::GpuTimer gpu;
-					gpu.Start();
+
+					auto batchStart = std::chrono::high_resolution_clock::now();
+
 					int dd = 0;
 
 					for (int i = 0; i < wx * wy * wz; i++) {
 						vv[dd].x = chunks[i].gx;
 						vv[dd].y = chunks[i].gy;
 						vv[dd].z = chunks[i].gz;
-						
-						
+
 						dd += world.chunkData[i].voxelCount != 0;
 					}
+
+					auto batchScanEnd = std::chrono::high_resolution_clock::now();
+
 					if (dd > 0) {
-						shaders.display.UpdateSSBO(10, vv, dd*sizeof(Math::IVector3), 0);
+						shaders.display.UpdateSSBO(10, vv, dd * sizeof(Math::IVector3), 0);
+
+						auto batchUploadEnd = std::chrono::high_resolution_clock::now();
 
 						Anubis::SwitchShaderStage(shaders.fluidRender.programID);
 						shaders.fluidRender.SetVector3({ pos.x,pos.y,pos.z }, "camPos");
@@ -1032,18 +1043,31 @@ public:
 						shaders.fluidRender.SetInt(wHeight, "renderHeight");
 						shaders.fluidRender.SetInt(frame, "frameIndex");
 						shaders.fluidRender.Use(dd, 1, 1);
-						std::cout << dd << " total \n";
+
+						auto dispatchSubmitEnd = std::chrono::high_resolution_clock::now();
+
+						std::cout << "Batch scan: "
+							<< std::chrono::duration<double, std::milli>(batchScanEnd - batchStart).count()
+							<< " ms\n";
+
+						std::cout << "SSBO upload: "
+							<< std::chrono::duration<double, std::milli>(batchUploadEnd - batchScanEnd).count()
+							<< " ms\n";
+
+						std::cout << "Uniform setup + dispatch submission: "
+							<< std::chrono::duration<double, std::milli>(dispatchSubmitEnd - batchUploadEnd).count()
+							<< " ms\n";
+
 						Anubis::SwitchShaderStage(shaders.display.shaderId);
 						glBindBuffer(GL_SHADER_STORAGE_BUFFER, shaders.display.ssboIds[9]);
-
 						glGetBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, sizeof(int), &totalMeshletCount);
 						glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
-						totalTriangleCount = totalMeshletCount * 64 + 64;
-						std::cout << gpu.Stop() << " meshing time \n";
-						std::cout << totalMeshletCount << "adada \n";
-					}
 
+						totalTriangleCount = totalMeshletCount * 64 + 64;
+					}
 				}
+
+				
 			}
 			offfr++;
 			
