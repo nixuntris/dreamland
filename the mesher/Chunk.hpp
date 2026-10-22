@@ -184,7 +184,8 @@ struct Faces {
 struct ChunkData {
 	bool skipped = false;
 	int lod;
-	Anubis::GPUONLYShortMap fluidByteMap;
+	Anubis::GPUONLYShortMap fluidShortMap;
+	Anubis::GPUONLYByteMap fluidByteMap;
 	uint8_t* bitMap;
 	uint16_t* terrain;
 	uint16_t* palette;
@@ -356,7 +357,8 @@ public:
 	int beginningTri;
 	std::vector<Vector3> grassList;
 	bool hwOrSoftwareRaster = false;
-	void GenerateSavanna(ChunkData* chunkData, GenerationData generationData, int gx, int gy, int gz, int lod = 1, bool grass = false) {
+	bool shortenedData = false;
+	inline void GenerateSavanna(ChunkData* chunkData, GenerationData generationData, int gx, int gy, int gz, int lod = 1, bool grass = false) {
 		this->gx = gx;
 		this->gy = gy;
 		this->gz = gz;
@@ -429,7 +431,7 @@ public:
 			
 		
 	}
-	void GenerateDesert(ChunkData* chunkData, GenerationData generationData, int gx, int gy, int gz, int lod = 1, bool grass = false) {
+	inline void GenerateDesert(ChunkData* chunkData, GenerationData generationData, int gx, int gy, int gz, int lod = 1, bool grass = false) {
 		this->gx = gx;
 		this->gy = gy;
 		this->gz = gz;
@@ -460,7 +462,7 @@ public:
 			}
 		}
 	}
-	void GenerateMountains(ChunkData* chunkData, GenerationData generationData, int gx, int gy, int gz, int lod = 1, bool grass = false) {
+	inline void GenerateMountains(ChunkData* chunkData, GenerationData generationData, int gx, int gy, int gz, int lod = 1, bool grass = false) {
 		this->gx = gx;
 		this->gy = gy;
 		this->gz = gz;
@@ -515,7 +517,7 @@ public:
 			}
 		}
 	}
-	void GenerateDebug(ChunkData* chunkData, GenerationData generationData, int gx, int gy, int gz, int lod = 1, bool grass = false) {
+	inline void GenerateDebug(ChunkData* chunkData, GenerationData generationData, int gx, int gy, int gz, int lod = 1, bool grass = false) {
 		this->gx = gx;
 		this->gy = gy;
 		this->gz = gz;
@@ -570,7 +572,7 @@ public:
 			}
 		}
 	}
-	void GenLowerResolution(ChunkData* chunkData) {
+	inline void GenLowerResolution(ChunkData* chunkData) {
 
 		uint16_t* lodVals = (uint16_t*)MemAlloc(this->size / 2 * this->size / 2 * this->size / 2 * sizeof(uint16_t));
 
@@ -595,7 +597,7 @@ public:
 		free(chunkData->terrain);
 		chunkData->terrain = lodVals;
 	}
-	void Compress(ChunkData* chunkData) {
+	inline void Compress(ChunkData* chunkData) {
 
 		if (voxelCount == 0) {
 			return;
@@ -606,11 +608,29 @@ public:
 		for (int i = 0; i < 65535; i++) {
 			voxels[i] = 0;
 		}
-
+		bool over255 = true;
 		for (int i = 0; i < size * size * size; i++) {
 			voxels[chunkData->terrain[i]] += 1;
+			if (chunkData->terrain[i] > 255) {
+				over255 = false;
+			}
 		}
 
+		if (!over255) {
+			chunkData->compressedTerrain = (uint8_t*)MemAlloc(size*size*size);
+
+			for (int i = 0; i < size * size * size; i++) {
+				chunkData->compressedTerrain[i] = (uint8_t)chunkData->terrain[i];
+			}
+
+			shortenedData = true;
+
+			free(chunkData->terrain);
+			chunkData->terrain = NULL;
+
+			afterGlobalMemUsage += size*size*size;
+			return;
+		}
 		int originalVoxels = 0;
 		uint16_t palette[255]; 
 		for (int i = 1; i < 65535; i++) {
@@ -644,7 +664,7 @@ public:
 			afterGlobalMemUsage += size * size * size + originalVoxels * sizeof(uint16_t);
 		}
 	}
-	uint16_t* DecompressChunk(ChunkData* chunkData) {
+	inline uint16_t* DecompressChunk(ChunkData* chunkData) {
 		int totalVoxels = size * size * size;
 		uint16_t* decompressedData = (uint16_t*)MemAlloc(totalVoxels * sizeof(uint16_t));
 		if (chunkData->compressed) {
@@ -659,7 +679,7 @@ public:
 
 		return decompressedData;
 	}
-	void GenerateLod(ChunkData* chunkData, int gx, int gy, int gz) {
+	inline void GenerateLod(ChunkData* chunkData, int gx, int gy, int gz) {
 		voxelCount = 0;
 		for (int i = 0; i < chunkSize * chunkSize * chunkSize; i++) {
 			if (chunkData->compressed) {
@@ -734,7 +754,7 @@ public:
 		chunkData->lod = lod;
 		GenerateBitMap(chunkData);
 	}
-	void GenerateBitMap(ChunkData* chunkData) {
+	inline void GenerateBitMap(ChunkData* chunkData) {
 		chunkData->bitMap = (uint8_t*)MemAlloc(size * size * size / 8 * sizeof(uint8_t));
 		for (int x = 0; x < size; x++) {
 			for (int y = 0; y < size; y++) {

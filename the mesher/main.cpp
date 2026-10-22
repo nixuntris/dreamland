@@ -956,42 +956,49 @@ public:
 			}
 
 			auto grassTimeMs = grassT.Stop();
-			auto allocateChunk = [&](int nx, int ny, int nz)
-				{
-					if (ny < 0) return;
-
-					int neighbourId = ny * (wx * wz) + nz * wx + nx;
-					if (nx < 0 || ny < 0 || nz < 0 || nx >= wx || ny >= wy || nz >= wz) return;
-					if (chunks[neighbourId].lod == 0) return;
-					if (chunks[neighbourId].hasFluid) return;
-					if (chunks[neighbourId].voxelCount == chunks[neighbourId].size * chunks[neighbourId].size * chunks[neighbourId].size) return;
-
-					chunks[neighbourId].hasFluid = true;
-					int size = chunkSize / chunks[neighbourId].lod;
-					world.chunkData[neighbourId].fluidByteMap.Clear({ size,size,size });
-
-					if (world.chunkData[neighbourId].voxelCount != 0)
-					{
-						uint16_t* tt = chunks[neighbourId].DecompressChunk(&world.chunkData[neighbourId]);
-						world.chunkData[neighbourId].fluidByteMap.Upload(tt);
-						free(tt);
-						world.chunkData[neighbourId].fluidByteMap.GetBindlessHandle();
-						world.handle.handle[neighbourId].handle = world.chunkData[neighbourId].fluidByteMap.handle;
-						world.handle.handle[neighbourId].lod = world.chunkData[neighbourId].lod;
-					}
-					else {
-					}
-				};
 			START_TIMER(physicsAllocator)
 			if (!preallocated) {
 				auto allocateStart = std::chrono::high_resolution_clock::now();
+#pragma omp parallel for collapse(3)
+				for (int nx = 0; nx < wx; nx++) {
+					for (int ny = 0; ny < wx; ny++) {
+						for (int nz = 0; nz < wx; nz++) {
 
-				for (int x = 0; x < wx; x++) {
-					for (int y = 0; y < wx; y++) {
-						for (int z = 0; z < wx; z++) {
 
-							allocateChunk(x, y, z);
-							
+							if (ny < 0) continue;
+
+							int neighbourId = ny * (wx * wz) + nz * wx + nx;
+							if (nx < 0 || ny < 0 || nz < 0 || nx >= wx || ny >= wy || nz >= wz) continue;
+							if (chunks[neighbourId].lod == 0) continue;
+							if (chunks[neighbourId].hasFluid) continue;
+							if (chunks[neighbourId].voxelCount == chunks[neighbourId].size * chunks[neighbourId].size * chunks[neighbourId].size) continue;
+
+							chunks[neighbourId].hasFluid = true;
+							int size = chunkSize / chunks[neighbourId].lod;
+
+							if (world.chunkData[neighbourId].voxelCount != 0)
+							{
+								
+								if (chunks[neighbourId].shortenedData) {
+
+									world.chunkData[neighbourId].fluidByteMap.Clear({ size,size,size });
+									world.chunkData[neighbourId].fluidByteMap.Upload(world.chunkData[neighbourId].compressedTerrain);
+									world.chunkData[neighbourId].fluidByteMap.GetBindlessHandle();
+									world.handle.handle[neighbourId].handle = world.chunkData[neighbourId].fluidByteMap.handle;
+
+								}
+								else {
+									world.chunkData[neighbourId].fluidShortMap.Clear({ size,size,size });
+									uint16_t* tt = chunks[neighbourId].DecompressChunk(&world.chunkData[neighbourId]);
+									world.chunkData[neighbourId].fluidShortMap.Upload(tt);
+									free(tt);
+									world.chunkData[neighbourId].fluidShortMap.GetBindlessHandle();
+									world.handle.handle[neighbourId].handle = world.chunkData[neighbourId].fluidShortMap.handle;
+
+								}
+								//so, basically, the bottleneck is the upload ,and i need to create multiple at once instead of one
+								world.handle.handle[neighbourId].lod = world.chunkData[neighbourId].lod;
+							}
 						}
 					}
 				}
@@ -1029,7 +1036,8 @@ public:
 						shaders.display.UpdateSSBO(10, vv, dd * sizeof(Math::IVector3), 0);
 
 						auto batchUploadEnd = std::chrono::high_resolution_clock::now();
-
+						Anubis::GpuTimer mesh;
+						mesh.Start();
 						Anubis::SwitchShaderStage(shaders.fluidRender.programID);
 						shaders.fluidRender.SetVector3({ pos.x,pos.y,pos.z }, "camPos");
 						shaders.fluidRender.SetVector3({ forward.x,forward.y,forward.z }, "camForward");
@@ -1043,7 +1051,9 @@ public:
 						shaders.fluidRender.SetInt(wHeight, "renderHeight");
 						shaders.fluidRender.SetInt(frame, "frameIndex");
 						shaders.fluidRender.Use(dd, 1, 1);
+						
 
+						std::cout << " Meshing time: " << mesh.Stop() << "ms \n";
 						auto dispatchSubmitEnd = std::chrono::high_resolution_clock::now();
 
 						std::cout << "Batch scan: "
@@ -1057,7 +1067,6 @@ public:
 						std::cout << "Uniform setup + dispatch submission: "
 							<< std::chrono::duration<double, std::milli>(dispatchSubmitEnd - batchUploadEnd).count()
 							<< " ms\n";
-
 						Anubis::SwitchShaderStage(shaders.display.shaderId);
 						glBindBuffer(GL_SHADER_STORAGE_BUFFER, shaders.display.ssboIds[9]);
 						glGetBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, sizeof(int), &totalMeshletCount);
