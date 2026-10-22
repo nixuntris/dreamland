@@ -272,11 +272,7 @@ namespace Anubis {
 
             glCreateBuffers(1, &pboID);
 
-            // CRITICAL FIX: Account for 2 bytes per pixel (GL_R16UI / uint16_t)
             GLsizeiptr dataSize = static_cast<GLsizeiptr>(size.x) * size.y * size.z * sizeof(uint16_t);
-
-            // Added GL_MAP_WRITE_BIT because persistent/dynamic mapping flags 
-            // often require paired access depending on driver implementations.
             glNamedBufferStorage(pboID, dataSize, nullptr, GL_MAP_READ_BIT | GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT);
         }
 

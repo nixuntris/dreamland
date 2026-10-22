@@ -616,7 +616,7 @@ public:
 			}
 		}
 
-		if (!over255) {
+		if (over255) {
 			chunkData->compressedTerrain = (uint8_t*)MemAlloc(size*size*size);
 
 			for (int i = 0; i < size * size * size; i++) {

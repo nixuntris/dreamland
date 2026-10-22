@@ -630,6 +630,12 @@ public:
 		mesh.Create(Anubis::cubeVertices, floatCount);
 		bool preallocated = false;
 		bool generatedMesh = false;
+		bool array[mwx][mwz];
+		for (int x = 0; x < wx; x++) {
+			for (int y = 0; y < wz; y++) {
+				array[x][y] = false;
+			}
+		}
 		while (window.IsOpen()) {
 			double frameStart = glfwGetTime(); 
 			CheckLodsToUpdate();
@@ -957,124 +963,157 @@ public:
 
 			auto grassTimeMs = grassT.Stop();
 			START_TIMER(physicsAllocator)
-			if (!preallocated) {
-				auto allocateStart = std::chrono::high_resolution_clock::now();
-#pragma omp parallel for collapse(3)
-				for (int nx = 0; nx < wx; nx++) {
-					for (int ny = 0; ny < wx; ny++) {
-						for (int nz = 0; nz < wx; nz++) {
-
-
-							if (ny < 0) continue;
-
-							int neighbourId = ny * (wx * wz) + nz * wx + nx;
-							if (nx < 0 || ny < 0 || nz < 0 || nx >= wx || ny >= wy || nz >= wz) continue;
-							if (chunks[neighbourId].lod == 0) continue;
-							if (chunks[neighbourId].hasFluid) continue;
-							if (chunks[neighbourId].voxelCount == chunks[neighbourId].size * chunks[neighbourId].size * chunks[neighbourId].size) continue;
-
-							chunks[neighbourId].hasFluid = true;
-							int size = chunkSize / chunks[neighbourId].lod;
-
-							if (world.chunkData[neighbourId].voxelCount != 0)
-							{
-								
-								if (chunks[neighbourId].shortenedData) {
-
-									world.chunkData[neighbourId].fluidByteMap.Clear({ size,size,size });
-									world.chunkData[neighbourId].fluidByteMap.Upload(world.chunkData[neighbourId].compressedTerrain);
-									world.chunkData[neighbourId].fluidByteMap.GetBindlessHandle();
-									world.handle.handle[neighbourId].handle = world.chunkData[neighbourId].fluidByteMap.handle;
-
-								}
-								else {
-									world.chunkData[neighbourId].fluidShortMap.Clear({ size,size,size });
-									uint16_t* tt = chunks[neighbourId].DecompressChunk(&world.chunkData[neighbourId]);
-									world.chunkData[neighbourId].fluidShortMap.Upload(tt);
-									free(tt);
-									world.chunkData[neighbourId].fluidShortMap.GetBindlessHandle();
-									world.handle.handle[neighbourId].handle = world.chunkData[neighbourId].fluidShortMap.handle;
-
-								}
-								//so, basically, the bottleneck is the upload ,and i need to create multiple at once instead of one
-								world.handle.handle[neighbourId].lod = world.chunkData[neighbourId].lod;
-							}
+			float lastDistance = 10000;
+			int chunkX = -1;
+			int chunkZ = -1;
+			for (int x = 0; x < wx; x++) {
+				for (int y = 0; y < wy; y++) {
+					Vector2 chunkPos = { x * 64,y * 64 };
+					Vector2 cameraPos2D = { camera.position.x,camera.position.z };
+					
+					float dd = Vector2Distance(chunkPos, cameraPos2D);
+					if (!array[x][y]) {
+						if (chunkX == -1) {
+							chunkX = x;
+							chunkZ = y;
+							lastDistance = dd;
+						}
+						if (lastDistance < dd && chunkX != -1) {
+							lastDistance = dd;
+							chunkX = x;
+							chunkZ = y;
 						}
 					}
 				}
+			}
+			if (chunkX != -1) {
+				std::cout << chunkX << " " << chunkZ << "\n";
+				array[chunkX][chunkZ] = true;
+				int nz = chunkZ;
+				int nx = chunkX;
+				for (int ny = 0; ny < wy; ny++) {
+
+
+					int neighbourId = ny * (wx * wz) + nz * wx + nx;
+					if (nx < 0 || ny < 0 || nz < 0 || nx >= wx || ny >= wy || nz >= wz) continue;
+					if (chunks[neighbourId].lod == 0) continue;
+					if (chunks[neighbourId].hasFluid) continue;
+					if (chunks[neighbourId].voxelCount == chunks[neighbourId].size * chunks[neighbourId].size * chunks[neighbourId].size) continue;
+
+					chunks[neighbourId].hasFluid = true;
+					int size = chunkSize / chunks[neighbourId].lod;
+
+					if (world.chunkData[neighbourId].voxelCount != 0)
+					{
+
+						if (chunks[neighbourId].shortenedData) {
+							world.chunkData[neighbourId].fluidByteMap.Clear({ size,size,size });
+							world.chunkData[neighbourId].fluidByteMap.Upload(world.chunkData[neighbourId].compressedTerrain);
+							world.chunkData[neighbourId].fluidByteMap.GetBindlessHandle();
+							world.handle.handle[neighbourId].handle = world.chunkData[neighbourId].fluidByteMap.handle;
+
+						}
+						else {
+							world.chunkData[neighbourId].fluidShortMap.Clear({ size,size,size });
+							uint16_t* tt = chunks[neighbourId].DecompressChunk(&world.chunkData[neighbourId]);
+							world.chunkData[neighbourId].fluidShortMap.Upload(tt);
+							free(tt);
+							world.chunkData[neighbourId].fluidShortMap.GetBindlessHandle();
+							world.handle.handle[neighbourId].handle = world.chunkData[neighbourId].fluidShortMap.handle;
+
+						}
+						//so, basically, the bottleneck is the upload ,and i need to create multiple at once instead of one
+						world.handle.handle[neighbourId].lod = world.chunkData[neighbourId].lod;
+					}
+				}
+			}
+			if (!preallocated) {
+				auto allocateStart = std::chrono::high_resolution_clock::now();
+
 				auto allocateEnd = std::chrono::high_resolution_clock::now();
 
 				std::cout << "Data upload: "
 					<< std::chrono::duration<double, std::milli>(allocateEnd - allocateStart).count()
 					<< " ms\n";
+				bool finish = true;
+				for (int x = 0; x < wx; x++) {
+					for (int z = 0; z < wz; z++) {
+						if (!array[x][z]) {
+							finish = false;
+						}
 
-				Anubis::SwitchShaderStage(shaders.display.shaderId);
-				shaders.display.CreateSSBO(3, sizeof(world.handle));
-				std::cout << "size of handle: "<<sizeof(world.handle) << "\n";
-				shaders.display.UpdateSSBO(3, &world.handle, sizeof(world.handle), 0);
-				preallocated = true;
-				
-				if (gpuMeshing) {
-					Anubis::SwitchShaderStage(shaders.display.shaderId);
-					shaders.display.UpdateSSBO(9, 0, sizeof(int), 0);
-
-					auto batchStart = std::chrono::high_resolution_clock::now();
-
-					int dd = 0;
-
-					for (int i = 0; i < wx * wy * wz; i++) {
-						vv[dd].x = chunks[i].gx;
-						vv[dd].y = chunks[i].gy;
-						vv[dd].z = chunks[i].gz;
-
-						dd += world.chunkData[i].voxelCount != 0;
-					}
-
-					auto batchScanEnd = std::chrono::high_resolution_clock::now();
-
-					if (dd > 0) {
-						shaders.display.UpdateSSBO(10, vv, dd * sizeof(Math::IVector3), 0);
-
-						auto batchUploadEnd = std::chrono::high_resolution_clock::now();
-						Anubis::GpuTimer mesh;
-						mesh.Start();
-						Anubis::SwitchShaderStage(shaders.fluidRender.programID);
-						shaders.fluidRender.SetVector3({ pos.x,pos.y,pos.z }, "camPos");
-						shaders.fluidRender.SetVector3({ forward.x,forward.y,forward.z }, "camForward");
-						shaders.fluidRender.SetMatrix({ matView.m0,matView.m1,matView.m2,matView.m3,matView.m4,matView.m5,matView.m6,matView.m7,matView.m8,matView.m9,matView.m10,matView.m11,matView.m12,matView.m13,matView.m14,matView.m15 }, "matView");
-						shaders.fluidRender.SetMatrix({ matProj.m0,matProj.m1,matProj.m2,matProj.m3,matProj.m4,matProj.m5,matProj.m6,matProj.m7,matProj.m8,matProj.m9,matProj.m10,matProj.m11,matProj.m12,matProj.m13,matProj.m14,matProj.m15 }, "matProj");
-						shaders.fluidRender.SetInt(wx, "wx");
-						shaders.fluidRender.SetInt(wy, "wy");
-						shaders.fluidRender.SetInt(wz, "wz");
-						shaders.fluidRender.SetFloat(timeSpeed, "timeSpeed");
-						shaders.fluidRender.SetInt(wWidth, "renderWidth");
-						shaders.fluidRender.SetInt(wHeight, "renderHeight");
-						shaders.fluidRender.SetInt(frame, "frameIndex");
-						shaders.fluidRender.Use(dd, 1, 1);
-						
-
-						std::cout << " Meshing time: " << mesh.Stop() << "ms \n";
-						auto dispatchSubmitEnd = std::chrono::high_resolution_clock::now();
-
-						std::cout << "Batch scan: "
-							<< std::chrono::duration<double, std::milli>(batchScanEnd - batchStart).count()
-							<< " ms\n";
-
-						std::cout << "SSBO upload: "
-							<< std::chrono::duration<double, std::milli>(batchUploadEnd - batchScanEnd).count()
-							<< " ms\n";
-
-						std::cout << "Uniform setup + dispatch submission: "
-							<< std::chrono::duration<double, std::milli>(dispatchSubmitEnd - batchUploadEnd).count()
-							<< " ms\n";
-						Anubis::SwitchShaderStage(shaders.display.shaderId);
-						glBindBuffer(GL_SHADER_STORAGE_BUFFER, shaders.display.ssboIds[9]);
-						glGetBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, sizeof(int), &totalMeshletCount);
-						glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
-
-						totalTriangleCount = totalMeshletCount * 64 + 64;
 					}
 				}
+				if (finish) {
+					Anubis::SwitchShaderStage(shaders.display.shaderId);
+					shaders.display.CreateSSBO(3, sizeof(world.handle));
+					std::cout << "size of handle: " << sizeof(world.handle) << "\n";
+					shaders.display.UpdateSSBO(3, &world.handle, sizeof(world.handle), 0);
+					preallocated = true;
+
+					if (gpuMeshing) {
+						Anubis::SwitchShaderStage(shaders.display.shaderId);
+						shaders.display.UpdateSSBO(9, 0, sizeof(int), 0);
+
+						auto batchStart = std::chrono::high_resolution_clock::now();
+
+						int dd = 0;
+
+						for (int i = 0; i < wx * wy * wz; i++) {
+							vv[dd].x = chunks[i].gx;
+							vv[dd].y = chunks[i].gy;
+							vv[dd].z = chunks[i].gz;
+
+							dd += world.chunkData[i].voxelCount != 0;
+						}
+
+						auto batchScanEnd = std::chrono::high_resolution_clock::now();
+
+						if (dd > 0) {
+							shaders.display.UpdateSSBO(10, vv, dd * sizeof(Math::IVector3), 0);
+
+							auto batchUploadEnd = std::chrono::high_resolution_clock::now();
+							Anubis::GpuTimer mesh;
+							mesh.Start();
+							Anubis::SwitchShaderStage(shaders.fluidRender.programID);
+							shaders.fluidRender.SetVector3({ pos.x,pos.y,pos.z }, "camPos");
+							shaders.fluidRender.SetVector3({ forward.x,forward.y,forward.z }, "camForward");
+							shaders.fluidRender.SetMatrix({ matView.m0,matView.m1,matView.m2,matView.m3,matView.m4,matView.m5,matView.m6,matView.m7,matView.m8,matView.m9,matView.m10,matView.m11,matView.m12,matView.m13,matView.m14,matView.m15 }, "matView");
+							shaders.fluidRender.SetMatrix({ matProj.m0,matProj.m1,matProj.m2,matProj.m3,matProj.m4,matProj.m5,matProj.m6,matProj.m7,matProj.m8,matProj.m9,matProj.m10,matProj.m11,matProj.m12,matProj.m13,matProj.m14,matProj.m15 }, "matProj");
+							shaders.fluidRender.SetInt(wx, "wx");
+							shaders.fluidRender.SetInt(wy, "wy");
+							shaders.fluidRender.SetInt(wz, "wz");
+							shaders.fluidRender.SetFloat(timeSpeed, "timeSpeed");
+							shaders.fluidRender.SetInt(wWidth, "renderWidth");
+							shaders.fluidRender.SetInt(wHeight, "renderHeight");
+							shaders.fluidRender.SetInt(frame, "frameIndex");
+							shaders.fluidRender.Use(dd, 1, 1);
+
+
+							std::cout << " Meshing time: " << mesh.Stop() << "ms \n";
+							auto dispatchSubmitEnd = std::chrono::high_resolution_clock::now();
+
+							std::cout << "Batch scan: "
+								<< std::chrono::duration<double, std::milli>(batchScanEnd - batchStart).count()
+								<< " ms\n";
+
+							std::cout << "SSBO upload: "
+								<< std::chrono::duration<double, std::milli>(batchUploadEnd - batchScanEnd).count()
+								<< " ms\n";
+
+							std::cout << "Uniform setup + dispatch submission: "
+								<< std::chrono::duration<double, std::milli>(dispatchSubmitEnd - batchUploadEnd).count()
+								<< " ms\n";
+							Anubis::SwitchShaderStage(shaders.display.shaderId);
+							glBindBuffer(GL_SHADER_STORAGE_BUFFER, shaders.display.ssboIds[9]);
+							glGetBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, sizeof(int), &totalMeshletCount);
+							glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
+
+							totalTriangleCount = totalMeshletCount * 64 + 64;
+						}
+					}
+				}
+
 
 				
 			}
