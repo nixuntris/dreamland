@@ -256,6 +256,7 @@ namespace Anubis {
             glDeleteTextures(1, &textureID);
         }
     };
+
     class GPUONLYShortMap {
     public:
         Math::IVector3 size{};
@@ -549,6 +550,72 @@ namespace Anubis {
 
         // Delete() method remains same
     };
+    void CreateByteMaps(
+        GPUONLYByteMap** maps,
+        uint8_t** data,
+        Math::IVector3* sizes,
+        int count
+    ) {
+        if (count <= 0) return;
+
+        std::vector<GLuint> textureIDs(count);
+        glCreateTextures(GL_TEXTURE_3D, count, textureIDs.data());
+
+        for (int i = 0; i < count; i++) {
+            maps[i]->size = sizes[i];
+            maps[i]->textureID = textureIDs[i];
+
+            glTextureStorage3D(
+                textureIDs[i], 1, GL_R8UI,
+                sizes[i].x, sizes[i].y, sizes[i].z
+            );
+        }
+
+        for (int i = 0; i < count; i++) {
+            glTextureSubImage3D(
+                textureIDs[i], 0,
+                0, 0, 0,
+                sizes[i].x, sizes[i].y, sizes[i].z,
+                GL_RED_INTEGER, GL_UNSIGNED_BYTE,
+                data[i]
+            );
+
+            maps[i]->GetBindlessHandle();
+        }
+    }
+    void CreateShortMaps(
+        GPUONLYShortMap** maps,
+        uint16_t** data,
+        Math::IVector3* sizes,
+        int count
+    ) {
+        if (count <= 0) return;
+
+        std::vector<GLuint> textureIDs(count);
+        glCreateTextures(GL_TEXTURE_3D, count, textureIDs.data());
+
+        for (int i = 0; i < count; i++) {
+            maps[i]->size = sizes[i];
+            maps[i]->textureID = textureIDs[i];
+
+            glTextureStorage3D(
+                textureIDs[i], 1, GL_R16UI,
+                sizes[i].x, sizes[i].y, sizes[i].z
+            );
+        }
+
+        for (int i = 0; i < count; i++) {
+            glTextureSubImage3D(
+                textureIDs[i], 0,
+                0, 0, 0,
+                sizes[i].x, sizes[i].y, sizes[i].z,
+                GL_RED_INTEGER, GL_UNSIGNED_SHORT,
+                data[i]
+            );
+
+            maps[i]->GetBindlessHandle();
+        }
+    }
     class GPUONLYInt32Map {
     public:
         Math::IVector3 size{};
