@@ -207,7 +207,6 @@ void main()
 
     vec3 origin = pos[idx];
     float time = float(frameIndex) *timeSpeed;
-    if (readVoxelData(ivec3(origin))==7) frame[idx] = 0;
     float radiance = 0.0;
 
     for (int d = 0; d < 2; d++)
@@ -223,45 +222,9 @@ void main()
         float shadow = cloudShadow(ro, rd, time, jitter);
         shadow = mix(1.0, shadow, 0.3);
         T *= shadow;   
-        for (int i = 0; i < 64; i++) {
-            t += 1.0;
-            ivec3 ip = ivec3(floor(ro + rd * t));
-            if (outOfBounds(ip)) break; 
 
-            ivec3 chunk = ip / chunkSize;
-            int ci = chunk.y * (wx * wz) + chunk.z * wx + chunk.x;
-            if (readVoxelData(ip) != 0) { T *= 0.70; break; }
-        }
-
-        float bounceLight = 0.0;
-
-        for (int b = 0; b < 2; b++)
-        {
-            vec3 br = normalize(bounceDirs[b]);
-
-            vec3 ro2 = ro;
-            float Tb = 1.0;
-
-            for (int i = 0; i < 32; i++)
-            {
-                vec3 p = ro2 + br * float(i);
-
-                
-                if (inBounds(ivec3(p))) break;
-                if (readVoxelData(ivec3(p)) != 0)
-                {
-                    Tb *= 0.15;
-                    break;
-                   
-                }
-            }
-
-            bounceLight += Tb;
-        }
-
-        bounceLight /= 2.0;
-
-        radiance += T + 0.35 * bounceLight;
+        
+        radiance += T;
     }
 
     float mean = radiance / 2.0;

@@ -15,7 +15,7 @@ struct ShaderManager {
 	Anubis::ComputeShader grassRenderer;
 	Anubis::ComputeShader secondaryRaysRender;
 	Anubis::ComputeShader fluidRender;
-	Anubis::ComputeShader fluidSim;
+	Anubis::ComputeShader generateTerrain;
 	Anubis::ComputeShader fillOut;
 	Anubis::ComputeShader clouds;
 	Anubis::ComputeShader bilboards;
@@ -33,7 +33,7 @@ struct ShaderManager {
 		hwRenderForObjects.LoadFromFile("hwMesh.fs", "hwMesh.vs");
 		secondaryRaysRender.Setup("SecondaryRays.glsl");
 		fluidRender.Setup("RenderFluids.glsl");
-		fluidSim.Setup("SimulateFluids.glsl");
+		generateTerrain.Setup("GenerateTerrain.glsl");
 		fillOut.Setup("FillOutPhysicsData.glsl");
 		renderPhysicalObjects.Setup("PhysicsObject.glsl");
 		clearPhysicalObjects.Setup("ClearPhysicalObject.glsl");

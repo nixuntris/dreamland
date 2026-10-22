@@ -63,7 +63,6 @@ uint readVoxelData(ivec3 pos) {
     int index = chunk.y * (wx * wz) + chunk.z * wx + chunk.x;
     int regionLod = handles[index].lod;
 
-
     uvec2 handle = handles[index].handle;
     if (handle != uvec2(0)) {
         uimage3D fluidMap = uimage3D(handle);
@@ -109,9 +108,9 @@ void main()
     uint cacheVal[perThread * perThread * perThread];
     uint myCount = 0u;
 
-    for (int x = 0; x < perThread; x++) {
-        for (int y = 0; y < perThread; y++) {
-            for (int z = 0; z < perThread; z++) {
+    for (int x = 0; x < perThread; x+=lod) {
+        for (int y = 0; y < perThread; y+=lod) {
+            for (int z = 0; z < perThread; z+=lod) {
                 ivec3 lp = base + ivec3(x, y, z);
                 ivec3 p = chunkOrigin + lp;
 

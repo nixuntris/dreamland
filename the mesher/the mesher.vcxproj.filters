@@ -124,7 +124,7 @@
     <None Include="RenderFluids.glsl">
       <Filter>Source Files\Shaders\Rasterizer\Physics</Filter>
     </None>
-    <None Include="SimulateFluids.glsl">
+    <None Include="GenerateTerrain.glsl">
       <Filter>Source Files\Shaders\Rasterizer\Physics</Filter>
     </None>
     <None Include="hwMesh.vs">
@@ -151,12 +151,14 @@
     <None Include="Clouds.glsl">
       <Filter>Source Files\Shaders\Rasterizer\Software\Illumination</Filter>
     </None>
-    <None Include="..\readme.md" />
     <None Include="bilboard.glsl">
       <Filter>Source Files\Shaders\Rasterizer\Software\Meshlets</Filter>
     </None>
     <None Include="desert.txt">
       <Filter>Source Files\terrain\example terrain</Filter>
+    </None>
+    <None Include="..\readme.md">
+      <Filter>Source Files</Filter>
     </None>
   </ItemGroup>
   <ItemGroup>

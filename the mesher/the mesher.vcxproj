@@ -166,7 +166,7 @@
     <None Include="renderAABB.glsl" />
     <None Include="HizBuilder.glsl" />
     <None Include="SecondaryRays.glsl" />
-    <None Include="SimulateFluids.glsl" />
+    <None Include="GenerateTerrain.glsl" />
     <None Include="tree.voxobj" />
     <None Include="ver.vs" />
   </ItemGroup>

@@ -206,6 +206,14 @@ void DrawQuadSoftwareCS(
         }
     }
 }
+const vec3 faceN[6] = vec3[6](
+    vec3( 0, 0,-1),  // face 0: z = 0
+    vec3( 0, 0, 1),  // face 1: z = 1
+    vec3(-1, 0, 0),  // face 2: x = 0
+    vec3( 1, 0, 0),  // face 3: x = 1
+    vec3( 0, 1, 0),  // face 4: y = 1
+    vec3( 0,-1, 0)   // face 5: y = 0
+);
 void main()
 {
 
@@ -243,8 +251,9 @@ void main()
         vec3 v2 = baseP+verticesr[tris[i][1]]*meta.lod;
         vec3 v3 = baseP+verticesr[tris[i][2]]*meta.lod;
         
+        vec3 v6 = baseP +verticesr[tris[i][5]]*meta.lod;
         vec3 c = vec3(
-            (v1+v2+v3)/3.0f
+            (v1+v2+v3+v6)/4.0f
         );
         vec3 edge1 = v2 - v1;
         vec3 edge2 = v3 - v1;
@@ -253,7 +262,6 @@ void main()
        if (dot(faceNormal, camPos - c) <= 0.0)
             continue;
         vec3 toC = c - camPos;
-        vec3 v6 = baseP +verticesr[tris[i][5]]*meta.lod;
     
 
         vec3 toV1 = v1 - camPos;
@@ -279,6 +287,6 @@ void main()
             (p1.y < SCREEN_MIN.y && p2.y < SCREEN_MIN.y && p3.y < SCREEN_MIN.y) ||
             (p1.y >= SCREEN_MAX.y && p2.y >= SCREEN_MAX.y && p3.y >= SCREEN_MAX.y)) continue;
         
-        DrawQuadSoftwareCS(p1, p2, p6, p3, color, int(distance), c,triangleId);
+        DrawQuadSoftwareCS(p1, p2, p6, p3, color, int(distance), baseP,triangleId);
     }
 }

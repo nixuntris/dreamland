@@ -81,9 +81,9 @@ void main() {
     vec3 centre = (near+far)/2.0f;
     vec3 relativePos = centre - camPos; 
        
-    float projection = dot(relativePos, camForward); //also distance to camera
+    //float projection = dot(relativePos, camForward); //also distance to camera
     
-    if (projection < 0.0f) return;
+    //if (projection < 0.0f) return;
     
     if (IsCubeInFrustum(near,far)) {
             int triangleFrustumedId = atomicAdd(triangleAtomic,1);

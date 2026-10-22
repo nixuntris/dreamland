@@ -157,7 +157,6 @@ public:
 		int maxSSBOCount = 0;
 		glGetIntegerv(GL_MAX_SHADER_STORAGE_BUFFER_BINDINGS, &maxSSBOCount);
 		std::cout << maxSSBOCount << "\n";
-		//Anubis::DebugMode();
 		if (gpuMeshing) {
 			shaders.display.CreateSSBO(9, sizeof(int) * 2);
 			shaders.display.CreateSSBO(9, sizeof(int) * 2);
@@ -190,101 +189,6 @@ public:
 		glEnable(GL_CULL_FACE);
 		glCullFace(GL_BACK);
 		glFrontFace(GL_CCW);
-	}
-	void Update() {
-		START_TIMER(triangle_counter);
-
-		totalTriangleCount = 0;
-		totalMeshletCount = 0;
-
-		// ---- calculate totals ----
-		for (int kk = 0; kk < wx * wy * wz; kk++) {
-			if (chunks[kk].voxelCount == 0) continue;
-			if (chunks[kk].updated) {
-
-				if (chunks[kk].oldTri > chunks[kk].cpumesh.triangleCount) {
-					//override old as empty
-					//need new memory
-					//look for pockets
-					//if no pockets that fit, push to the end
-					//nuclear option, if no memory that is already allocated can be used	
-					chunks[kk].oldTri = chunks[kk].cpumesh.triangleCount;
-				}
-				else {
-					//std::cout << "existing mem \n";
-					//override existing
-
-				}
-			}
-			chunks[kk].beginningTri = totalTriangleCount;
-			chunks[kk].beginningMeshlet = totalMeshletCount;
-
-			int triCount = chunks[kk].cpumesh.triangleCount;
-			int meshletCount = (int)ceil((float)triCount / 64.0f);
-
-			totalTriangleCount += triCount;
-			totalMeshletCount += meshletCount;
-		}
-
-		END_TIMER(triangle_counter);
-
-		if (firstGen) {
-			if (totalMeshletCount <= 0 || totalTriangleCount <= 0) std::cout << "First gen of software meshing is failing\n";
-			shaders.display.CreatePersistentSSBO(5, (totalMeshletCount + 1) * sizeof(int)*8);
-			shaders.display.CreatePersistentSSBO(2, totalTriangleCount * sizeof(uint32_t)*8);
-			shaders.display.CreatePersistentSSBO(6, totalTriangleCount * sizeof(uint32_t)*8);
-			shaders.display.CreatePersistentSSBO(7, totalMeshletCount * 6 * sizeof(float)*8);
-			firstGen = false;
-		}
-
-		START_TIMER(stream_to_gpu);
-
-		uint32_t* p_vertex = (uint32_t*)shaders.display.ssboPointers[2];
-		uint32_t* p_color = (uint32_t*)shaders.display.ssboPointers[6];
-		float* p_aabb = (float*)shaders.display.ssboPointers[7];
-
-		size_t bytesVertex = 0;
-		size_t bytesColor = 0;
-		size_t bytesAABB = 0;
-
-		bool previously = false;
-
-		for (int kk = 0; kk < wx * wy * wz; kk++) {
-//			if (Vector3Distance({ (float)camera.position.x ,(float)camera.position.y,(float)camera.position.z }, { (float)chunks[kk].gx * chunkSize,(float)chunks[kk].gy * chunkSize,(float)chunks[kk].gz * chunkSize }) > 100 * chunkSize) continue;
-			if (chunks[kk].voxelCount == 0) continue;
-			if (!chunks[kk].updated && !previously) continue;
-			
-			previously = true;
-			int triCount = chunks[kk].cpumesh.triangleCount;
-			int meshletCount = (int)ceil((float)triCount / 64.0f);
-
-			size_t vBytes = triCount * sizeof(uint32_t);
-			size_t cBytes = triCount * sizeof(uint32_t);
-			size_t aBytes = meshletCount * 6 * sizeof(float);
-
-			memcpy(p_vertex + chunks[kk].beginningTri,
-				chunks[kk].cpumesh.packedVertex,
-				vBytes);
-
-			memcpy(p_color + chunks[kk].beginningTri,
-				chunks[kk].cpumesh.gpuBasedColoring,
-				cBytes);
-
-			memcpy(p_aabb + chunks[kk].beginningMeshlet * 6,
-				chunks[kk].cpumesh.MeshletAABB,
-				aBytes);
-
-			bytesVertex += vBytes;
-			bytesColor += cBytes;
-			bytesAABB += aBytes;
-
-			previously = true;
-			chunks[kk].updated = false;
-		}
-
-		END_TIMER(stream_to_gpu);
-
-		size_t totalBytes = bytesVertex + bytesColor + bytesAABB;
 	}
 	void CheckLodsToUpdate() {
 		std::vector<Vector3> ids;
@@ -460,58 +364,6 @@ public:
 		END_TIMER(terrain)
 
 	}
-	void MeshWorld() {
-		int meshletCountSoftwareRendered = 0;
-		START_TIMER(mesher)
-#pragma omp parallel for collapse(2)
-			for (int x = 0; x < wx; x++) {
-				for (int z = 0; z < wz; z++) {
-					for (int y = 0; y < wy; y++) {
-						int index = y * (wx * wz) + z * wx + x;
-						if (chunks[index].voxelCount == 0) continue;
-						if (chunks[index].voxelCount == chunks[index].size * chunks[index].size * chunks[index].size) continue;
-						float dist = Vector2Distance({ (float)x * chunkSize,(float)z * chunkSize }, { float(camera.position.x),float(camera.position.z) });
-						//if (dist < 256) {
-							//hardware mesh
-							//pretty much the same as software mesh but instead I store a hardware mesh
-							//woah
-						//	std::cout << "a\n";
-						//	chunks[index].hwOrSoftwareRaster = false;
-						//	chunks[index].HardwareMesher(&world, x, y, z);
-						//}
-						//else {
-							//std::cout << "d\n";
-						if (!gpuMeshing) {
-							chunks[index].hwOrSoftwareRaster = true;
-							chunks[index].SoftwareMesher(&world, x, y, z);
-							chunks[index].updated = true;
-
-						}
-						//}
-						meshletCountSoftwareRendered++;
-						
-					}
-				}
-			}
-		END_TIMER(mesher)
-		std::cout << meshletCountSoftwareRendered << " proper meshlet count \n";
-	}
-	void FreeTerrain() {
-
-#pragma omp parallel for collapse(2)
-		for (int x = 0; x < wx; x++) {
-			for (int z = 0; z < wz; z++) {
-				for (int y = 0; y < wy; y++) {
-					if (chunks[y * (wx * wz) + z * wx + x].voxelCount == 0) continue;
-					int index = y * (wx * wz) + z * wx + x;
-					if (chunks[y * (wx * wz) + z * wx + x].lod != 1) {
-						//free(world.chunkData[y * (wx * wz) + z * wx + x].terrain);
-					}
-
-				}
-			}
-		}
-	}
 	void RecalculateParticles() {
 		
 		grass = 0;
@@ -668,14 +520,6 @@ public:
 			}
 
 			ImGui::Spacing();
-			if (ImGui::Button("Randomize seed")) {
-			}
-
-			ImGui::Spacing();
-			if (ImGui::CollapsingHeader("Advanced")) {
-			}
-
-			ImGui::Spacing();
 			ImGui::Separator();
 			ImGui::Spacing();
 
@@ -708,7 +552,7 @@ public:
 
 				particleRenderer.Create();
 				for (int i = 0; i < 10000; i++) {
-				//	particleRenderer.PushRenderParticle({ (float)GetRandomValue(wx * 32 + 32, wx * 32 - 32),100,(float)GetRandomValue(wx * 32 + 32, wx * 32 - 32) }, { 255,255,255,255 }, ExampleUpdate);
+					particleRenderer.PushRenderParticle({ (float)GetRandomValue(wx * 32 + 32, wx * 32 - 32),100,(float)GetRandomValue(wx * 32 + 32, wx * 32 - 32) }, { 255,255,255,255 }, ExampleUpdate);
 				}
 				currentResolutionWindow = menuResolutionIndex;
 				wWidth = graphicsSettings.resolutions[currentResolutionWindow].width;
@@ -772,14 +616,7 @@ public:
 		int selectedColorIndex = 0; // Keep track of selection
 		Math::Vector2 oldMouse = window.GetMousePos();
 		GenerateDebugScene();
-		MeshWorld();
-		FreeTerrain();
 		RecalculateParticles();
-		if (!gpuMeshing) {
-			
-			Update();
-
-		}
 		const ImVec4 clearColor = { 0.1f, 0.1f, 0.12f, 1.0f };
 		bool menuOpen = false;
 		bool releasedMenu = false;
@@ -806,7 +643,6 @@ public:
 			if (!menuOpen) {
 				camera.UpdateFREE(window.GetMousePos(), oldMouse, window);
 			}
-			//std::cout << afterGlobalMemUsage << " " << globalMemUsage << "\n";
 			Vector3 tag = { (float)camera.target.x ,(float)camera.target.y,(float)camera.target.z };
 			Vector3 pos = { (float)camera.position.x ,(float)camera.position.y,(float)camera.position.z };
 
@@ -866,9 +702,9 @@ public:
 
 			for (size_t i = 0; i < physicalObjects.size(); i++) {
 				auto& a = physicalObjects[i];
-				int offx = ceil((a->size.x/2)/ chunkSize)+1;
-				int offy = ceil((a->size.y/2)/ chunkSize)+1;
-				int offz = ceil((a->size.z/2)/ chunkSize)+1;
+				int offx = ceil((a->size.x/2)/ chunkSize)+2;
+				int offy = ceil((a->size.y/2)/ chunkSize)+2;
+				int offz = ceil((a->size.z/2)/ chunkSize)+2;
 				for (int x = -offx; x <= offx; x++) {
 					for (int y = -offy; y <= offy; y++) {
 						for (int z = -offz; z <= offz; z++) {
@@ -1075,17 +911,6 @@ public:
 			Math::Vector3 pp[2] = { camera.target,{wx * 32,150,wy * 32} };
 			double rasterTimeMs;
 			int trianglesRendered = 0;
-			int count = 0;
-			for (int x = 0; x < wx; x++) {
-				for (int z = 0; z < wz; z++) {
-					for (int y = 0; y < wy; y++) {
-						int index = y * (wx * wz) + z * wx + x;
-						count += chunks[index].cpumesh.triangleCount;
-
-					}
-	
-				}
-			}
 			Anubis::GpuTimer raster;
 			raster.Start();
 			if (graphicsSettings.hardwareSoftwareRendering && triangleCount>0) {
@@ -1106,7 +931,7 @@ public:
 				shaders.rasterizer.Use(floor(triangleCount), 1, 1);
 				trianglesRendered = triangleCount;
 			}
-			rasterTimeMs = raster.Stop(); // This will block until raster is done
+			rasterTimeMs = raster.Stop(); 
 
 			Anubis::GpuTimer grassT;
 			grassT.Start();
@@ -1153,6 +978,8 @@ public:
 						world.chunkData[neighbourId].fluidByteMap.GetBindlessHandle();
 						world.handle.handle[neighbourId].handle = world.chunkData[neighbourId].fluidByteMap.handle;
 						world.handle.handle[neighbourId].lod = world.chunkData[neighbourId].lod;
+					}
+					else {
 					}
 				};
 			START_TIMER(physicsAllocator)
@@ -1219,7 +1046,7 @@ public:
 				}
 			}
 			offfr++;
-			/*
+			
 			if (window.GetMouseButtonPressed(1) && offfr>5) {
 				offfr = 0;
 				Math::Vector3 angularVelocity = Math::NormalizeVector3(Math::SubtractVector3(camera.target, camera.position));
@@ -1261,7 +1088,7 @@ public:
 				
 				physicalObjects.push_back(std::move(pp));
 			}
-			*/
+			
 			if (graphicsSettings.secondaryRays) {
 
 				secondaryRays.Start();
