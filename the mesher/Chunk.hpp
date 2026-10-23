@@ -192,7 +192,7 @@ struct ChunkData {
 	int paletteSize;
 	uint8_t* compressedTerrain;
 	bool compressed;
-	int voxelCount;
+	int voxelCount = 0;
 	bool updated = false;
 };
 #define READ_BITMAP(x,y,z) ((chunkdata->bitMap[(((x) + (y) * size + (z) * size * size))>>3] >> ((((x) + (y) * size + (z) * size * size))&7)) & 1u)
