@@ -156,7 +156,7 @@ public:
 		shaders.display.CreateSSBO(0, sizeof(uint32_t) * 3840 * 2160 *6);
 		int maxSSBOCount = 0;
 		glGetIntegerv(GL_MAX_SHADER_STORAGE_BUFFER_BINDINGS, &maxSSBOCount);
-		std::cout << maxSSBOCount << "\n";
+		//std::cout << maxSSBOCount << "\n";
 		if (gpuMeshing) {
 			shaders.display.CreateSSBO(9, sizeof(int) * 2);
 			shaders.display.CreateSSBO(9, sizeof(int) * 2);
@@ -636,6 +636,8 @@ public:
 				array[x][y] = false;
 			}
 		}
+		Anubis::SwitchShaderStage(shaders.display.shaderId);
+		shaders.display.CreateSSBO(3, sizeof(world.handle));
 		while (window.IsOpen()) {
 			double frameStart = glfwGetTime(); 
 			CheckLodsToUpdate();
@@ -697,7 +699,7 @@ public:
 			glDeleteSync(fence);
 			int triangleCount = *p_triangleCounter;
 
-			std::cout << triangleCount << " "<<totalMeshletCount / 32 << " frust \n";
+			//std::cout << triangleCount << " "<<totalMeshletCount / 32 << " frust \n";
 			int r = 0;
 			for (auto t : decals) {
 
@@ -967,7 +969,7 @@ public:
 			int chunkX = -1;
 			int chunkZ = -1;
 			for (int x = 0; x < wx; x++) {
-				for (int y = 0; y < wy; y++) {
+				for (int y = 0; y < wz; y++) {
 					Vector2 chunkPos = { x * 64,y * 64 };
 					Vector2 cameraPos2D = { camera.position.x,camera.position.z };
 					
@@ -986,8 +988,16 @@ public:
 					}
 				}
 			}
+			auto uploadChunkSSBO = [&](uint32_t neighbourId) {
+				Anubis::SwitchShaderStage(shaders.display.shaderId);
+				shaders.display.UpdateSSBO(
+					3,
+					&world.handle.handle[neighbourId],
+					sizeof(World::GlobalHandle::Region),
+					neighbourId * sizeof(World::GlobalHandle::Region)
+				);
+			};
 			if (chunkX != -1) {
-				std::cout << chunkX << " " << chunkZ << "\n";
 				array[chunkX][chunkZ] = true;
 				int nz = chunkZ;
 				int nx = chunkX;
@@ -1022,8 +1032,10 @@ public:
 							world.handle.handle[neighbourId].handle = world.chunkData[neighbourId].fluidShortMap.handle;
 
 						}
+
 						//so, basically, the bottleneck is the upload ,and i need to create multiple at once instead of one
 						world.handle.handle[neighbourId].lod = world.chunkData[neighbourId].lod;
+						uploadChunkSSBO(neighbourId);
 					}
 				}
 			}
@@ -1045,10 +1057,6 @@ public:
 					}
 				}
 				if (finish) {
-					Anubis::SwitchShaderStage(shaders.display.shaderId);
-					shaders.display.CreateSSBO(3, sizeof(world.handle));
-					std::cout << "size of handle: " << sizeof(world.handle) << "\n";
-					shaders.display.UpdateSSBO(3, &world.handle, sizeof(world.handle), 0);
 					preallocated = true;
 
 					if (gpuMeshing) {
@@ -1616,7 +1624,7 @@ public:
 			else {
 				window.DisableCursor();
 			}
-			std::cout << window.getFPS() << "\n";
+			//std::cout << window.getFPS() << "\n";
 			ImGui::Render();
 			ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 			window.UpdateBuffer();
