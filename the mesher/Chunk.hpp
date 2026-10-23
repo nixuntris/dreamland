@@ -193,7 +193,7 @@ struct ChunkData {
 	uint8_t* compressedTerrain;
 	bool compressed;
 	int voxelCount;
-	bool updated;
+	bool updated = false;
 };
 #define READ_BITMAP(x,y,z) ((chunkdata->bitMap[(((x) + (y) * size + (z) * size * size))>>3] >> ((((x) + (y) * size + (z) * size * size))&7)) & 1u)
 struct PhysicsAccelerationChunk {
@@ -837,7 +837,10 @@ public:
 		int index = x + y * size + z * size * size; 
 		if (chunkData->voxelCount == 0) return 0;
 		if (chunkData->skipped) return 0;
-		
+		if (shortenedData) {
+			return chunkData->compressedTerrain[index];;
+
+		}
 		if (chunkData->compressed) {
 			uint8_t compressedValue = chunkData->compressedTerrain[index];
 			if (compressedValue == 0) {
