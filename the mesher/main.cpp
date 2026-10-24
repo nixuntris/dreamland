@@ -190,155 +190,10 @@ public:
 		glCullFace(GL_BACK);
 		glFrontFace(GL_CCW);
 	}
-	void CheckLodsToUpdate() {
-		std::vector<Vector3> ids;
-		for (int x = 0; x < wx; x++) {
-			for (int z = 0; z < wz; z++) {
-
-				int lod = 1;
-				float dist = Vector2Distance({ (float)x * chunkSize,(float)z * chunkSize}, { float(camera.position.x),float(camera.position.z) });
-				
-				if (dist > 640) lod = 2;
-				if (dist > 640 * 2) lod = 4;
-				if (dist > 640 * 4) lod = 8;
-				if (dist > 640 * 8) lod = 16;
-				if (dist > 640 * 12) lod = 32;
-				if (dist > 640 * 24) lod = 64;
-				if (chunks[0 * (wx * wz) + z * wx + x].lod != lod) {
-					ids.push_back({ (float)x,0,(float)z });
-				}
-			}
-		}
-		for (auto t : ids) {
-			int lod = 1;
-			float dist = Vector2Distance({ (float)t.x * chunkSize,(float)t.z * chunkSize }, { float(camera.position.x),float(camera.position.z) });
-			if (dist > 640) lod = 2;
-			if (dist > 640 * 2) lod = 4;
-			if (dist > 640 * 4) lod = 8;
-			if (dist > 640 * 8) lod = 16;
-			if (dist > 640 * 12) lod = 32;
-			if (dist > 640 * 24) lod = 64;
-			for (int y = 0; y < wy; y++) {
-				if (chunks[y * (wx * wz) + (int)t.z * wx + (int)t.x].lod > lod) {
-				//	std::cout << "Fuck\n";
-				}
-				else {
-				//	std::cout << "Nah chill, downscale\n";
-//					chunks[y * (wx * wz) + (int)t.z * wx + (int)t.x].GenLowerResolution(&world.chunkData[y * (wx * wz) + (int)t.z * wx + (int)t.x]);
-	//				chunks[y * (wx * wz) + (int)t.z * wx + (int)t.x].size = chunkSize / lod;
-				}
-		//		chunks[y * (wx * wz) + (int)t.z * wx + (int)t.x].lod = lod;
-
-			}
-		}
-		//std::cout << ids.size() << "\n";
-
-	}	
-	void GenerateDebugScene() {
-		off = (ChunkOffset*)MemAlloc(wx * wy * wz * sizeof(ChunkOffset));
-		chunks = (Chunk*)MemAlloc(wx * wz * wy * sizeof(Chunk));
-		START_TIMER(terrain)
-#pragma omp parallel for collapse(2)
-			for (int x = 0; x < wx; x++) {
-				for (int z = 0; z < wz; z++) {
-					int lod = 1;
-					float dist = Vector2Distance({ (float)x * chunkSize,(float)z * chunkSize }, { float(camera.position.x),float(camera.position.z) });
-					bool grass = false;
-
-					if (dist < 1920) grass = true;
-					if (dist > 960) lod = 2;
-					if (dist > 960 * 2) lod = 4;
-					if (dist > 960 * 4) lod = 8;
-					if (dist > 960 * 8) lod = 16;
-					if (dist > 960 * 12) lod = 32;
-					if (dist > 960 * 24) lod = 64;
-					GenerationData gen;
-					gen.GenerateMountains(x, z);
-					float n = perlin_noise_2d((x + 0.5f) * 0.05f, (z + 0.5f) * 0.05f);
-					gen.highestChunkY *= 2;
-					if (n < -0.2f) {
-						// Desert
-//						for (int y = 0; y < gen.highestChunkY && y < wy; y++) {
-	//						chunks[y * (wx * wz) + z * wx + x].GenerateDesert(&world.chunkData[y * (wx * wz) + z * wx + x], gen, x, y, z, lod, grass);
-		//				};
-					}
-					else {
-					//	else if (n < 0.2f) {
-						// Savanna
-			//			for (int y = 0; y < gen.highestChunkY && y < wy; y++) {
-				//			chunks[y * (wx * wz) + z * wx + x].GenerateSavanna(&world.chunkData[y * (wx * wz) + z * wx + x], gen, x, y, z, lod, grass);
-					//	};
-				 }
-				//	else {
-						// Mountains
-						for (int y = 0; y < gen.highestChunkY && y < wy; y++) {
-					//		world.chunkData[y * (wx * wz) + z * wx + x].skipped = false;
-							chunks[y * (wx * wz) + z * wx + x].GenerateMountains(&world.chunkData[y * (wx * wz) + z * wx + x], gen, x, y, z, lod, grass);
-						};
-			//		}
-					if (x==wx/2 && z==wz/2) {
-						for (int i = 0; i < 20; i++) {
-							world.chunkData[0 * (wx * wz) + z * wx + x].terrain[IDX(chunkSize / 2, i + 50, chunkSize / 2, chunkSize)] = 2;
-							world.chunkData[0 * (wx * wz) + z * wx + x].terrain[IDX(chunkSize / 2, i + 50, chunkSize / 2+1, chunkSize)] = 2;
-							world.chunkData[0 * (wx * wz) + z * wx + x].terrain[IDX(chunkSize / 2+1, i + 50, chunkSize / 2+1, chunkSize)] = 2;
-							world.chunkData[0 * (wx * wz) + z * wx + x].terrain[IDX(chunkSize / 2+1, i + 50, chunkSize / 2, chunkSize)] = 2;
-						
-						}
-						if (world.lightCount < 16) {
-							world.lightPositions[world.lightCount] = { (float)chunkSize / 2 + x * chunkSize,70,(float)chunkSize / 2 + z * chunkSize };
-							float t = float(GetRandomValue(0, 100)) / 100.0f;
-
-							float r = 1.0f;
-							float g = 0.15f + 0.35f * t; 
-							float b = 0.0f + 0.05f * t; 
-
-							int radius = 90 * (0.75f + 0.35f * t);
-							world.lightValues[world.lightCount] = { r, g, b };
-							world.lightRadiusList[world.lightCount] = radius;
-							int offset = (radius + chunkSize - 1) / chunkSize;
-
-							for (int dx = -offset-1; dx <= offset+1; dx++) {
-								for (int dy = -offset-1; dy <= offset+1; dy++) {
-									for (int dz = -offset-1; dz <= offset+1; dz++) {
-
-										for (int i = 0; i < 16; i++) {
-											if (dy<0 || z+dz<0 || x+dz < 0 || x+dx>wx || dy>wy || z+dz>wz) continue;
-											if (world.handle.handle[(0+dy) * (wx * wz) + (z+dz) * wx + (x+dx)].lightIds[i] == -1) {
-												world.handle.handle[(0 + dy) * (wx * wz) + (z + dz) * wx + (x + dx)].lightIds[i] = world.lightCount ;
-												break;
-											}
-										}
-									}
-								}
-							}
-						//	world.lightCount++;
-
-						}
-					}
-					
-					for (int y = 0; y < gen.highestChunkY && y < wy; y++) {
-						chunks[y * (wx * wz) + z * wx + x].GenerateLod(&world.chunkData[y * (wx * wz) + z * wx + x], x, y, z);
-						chunks[y * (wx * wz) + z * wx + x].Compress(&world.chunkData[y * (wx * wz) + z * wx + x]);
-
-					};
-
-				}
-			}
-		END_TIMER(terrain)
-	}
 	void GenerateTerrain() {
 
 		off = (ChunkOffset*)MemAlloc(wx * wy * wz * sizeof(ChunkOffset));
 		chunks = (Chunk*)MemAlloc(wx * wz * wy * sizeof(Chunk));
-		START_TIMER(terrain)
-#pragma omp parallel for collapse(2)
-			for (int x = 0; x < wx; x++) {
-				for (int z = 0; z < wz; z++) {
-
-				}
-			}
-		END_TIMER(terrain)
-
 	}
 	void RecalculateParticles() {
 		
@@ -618,7 +473,6 @@ public:
 		shaders.display.UpdateSSBO(9, 0, sizeof(int), 0);
 		while (window.IsOpen()) {
 			double frameStart = glfwGetTime(); 
-			CheckLodsToUpdate();
 			Anubis::DisplayShader* shader = &shaders.display;
 			if (graphicsSettings.FXAA) {
 				shader = &shaders.displayNoFXAA;
@@ -943,137 +797,158 @@ public:
 
 			auto grassTimeMs = grassT.Stop();
 			START_TIMER(physicsAllocator)
-			int dd = 0;
+			auto uploadChunkSSBO = [&](uint32_t neighbourId) {
+			Anubis::SwitchShaderStage(shaders.display.shaderId);
+			shaders.display.UpdateSSBO(
+				3,
+				&world.handle.handle[neighbourId],
+				sizeof(World::GlobalHandle::Region),
+				neighbourId * sizeof(World::GlobalHandle::Region)
+			);
+			};
+			int drd = 0;
+			Math::IVector2 generateArrayId[1024];
+			int generateCount = 0;
+			//first should be calculated the ones in front of the camera
 			for (int i = 0; i < 10; i++) {
 				float lastDistance = 10000;
 				int chunkX = -1;
 				int chunkZ = -1;
 				for (int x = 0; x < wx; x++) {
-					for (int y = 0; y < wz; y++) {
-						Vector2 chunkPos = { x * 64,y * 64 };
+					for (int z = 0; z < wz; z++) {
+						Vector2 chunkPos = { x * chunkSize+ chunkSize/2,z * chunkSize + chunkSize /2};
 						Vector2 cameraPos2D = { camera.position.x,camera.position.z };
 
-						float dd = Vector2Distance(chunkPos, cameraPos2D);
-						if (!array[x][y]) {
-							if (chunkX == -1) {
-								chunkX = x;
-								chunkZ = y;
-								lastDistance = dd;
-							}
-							if (lastDistance > dd && chunkX != -1) {
-								lastDistance = dd;
-								chunkX = x;
-								chunkZ = y;
+						
+						if (Anubis::IsInFrustum2D({ chunkPos.x,chunkPos.y }, camera, 160, 0.001, 10000000)) {
+
+							float dd = Vector2Distance(chunkPos, cameraPos2D);
+							if (!array[x][z]) {
+								if (lastDistance > dd || chunkX == -1) {
+									lastDistance = dd;
+									chunkX = x;
+									chunkZ = z;
+								}
 							}
 						}
 					}
 				}
-				auto uploadChunkSSBO = [&](uint32_t neighbourId) {
-					Anubis::SwitchShaderStage(shaders.display.shaderId);
-					shaders.display.UpdateSSBO(
-						3,
-						&world.handle.handle[neighbourId],
-						sizeof(World::GlobalHandle::Region),
-						neighbourId * sizeof(World::GlobalHandle::Region)
-					);
-					};
 				if (chunkX != -1) {
-					//for (int dx = -1; dx <= 1; dx++) {
-					//	for (int dz = -1; dz <= 1; dz++) {
 					int nz = chunkZ;
 					int nx = chunkX;
 					if (nz < 0 || nx < 0 || nx >= wx || nz >= wz) continue;
 
 					if (!array[nx][nz]) {
 						array[nx][nz] = true;
-
-						int lod = 1;
-						float dist = Vector2Distance({ (float)nx * chunkSize,(float)nz * chunkSize }, { float(camera.position.x),float(camera.position.z) });
-						bool grass = false;
-
-						if (dist < 1920) grass = true;
-						if (dist > 960) lod = 2;
-						if (dist > 960 * 2) lod = 4;
-						if (dist > 960 * 4) lod = 8;
-						if (dist > 960 * 8) lod = 16;
-						if (dist > 960 * 12) lod = 32;
-						if (dist > 960 * 24) lod = 64;
-						GenerationData gen;
-						gen.GenerateMountains(nx, nz);
-						gen.highestChunkY += 2;
-						for (int y = 0; y < gen.highestChunkY && y < wy; y++) {
-							chunks[y * (wx * wz) + nz * wx + nx].GenerateMountains(&world.chunkData[y * (wx * wz) + nz * wx + nx], gen, nx, y, nz, lod, grass);
-
-						};
-						for (int y = 0; y < gen.highestChunkY && y < wy; y++) {
-							chunks[y * (wx * wz) + nz * wx + nx].GenerateLod(&world.chunkData[y * (wx * wz) + nz * wx + nx], nx, y, nz);
-							chunks[y * (wx * wz) + nz * wx + nx].Compress(&world.chunkData[y * (wx * wz) + nz * wx + nx]);
-
-						};
-						free(gen.heightMap);
-						for (int ny = 0; ny < wy; ny++) {
-
-
-							int neighbourId = ny * (wx * wz) + nz * wx + nx;
-							if (nx < 0 || ny < 0 || nz < 0 || nx >= wx || ny >= wy || nz >= wz) continue;
-							if (chunks[neighbourId].lod == 0) continue;
-							if (chunks[neighbourId].hasFluid) continue;
-							if (chunks[neighbourId].voxelCount == chunks[neighbourId].size * chunks[neighbourId].size * chunks[neighbourId].size) continue;
-
-							chunks[neighbourId].hasFluid = true;
-							int size = chunkSize / chunks[neighbourId].lod;
-
-							if (world.chunkData[neighbourId].voxelCount != 0)
-							{
-
-								if (chunks[neighbourId].shortenedData) {
-									world.chunkData[neighbourId].fluidByteMap.Clear({ size,size,size });
-									world.chunkData[neighbourId].fluidByteMap.Upload(world.chunkData[neighbourId].compressedTerrain);
-									world.chunkData[neighbourId].fluidByteMap.GetBindlessHandle();
-									world.handle.handle[neighbourId].handle = world.chunkData[neighbourId].fluidByteMap.handle;
-
-								}
-								else {
-									world.chunkData[neighbourId].fluidShortMap.Clear({ size,size,size });
-									uint16_t* tt = chunks[neighbourId].DecompressChunk(&world.chunkData[neighbourId]);
-									world.chunkData[neighbourId].fluidShortMap.Upload(tt);
-									free(tt);
-									world.chunkData[neighbourId].fluidShortMap.GetBindlessHandle();
-									world.handle.handle[neighbourId].handle = world.chunkData[neighbourId].fluidShortMap.handle;
-
-								}
-
-								//so, basically, the bottleneck is the upload ,and i need to create multiple at once instead of one
-								world.handle.handle[neighbourId].lod = world.chunkData[neighbourId].lod;
-								uploadChunkSSBO(neighbourId);
-							}
-						}
-						//		}
-						//	}
+						generateArrayId[generateCount++] = { nx,nz };
 					}
-					//mesh the chunk volume at chunkx, chunkz
-					//int nx = chunkX;
-					//int nz = chunkZ;
-					for (int ny = 0; ny < wy; ny++) {
-						int id = ny * (wx * wz) + nz * wx + nx;
-						if (!world.chunkData[dd].updated) {
-
-							vv[dd].x = chunks[id].gx;
-							vv[dd].y = chunks[id].gy;
-							vv[dd].z = chunks[id].gz;
-
-							if (world.chunkData[id].voxelCount != 0) {
-								world.chunkData[id].updated = true;
-								dd++;
-							}
-						}
-					}
-					
 				}
 			}
-			if (dd > 0) {
-				std::cout << "Batch begin\n";
-				shaders.display.UpdateSSBO(10, vv, dd * sizeof(Math::IVector3), 0);
+			std::cout << generateCount << "\n";
+			START_TIMER(chunkAllocator)
+#pragma omp parallel for schedule(dynamic,1)
+			for (int i = 0; i < generateCount; i++) {
+				int nx = generateArrayId[i].x;
+				int nz = generateArrayId[i].y;
+
+				int lod = 1;
+				float dist = Vector2Distance({ (float)nx * chunkSize,(float)nz * chunkSize }, { float(camera.position.x),float(camera.position.z) });
+				bool grass = false;
+
+				if (dist < 1920) grass = true;
+				if (dist > 960) lod = 2;
+				if (dist > 960 * 2) lod = 4;
+				if (dist > 960 * 4) lod = 8;
+				if (dist > 960 * 8) lod = 16;
+				if (dist > 960 * 12) lod = 32;
+				if (dist > 960 * 24) lod = 64;
+				GenerationData gen;
+				gen.GenerateMountains(nx, nz);
+				gen.highestChunkY += 2;
+
+				for (int y = 0; y < gen.highestChunkY && y < wy; y++) {
+					chunks[y * (wx * wz) + nz * wx + nx].GenerateMountains(&world.chunkData[y * (wx * wz) + nz * wx + nx], gen, nx, y, nz, lod, grass);
+
+				};
+				for (int y = 0; y < gen.highestChunkY && y < wy; y++) {
+					chunks[y * (wx * wz) + nz * wx + nx].GenerateLod(&world.chunkData[y * (wx * wz) + nz * wx + nx], nx, y, nz);
+					chunks[y * (wx * wz) + nz * wx + nx].Compress(&world.chunkData[y * (wx * wz) + nz * wx + nx]);
+
+				};
+				free(gen.heightMap);
+			}
+			END_TIMER(chunkAllocator)
+			for (int i = 0; i < generateCount; i++) {
+				int nx = generateArrayId[i].x;
+				int nz = generateArrayId[i].y;
+
+				for (int ny = 0; ny < wy; ny++) {
+
+
+					int neighbourId = ny * (wx * wz) + nz * wx + nx;
+					if (nx < 0 || ny < 0 || nz < 0 || nx >= wx || ny >= wy || nz >= wz) continue;
+					if (chunks[neighbourId].lod == 0) continue;
+					if (chunks[neighbourId].hasFluid) continue;
+					if (chunks[neighbourId].voxelCount == chunks[neighbourId].size * chunks[neighbourId].size * chunks[neighbourId].size) continue;
+
+					chunks[neighbourId].hasFluid = true;
+					int size = chunkSize / chunks[neighbourId].lod;
+
+					if (world.chunkData[neighbourId].voxelCount != 0)
+					{
+
+						if (chunks[neighbourId].shortenedData) {
+							world.chunkData[neighbourId].fluidByteMap.Clear({ size,size,size });
+							world.chunkData[neighbourId].fluidByteMap.Upload(world.chunkData[neighbourId].compressedTerrain);
+							world.chunkData[neighbourId].fluidByteMap.GetBindlessHandle();
+							world.handle.handle[neighbourId].handle = world.chunkData[neighbourId].fluidByteMap.handle;
+
+						}
+						else {
+							world.chunkData[neighbourId].fluidShortMap.Clear({ size,size,size });
+							uint16_t* tt = chunks[neighbourId].DecompressChunk(&world.chunkData[neighbourId]);
+							world.chunkData[neighbourId].fluidShortMap.Upload(tt);
+							free(tt);
+							world.chunkData[neighbourId].fluidShortMap.GetBindlessHandle();
+							world.handle.handle[neighbourId].handle = world.chunkData[neighbourId].fluidShortMap.handle;
+
+						}
+
+						//so, basically, the bottleneck is the upload ,and i need to create multiple at once instead of one
+						world.handle.handle[neighbourId].lod = world.chunkData[neighbourId].lod;
+						uploadChunkSSBO(neighbourId);
+					}
+				}
+			}
+			for (int x = 0; x < wx; x++) {
+				for (int z = 0; z < wz; z++) {
+					if (array[x][z]) {
+						bool neighborsLoaded =
+							x > 0 && x < wx - 1 && z > 0 && z < wz - 1 &&
+							array[x - 1][z] && array[x + 1][z] && array[x][z - 1] && array[x][z + 1];
+						if (neighborsLoaded) {
+
+							for (int ny = 0; ny < wy; ny++) {
+								int id = ny * (wx * wz) + z * wx + x;
+								if (!world.chunkData[id].updated && world.chunkData[id].voxelCount != 0) {
+
+									vv[drd].x = chunks[id].gx;
+									vv[drd].y = chunks[id].gy;
+									vv[drd].z = chunks[id].gz;
+
+									if (world.chunkData[id].voxelCount != 0) {
+										world.chunkData[id].updated = true;
+										drd++;
+									}
+								}
+							}
+						}
+					}
+
+				}
+			}
+			if (drd > 0) {
+				shaders.display.UpdateSSBO(10, vv, drd * sizeof(Math::IVector3), 0);
 
 				auto batchUploadEnd = std::chrono::high_resolution_clock::now();
 				Anubis::GpuTimer mesh;
@@ -1090,7 +965,7 @@ public:
 				shaders.fluidRender.SetInt(wWidth, "renderWidth");
 				shaders.fluidRender.SetInt(wHeight, "renderHeight");
 				shaders.fluidRender.SetInt(frame, "frameIndex");
-				shaders.fluidRender.Use(dd, 1, 1);
+				shaders.fluidRender.Use(drd, 1, 1);
 
 				Anubis::SwitchShaderStage(shaders.display.shaderId);
 				glBindBuffer(GL_SHADER_STORAGE_BUFFER, shaders.display.ssboIds[9]);
@@ -1098,97 +973,6 @@ public:
 				glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
 
 				totalTriangleCount = totalMeshletCount * 64 + 64;
-				std::cout << totalMeshletCount << 'n';
-			}
-			if (!preallocated) {
-				auto allocateStart = std::chrono::high_resolution_clock::now();
-
-				auto allocateEnd = std::chrono::high_resolution_clock::now();
-
-				std::cout << "Data upload: "
-					<< std::chrono::duration<double, std::milli>(allocateEnd - allocateStart).count()
-					<< " ms\n";
-				bool finish = true;
-				for (int x = 0; x < wx; x++) {
-					for (int z = 0; z < wz; z++) {
-						if (!array[x][z]) {
-							finish = false;
-						}
-
-					}
-				}
-				if (finish) {
-					preallocated = true;
-
-					if (gpuMeshing) {
-
-						auto batchStart = std::chrono::high_resolution_clock::now();
-
-						int dd = 0;
-
-						for (int i = 0; i < wx * wy * wz; i++) {
-							if (!world.chunkData[i].updated) {
-
-								vv[dd].x = chunks[i].gx;
-								vv[dd].y = chunks[i].gy;
-								vv[dd].z = chunks[i].gz;
-
-								if (world.chunkData[i].voxelCount != 0) {
-									dd++;
-									world.chunkData[i].updated = true;
-								}
-							}
-						}
-
-						auto batchScanEnd = std::chrono::high_resolution_clock::now();
-
-						if (dd > 0) {
-							shaders.display.UpdateSSBO(10, vv, dd * sizeof(Math::IVector3), 0);
-
-							auto batchUploadEnd = std::chrono::high_resolution_clock::now();
-							Anubis::GpuTimer mesh;
-							mesh.Start();
-							Anubis::SwitchShaderStage(shaders.fluidRender.programID);
-							shaders.fluidRender.SetVector3({ pos.x,pos.y,pos.z }, "camPos");
-							shaders.fluidRender.SetVector3({ forward.x,forward.y,forward.z }, "camForward");
-							shaders.fluidRender.SetMatrix({ matView.m0,matView.m1,matView.m2,matView.m3,matView.m4,matView.m5,matView.m6,matView.m7,matView.m8,matView.m9,matView.m10,matView.m11,matView.m12,matView.m13,matView.m14,matView.m15 }, "matView");
-							shaders.fluidRender.SetMatrix({ matProj.m0,matProj.m1,matProj.m2,matProj.m3,matProj.m4,matProj.m5,matProj.m6,matProj.m7,matProj.m8,matProj.m9,matProj.m10,matProj.m11,matProj.m12,matProj.m13,matProj.m14,matProj.m15 }, "matProj");
-							shaders.fluidRender.SetInt(wx, "wx");
-							shaders.fluidRender.SetInt(wy, "wy");
-							shaders.fluidRender.SetInt(wz, "wz");
-							shaders.fluidRender.SetFloat(timeSpeed, "timeSpeed");
-							shaders.fluidRender.SetInt(wWidth, "renderWidth");
-							shaders.fluidRender.SetInt(wHeight, "renderHeight");
-							shaders.fluidRender.SetInt(frame, "frameIndex");
-							shaders.fluidRender.Use(dd, 1, 1);
-
-
-							std::cout << " Meshing time: " << mesh.Stop() << "ms \n";
-							auto dispatchSubmitEnd = std::chrono::high_resolution_clock::now();
-
-							std::cout << "Batch scan: "
-								<< std::chrono::duration<double, std::milli>(batchScanEnd - batchStart).count()
-								<< " ms\n";
-
-							std::cout << "SSBO upload: "
-								<< std::chrono::duration<double, std::milli>(batchUploadEnd - batchScanEnd).count()
-								<< " ms\n";
-
-							std::cout << "Uniform setup + dispatch submission: "
-								<< std::chrono::duration<double, std::milli>(dispatchSubmitEnd - batchUploadEnd).count()
-								<< " ms\n";
-							Anubis::SwitchShaderStage(shaders.display.shaderId);
-							glBindBuffer(GL_SHADER_STORAGE_BUFFER, shaders.display.ssboIds[9]);
-							glGetBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, sizeof(int), &totalMeshletCount);
-							glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
-
-							totalTriangleCount = totalMeshletCount * 64 + 64;
-						}
-					}
-				}
-
-
-				
 			}
 			offfr++;
 			
@@ -1580,6 +1364,7 @@ public:
 			if (!window.GetKeyPressed(KEY_K)) {
 				releasedMenu = true;
 			}
+			printf("max_threads=%d\n", omp_get_max_threads());
 			if (menuOpen) {
 				window.EnableCursor();
 
