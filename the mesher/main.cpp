@@ -114,6 +114,7 @@ class App {
 	float* particles;
 	bool firstGen = true;
 	int totalTriangleCount;
+	int renderDistance = 1000;
 	struct ChunkOffset {
 		int vertice;
 		int color;
@@ -236,6 +237,7 @@ public:
 			shaders.display.UpdateSSBO(20, particles, grass * 3 * sizeof(float), 0);
 		}
 		free(particles);
+		std:: cout << "grass count: " <<grass << "\n";
 	}
 	bool CustomToggle(const char* label, bool* value) {
 		ImVec2 pos = ImGui::GetCursorScreenPos();
@@ -472,7 +474,7 @@ public:
 		shaders.display.CreateSSBO(3, sizeof(world.handle));
 		shaders.display.UpdateSSBO(9, 0, sizeof(int), 0);
 		while (window.IsOpen()) {
-			double frameStart = glfwGetTime(); 
+			double frameStart = glfwGetTime();
 			Anubis::DisplayShader* shader = &shaders.display;
 			if (graphicsSettings.FXAA) {
 				shader = &shaders.displayNoFXAA;
@@ -531,26 +533,25 @@ public:
 			glDeleteSync(fence);
 			int triangleCount = *p_triangleCounter;
 
-			//std::cout << triangleCount << " "<<totalMeshletCount / 32 << " frust \n";
 			int r = 0;
 			for (auto t : decals) {
 
-				Render(&shaders, camera, matView, mesh, t, frame, decalTypes[r], editSize, ColorPallete.data(), ColorPallete.size(),wHeight);
+				Render(&shaders, camera, matView, mesh, t, frame, decalTypes[r], editSize, ColorPallete.data(), ColorPallete.size(), wHeight);
 				r++;
 			}
 			const float radius = 0.5f;
 
 			for (size_t i = 0; i < physicalObjects.size(); i++) {
 				auto& a = physicalObjects[i];
-				int offx = ceil((a->size.x/2)/ chunkSize)+2;
-				int offy = ceil((a->size.y/2)/ chunkSize)+2;
-				int offz = ceil((a->size.z/2)/ chunkSize)+2;
+				int offx = ceil((a->size.x / 2) / chunkSize) + 2;
+				int offy = ceil((a->size.y / 2) / chunkSize) + 2;
+				int offz = ceil((a->size.z / 2) / chunkSize) + 2;
 				for (int x = -offx; x <= offx; x++) {
 					for (int y = -offy; y <= offy; y++) {
 						for (int z = -offz; z <= offz; z++) {
-							int chunkX = int(floor(a->position.x / chunkSize))+x;
-							int chunkY = int(floor(a->position.y / chunkSize))+y;
-							int chunkZ = int(floor(a->position.z / chunkSize))+z;
+							int chunkX = int(floor(a->position.x / chunkSize)) + x;
+							int chunkY = int(floor(a->position.y / chunkSize)) + y;
+							int chunkZ = int(floor(a->position.z / chunkSize)) + z;
 							int id = INDEX(chunkX, chunkY, chunkZ, wx, wy);
 							if (!world.physicsAccelerationChunks[id].allocated) {
 								world.physicsAccelerationChunks[id].objectsInChunk = 0;
@@ -560,11 +561,11 @@ public:
 							if (world.physicsAccelerationChunks[id].objectsInChunk < 1024) {
 								world.physicsAccelerationChunks[id].idReferences[world.physicsAccelerationChunks[id].objectsInChunk++] = i;
 							}
-							
+
 						}
 					}
 				}
-				
+
 			}
 			for (size_t i = 0; i < physicalObjects.size(); i++)
 			{
@@ -573,7 +574,7 @@ public:
 				int chunkY = int(floor(a->position.y / chunkSize));
 				int chunkZ = int(floor(a->position.z / chunkSize));
 				int id = INDEX(chunkX, chunkY, chunkZ, wx, wy);
-				
+
 				for (size_t f = i + 1; f < world.physicsAccelerationChunks[id].objectsInChunk; f++)
 				{
 					int j = world.physicsAccelerationChunks[id].idReferences[f];
@@ -673,7 +674,7 @@ public:
 			world.lightValues[0] = { 1.0f,  0.15f + 0.35f * t, 0.0f + 0.05f * t };
 			world.lightRadiusList[0] = 90 * (0.75f + 0.35f * t);
 
-						
+
 			for (size_t i = 0; i < physicalObjects.size(); i++) {
 				auto& a = physicalObjects[i];
 				int chunkX = int(floor(a->position.x / chunkSize));
@@ -686,7 +687,7 @@ public:
 				}
 
 			}
-			auto RenderPhysicsObject = [&](ShaderManager * shaders, Anubis::Camera camera, Matrix matView, Anubis::HWVIrGeomMesh & renderSphere, Vector3 vv, int frame, int voxelType, int size, uint32_t * pack, int packCount, GLuint handle, Vector3 rotation){
+			auto RenderPhysicsObject = [&](ShaderManager* shaders, Anubis::Camera camera, Matrix matView, Anubis::HWVIrGeomMesh& renderSphere, Vector3 vv, int frame, int voxelType, int size, uint32_t* pack, int packCount, GLuint handle, Vector3 rotation) {
 				Anubis::SwitchShaderStage(shaders->hwRenderForObjects.shaderId);
 
 				Matrix m = GetStaticMVPMatrix(vv, matView);
@@ -703,21 +704,21 @@ public:
 				shaders->hwRenderForObjects.SetInt(wHeight, "vHeight");
 				shaders->hwRenderForObjects.SetInt(voxelType, "voxelType");
 				shaders->hwRenderForObjects.SetUVec2(handle, "handle");
-				
+
 				shaders->hwRenderForObjects.SetVector3({ 1,0,1 }, "colorr");
 				shaders->hwRenderForObjects.SetMatrix({ m.m0 ,m.m1,m.m2,m.m3,m.m4,m.m5,m.m6,m.m7,m.m8,m.m9,m.m10,m.m11,m.m12,m.m13,m.m14,m.m15 }, "MVP");
-				
+
 				shaders->hwRenderForObjects.Use();
 
 				renderSphere.Draw();
-			};
+				};
 			for (auto& k : physicalObjects) {
 				bool downardsCollision = false;
 				bool rightLeftCollision = false;
 				bool frontBackCollision = false;
 
 
-				if (Vector3Distance({ (float)k->position.x,(float)k->position.y,(float)k->position.z }, { (float)camera.position.x,(float)camera.position.y,(float)camera.position.z })<20) {
+				if (Vector3Distance({ (float)k->position.x,(float)k->position.y,(float)k->position.z }, { (float)camera.position.x,(float)camera.position.y,(float)camera.position.z }) < 20) {
 					RenderPhysicsObject(&shaders, camera, matView, k->mesh, { (float)k->position.x,(float)k->position.y,(float)k->position.z }, frame, 1, 1, ColorPallete.data(), ColorPallete.size(), k->byte.handle, { (float)k->rotation.x,(float)k->rotation.y,(float)k->rotation.z });
 
 					Anubis::SwitchShaderStage(shaders.fillOut.programID);
@@ -753,7 +754,7 @@ public:
 			int trianglesRendered = 0;
 			Anubis::GpuTimer raster;
 			raster.Start();
-			if (graphicsSettings.hardwareSoftwareRendering && triangleCount>0) {
+			if (graphicsSettings.hardwareSoftwareRendering && triangleCount > 0) {
 				Anubis::SwitchShaderStage(shaders.rasterizer.programID);
 				shaders.rasterizer.SetVector3({ pos.x,pos.y,pos.z }, "camPos");
 				shaders.rasterizer.SetVector3({ forward.x,forward.y,forward.z }, "camForward");
@@ -767,15 +768,15 @@ public:
 				shaders.rasterizer.SetInt(wHeight, "renderHeight");
 				shaders.rasterizer.SetInt(frame, "frameIndex");
 				shaders.rasterizer.SetInt(0, "offset");
-				
+
 				shaders.rasterizer.Use(floor(triangleCount), 1, 1);
 				trianglesRendered = triangleCount;
 			}
-			rasterTimeMs = raster.Stop(); 
+			rasterTimeMs = raster.Stop();
 
 			Anubis::GpuTimer grassT;
 			grassT.Start();
-			if (graphicsSettings.grassRender && grass>0) {
+			if (graphicsSettings.grassRender && grass > 0) {
 
 				Anubis::SwitchShaderStage(shaders.grassRenderer.programID);
 				shaders.grassRenderer.SetVector3({ pos.x,pos.y,pos.z }, "camPos");
@@ -791,7 +792,7 @@ public:
 				shaders.grassRenderer.SetVector3Array(planeNormals, 6, "planeNormals");
 				shaders.grassRenderer.SetFloatArray(planeDs, 6, "planeDs");
 				shaders.grassRenderer.SetInt(frame, "frameIndex");
-				shaders.grassRenderer.Use(grass/64, 1, 1);
+				shaders.grassRenderer.Use(grass / 64, 1, 1);
 
 			}
 
@@ -806,28 +807,57 @@ public:
 				neighbourId * sizeof(World::GlobalHandle::Region)
 			);
 			};
+			START_TIMER(chunkAllocator)
 			int drd = 0;
 			Math::IVector2 generateArrayId[1024];
 			int generateCount = 0;
-			//first should be calculated the ones in front of the camera
-			for (int i = 0; i < 10; i++) {
+			const float halfAngle = tanf((160 * 0.5f) * DEG2RAD);
+			Vector2 camPos2D = { camera.position.x, camera.position.z };
+			Vector2 camTarget2D = { camera.target.x,   camera.target.z };
+			Vector2 baseForward2D = { camera.GetForward().x, camera.GetForward().z };
+			Vector2 right = { -baseForward2D.y, baseForward2D.x };
+			float fLen = sqrtf(camTarget2D.x * camTarget2D.x + camTarget2D.y * camTarget2D.y);
+			baseForward2D.x /= fLen;
+			baseForward2D.y /= fLen;
+			bool alwaysInFrustum = false;
+			if (fLen < 0.001f) {
+				alwaysInFrustum = true;
+			}
+
+			for (int i = 0; i < 2; i++) {
 				float lastDistance = 10000;
 				int chunkX = -1;
 				int chunkZ = -1;
 				for (int x = 0; x < wx; x++) {
 					for (int z = 0; z < wz; z++) {
-						Vector2 chunkPos = { x * chunkSize+ chunkSize/2,z * chunkSize + chunkSize /2};
-						Vector2 cameraPos2D = { camera.position.x,camera.position.z };
+						Vector2 point = { x * chunkSize+ chunkSize/2,z * chunkSize + chunkSize /2};
+						float dd = Vector2Distance(point, camPos2D);
+						if (dd < renderDistance) {
 
-						
-						if (Anubis::IsInFrustum2D({ chunkPos.x,chunkPos.y }, camera, 160, 0.001, 10000000)) {
+							bool inFrustum = false;
+							if (!alwaysInFrustum) {
 
-							float dd = Vector2Distance(chunkPos, cameraPos2D);
-							if (!array[x][z]) {
-								if (lastDistance > dd || chunkX == -1) {
-									lastDistance = dd;
-									chunkX = x;
-									chunkZ = z;
+								Vector2 toPoint = { point.x - camera.position.x, point.y - camera.position.y };
+
+								float alongForward = toPoint.x * forward.x + toPoint.y * forward.y;
+								float alongRight = toPoint.x * right.x + toPoint.y * right.y;
+
+								float halfWidth = alongForward * halfAngle;
+
+								if (fabsf(alongRight) <= halfWidth) {
+									inFrustum = true;
+								}
+							}
+
+
+							if (inFrustum || alwaysInFrustum) {
+
+								if (!array[x][z]) {
+									if (lastDistance > dd || chunkX == -1) {
+										lastDistance = dd;
+										chunkX = x;
+										chunkZ = z;
+									}
 								}
 							}
 						}
@@ -844,9 +874,6 @@ public:
 					}
 				}
 			}
-			std::cout << generateCount << "\n";
-			START_TIMER(chunkAllocator)
-#pragma omp parallel for schedule(dynamic,1)
 			for (int i = 0; i < generateCount; i++) {
 				int nx = generateArrayId[i].x;
 				int nz = generateArrayId[i].y;
@@ -868,7 +895,6 @@ public:
 
 				for (int y = 0; y < gen.highestChunkY && y < wy; y++) {
 					chunks[y * (wx * wz) + nz * wx + nx].GenerateMountains(&world.chunkData[y * (wx * wz) + nz * wx + nx], gen, nx, y, nz, lod, grass);
-
 				};
 				for (int y = 0; y < gen.highestChunkY && y < wy; y++) {
 					chunks[y * (wx * wz) + nz * wx + nx].GenerateLod(&world.chunkData[y * (wx * wz) + nz * wx + nx], nx, y, nz);
@@ -877,7 +903,7 @@ public:
 				};
 				free(gen.heightMap);
 			}
-			END_TIMER(chunkAllocator)
+			//END_TIMER(chunkAllocator)
 			for (int i = 0; i < generateCount; i++) {
 				int nx = generateArrayId[i].x;
 				int nz = generateArrayId[i].y;
@@ -893,8 +919,11 @@ public:
 
 					chunks[neighbourId].hasFluid = true;
 					int size = chunkSize / chunks[neighbourId].lod;
-
-					if (world.chunkData[neighbourId].voxelCount != 0)
+					if (world.chunkData[neighbourId].skipped) {
+						world.handle.handle[neighbourId].lod = 3000;
+						uploadChunkSSBO(neighbourId);
+					}
+					if (world.chunkData[neighbourId].voxelCount != 0 && !world.chunkData[neighbourId].skipped)
 					{
 
 						if (chunks[neighbourId].shortenedData) {
@@ -936,7 +965,7 @@ public:
 									vv[drd].y = chunks[id].gy;
 									vv[drd].z = chunks[id].gz;
 
-									if (world.chunkData[id].voxelCount != 0) {
+									if (world.chunkData[id].voxelCount != 0 && !world.chunkData[id].skipped) {
 										world.chunkData[id].updated = true;
 										drd++;
 									}
@@ -975,7 +1004,9 @@ public:
 				totalTriangleCount = totalMeshletCount * 64 + 64;
 			}
 			offfr++;
-			
+			if (window.GetKeyPressed(KEY_L) && offfr>3) {
+				RecalculateParticles();
+			}
 			if (window.GetMouseButtonPressed(1) && offfr>5) {
 				offfr = 0;
 				Math::Vector3 angularVelocity = Math::NormalizeVector3(Math::SubtractVector3(camera.target, camera.position));
@@ -1364,7 +1395,6 @@ public:
 			if (!window.GetKeyPressed(KEY_K)) {
 				releasedMenu = true;
 			}
-			printf("max_threads=%d\n", omp_get_max_threads());
 			if (menuOpen) {
 				window.EnableCursor();
 

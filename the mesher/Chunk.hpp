@@ -472,8 +472,8 @@ public:
 		this->lod = lod;
 		START_TIMER(voxel_fill)
 			if (gy * chunkSize + chunkSize< generationData.lowestChunkY * chunkSize || gy * chunkSize> generationData.highestChunkY * chunkSize) {
-				//		chunkData->skipped = true;
-						//return;
+				chunkData->skipped = true;
+				return;
 			}
 		for (uint8_t x = 0; x < chunkSize; x += 1) {
 			for (uint8_t z = 0; z < chunkSize; z += 1) {

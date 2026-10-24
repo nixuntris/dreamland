@@ -594,12 +594,8 @@ namespace Anubis {
         glDebugMessageCallback(GLDebugCallback, nullptr);
     }
     //need vulkan alternative
-    inline static bool IsInFrustum2D(Vector2 point, Anubis::Camera camera, float fovDegrees, float nearDist, float farDist)
+    inline static bool IsInFrustum2D(Vector2 point, Math::Vector2 camPos, Math::Vector2 forward, float fovDegrees, float nearDist, float farDist)
     {
-        Vector2 camPos = { camera.position.x, camera.position.z };
-        Vector2 camTarget = { camera.target.x,   camera.target.z };
-
-        Vector2 forward = { camTarget.x - camPos.x, camTarget.y - camPos.y };
         float fLen = sqrtf(forward.x * forward.x + forward.y * forward.y);
         if (fLen < 0.0001f) return true;
         forward.x /= fLen;

@@ -62,7 +62,7 @@ uint readVoxelData(ivec3 pos) {
     ivec3 chunk = pos / chunkSize;
     int index = chunk.y * (wx * wz) + chunk.z * wx + chunk.x;
     int regionLod = handles[index].lod;
-
+    if (regionLod==3000) return 1u;
     uvec2 handle = handles[index].handle;
     if (handle != uvec2(0)) {
         uimage3D fluidMap = uimage3D(handle);
