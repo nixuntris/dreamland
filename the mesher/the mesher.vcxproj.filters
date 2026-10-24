@@ -154,10 +154,10 @@
     <None Include="bilboard.glsl">
       <Filter>Source Files\Shaders\Rasterizer\Software\Meshlets</Filter>
     </None>
-    <None Include="desert.txt">
-      <Filter>Source Files\terrain\example terrain</Filter>
-    </None>
     <None Include="..\readme.md">
+      <Filter>Source Files</Filter>
+    </None>
+    <None Include="desert.txt">
       <Filter>Source Files</Filter>
     </None>
   </ItemGroup>
@@ -166,7 +166,7 @@
       <Filter>Source Files\terrain\example terrain</Filter>
     </Text>
     <Text Include="mountains.txt">
-      <Filter>Source Files</Filter>
+      <Filter>Source Files\terrain\example terrain</Filter>
     </Text>
   </ItemGroup>
 </Project>

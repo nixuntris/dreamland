@@ -105,6 +105,7 @@ public:
 	
 };
 const int maxGPUBatch = 1024 * 1024;
+const int maxGrassCount = 1449303 * 2;
 class App {
 	Anubis::Window window;
 	Anubis::Camera camera;
@@ -137,6 +138,7 @@ class App {
 	std::vector<std::string> worlds = { "Mountains", "Desert", "Caves", "Sky" };
 	float timeSpeed = 0.0004;
 	bool mainMenu = false;
+	int alreadySpawnedGrass = 0;
 	ParticleRender particleRenderer;
 public:
 	App() {
@@ -181,8 +183,9 @@ public:
 			shaders.display.CreatePersistentSSBO(2, totalTriangleCount * sizeof(uint32_t) * 8);
 			shaders.display.CreatePersistentSSBO(6, totalTriangleCount * sizeof(uint32_t) * 8);
 			shaders.display.CreatePersistentSSBO(7, totalMeshletCount * 6 * sizeof(float) * 8);
-			firstGen = false;
+				firstGen = false;
 		}
+		shaders.display.CreateSSBO(20, maxGrassCount * 3 * sizeof(float));
 		ImGui_ImplGlfw_InitForOpenGL(window.GetWindowHandle(), true);
 		ImGui_ImplOpenGL3_Init("#version 460");
 		glEnable(GL_DEBUG_OUTPUT);
@@ -196,48 +199,30 @@ public:
 		off = (ChunkOffset*)MemAlloc(wx * wy * wz * sizeof(ChunkOffset));
 		chunks = (Chunk*)MemAlloc(wx * wz * wy * sizeof(Chunk));
 	}
-	void RecalculateParticles() {
-		
-		grass = 0;
+	void RecalculateParticles(int x, int y, int z) {
+		Anubis::SwitchShaderStage(shaders.display.shaderId);
 		int total = 0;
-		int tt = 0;
-		for (int x = 0; x < wx; x++) {
-			for (int z = 0; z < wz; z++) {
-				for (int y = 0; y < wy; y++) {
+		int tt = chunks[y * (wx * wz) + z * wx + x].grassList.size();
+		if (tt <= 0) return;
+		particles = (float*)MemAlloc(tt * 2 * 3 * sizeof(float));
+		std::cout << tt << "\n";
 
-					tt+=chunks[y * (wx * wz) + z * wx + x].grassList.size();
-				}
+		for (auto t : chunks[y * (wx * wz) + z * wx + x].grassList) {
+			for (int i = 0; i < GetRandomValue(1, 2); i++) {
+				particles[total * 3] = (t.x + float(GetRandomValue(-10, 10)) / 10.0f);
+				particles[total * 3 + 1] = (t.y + 1);
+				particles[total * 3 + 2] = (t.z + float(GetRandomValue(-10, 10)) / 10.0f);
+				grass++;
+				total++;
 			}
 		}
-		particles = (float*)MemAlloc(tt*2 * 3 * sizeof(float));
-
-		for (int x = 0; x < wx; x++) {
-			for (int z = 0; z < wz; z++) {
-				for (int y = 0; y < wy; y++) {
-
-						for (auto t : chunks[y * (wx * wz) + z * wx + x].grassList) {
-							for (int i = 0; i < GetRandomValue(1, 2); i++) {
-								particles[total * 3] = (t.x + float(GetRandomValue(-10, 10)) / 10.0f);
-								particles[total * 3 + 1] = (t.y + 1);
-								particles[total * 3 + 2] = (t.z + float(GetRandomValue(-10, 10)) / 10.0f);
-								grass++;
-								total++;
-							}
-
-
-						}
-						chunks[y * (wx * wz) + z * wx + x].grassList.clear();
-				}
-			}
-		}
+	
+		if (grass > maxGrassCount) grass = maxGrassCount;
 		if (grass > 0) {
-
-			shaders.display.CreateSSBO(20, grass * 3 * sizeof(float));
-
-			shaders.display.UpdateSSBO(20, particles, grass * 3 * sizeof(float), 0);
+			shaders.display.UpdateSSBO(20, particles, tt * 3 * sizeof(float), alreadySpawnedGrass*3*sizeof(float));
+			alreadySpawnedGrass += tt;
 		}
-		free(particles);
-		std:: cout << "grass count: " <<grass << "\n";
+		free(particles); 
 	}
 	bool CustomToggle(const char* label, bool* value) {
 		ImVec2 pos = ImGui::GetCursorScreenPos();
@@ -895,6 +880,7 @@ public:
 
 				for (int y = 0; y < gen.highestChunkY && y < wy; y++) {
 					chunks[y * (wx * wz) + nz * wx + nx].GenerateMountains(&world.chunkData[y * (wx * wz) + nz * wx + nx], gen, nx, y, nz, lod, grass);
+					RecalculateParticles(nx,y,nz);
 				};
 				for (int y = 0; y < gen.highestChunkY && y < wy; y++) {
 					chunks[y * (wx * wz) + nz * wx + nx].GenerateLod(&world.chunkData[y * (wx * wz) + nz * wx + nx], nx, y, nz);
@@ -1002,11 +988,9 @@ public:
 				glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
 
 				totalTriangleCount = totalMeshletCount * 64 + 64;
+				
 			}
 			offfr++;
-			if (window.GetKeyPressed(KEY_L) && offfr>3) {
-				RecalculateParticles();
-			}
 			if (window.GetMouseButtonPressed(1) && offfr>5) {
 				offfr = 0;
 				Math::Vector3 angularVelocity = Math::NormalizeVector3(Math::SubtractVector3(camera.target, camera.position));
