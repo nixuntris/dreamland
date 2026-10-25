@@ -27,7 +27,10 @@ layout(std430, binding = 7) buffer AABBBuffer {
 };
 layout(std430, binding = 9) buffer MeshletCounter {
     int meshletCounter;
+    int chunkBeginning[1024*1024];
+    int chunkEnd[1024*1024];
 };
+
 uniform vec3 planeNormals[6];
 uniform float planeDs[6];
 

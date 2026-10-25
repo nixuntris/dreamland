@@ -207,6 +207,8 @@ const int mwz = 300;
 
 struct World {
 
+	bool array[mwx][mwz];
+	uint8_t setLod[mwx][mwz];
 	struct GlobalHandle {
 		struct Region {
 			GLuint64 handle;
@@ -329,6 +331,12 @@ struct World {
 			for (int d = 0; d < 16; d++) handle.handle[i].lightIds[d] = -1;
 
 		}
+		for (int x = 0; x < wx; x++) {
+			for (int y = 0; y < wz; y++) {
+				array[x][y] = false;
+				setLod[x][y] = 0;
+			}
+		}
 		physicsAccelerationChunks = (PhysicsAccelerationChunk*)MemAlloc(wx * wy * wz * sizeof(PhysicsAccelerationChunk));
 	}
 	~World() {
@@ -353,7 +361,7 @@ public:
 	int size;
 	int lod;
 	int voxelCount = 0;
-	int beginningMeshlet;
+	int endTri;
 	int beginningTri;
 	std::vector<Vector3> grassList;
 	bool hwOrSoftwareRaster = false;
@@ -851,5 +859,52 @@ public:
 		else {
 			return chunkData->terrain[index];
 		}
+	}
+	inline void ClearChunkData(ChunkData* cd)
+	{
+		if (!cd) return;
+		if (cd->voxelCount != 0) {
+
+			if (cd->terrain && !cd->compressed) {
+				MemFree(cd->terrain);
+				cd->terrain = NULL;
+			}
+			if (cd->compressedTerrain && (cd->compressed || shortenedData)) {
+				MemFree(cd->compressedTerrain);
+				cd->compressedTerrain = NULL;
+			}
+			if (cd->palette && cd->compressed) {
+				MemFree(cd->palette);
+				cd->palette = NULL;
+			}
+			if (cd->bitMap) {
+				MemFree(cd->bitMap);
+				cd->bitMap = NULL;
+			}
+		}
+
+		lod = 0;
+		voxelCount = 0;
+		cd->fluidShortMap.Delete();
+		cd->fluidByteMap.Delete();
+
+		cd->skipped = false;
+		cd->lod = 0;
+		cd->paletteSize = 0;
+		cd->compressed = false;
+		cd->voxelCount = 0;
+		cd->updated = false;
+
+		shortenedData = false;
+		hasFluid = false;
+		updated = false;
+		voxelCount = 0;
+		allocatedTriSize = 0;
+		beginningTri = 0;
+		endTri = 0;
+		oldTri = 0;
+
+		tallestY = 0;
+		grassList.clear();
 	}
 };

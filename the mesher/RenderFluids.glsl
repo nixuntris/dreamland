@@ -22,6 +22,8 @@ layout(std430, binding = 2) buffer VerticesBuffer {
 
 layout(std430, binding = 9) buffer MeshletCounter {
     int meshletCounter;
+    int chunkBeginning[1024*1024];
+    int chunkEnd[1024*1024];
 };
 
 layout(std430, binding = 7) buffer AABBBuffer {
@@ -86,15 +88,23 @@ layout(std430, binding = 10) buffer GPUBatch {
 void main()
 {
     uint tid = gl_LocalInvocationIndex;
+    int batchId = int(gl_WorkGroupID.x);
 
     ivec3 chunk = ivec3(
-        gpuBatch[int(gl_WorkGroupID.x) * 3 + 0],
-        gpuBatch[int(gl_WorkGroupID.x) * 3 + 1],
-        gpuBatch[int(gl_WorkGroupID.x) * 3 + 2]
+        gpuBatch[batchId * 3 + 0],
+        gpuBatch[batchId * 3 + 1],
+        gpuBatch[batchId * 3 + 2]
     );
     int chunkIndex = chunk.y * (wx * wz) + chunk.z * wx + chunk.x;
     int lod = handles[chunkIndex].lod;
-    if (lod == 0) return;
+
+    if (lod == 0) {
+        if (tid == 0u) {
+            chunkBeginning[batchId] = 0;
+            chunkEnd[batchId] = 0;
+        }
+        return;
+    }
 
     for (int c = 0; c < 3; c++) {
         sMin[tid * 3u + uint(c)] = 1 << 30;
@@ -108,9 +118,9 @@ void main()
     uint cacheVal[perThread * perThread * perThread];
     uint myCount = 0u;
 
-    for (int x = 0; x < perThread; x+=lod) {
-        for (int y = 0; y < perThread; y+=lod) {
-            for (int z = 0; z < perThread; z+=lod) {
+    for (int x = 0; x < perThread; x += lod) {
+        for (int y = 0; y < perThread; y += lod) {
+            for (int z = 0; z < perThread; z += lod) {
                 ivec3 lp = base + ivec3(x, y, z);
                 ivec3 p = chunkOrigin + lp;
 
@@ -125,7 +135,7 @@ void main()
                 if (mask == 0u) continue;
 
                 cachePos[myCount] = uint(lp.x) | (uint(lp.y) << 5) | (uint(lp.z) << 10) | (mask << 15);
-                cacheVal[myCount] = value-1;
+                cacheVal[myCount] = value - 1u;
                 myCount++;
             }
         }
@@ -143,7 +153,13 @@ void main()
     }
 
     uint total = sScan[threadCount - 1];
-    if (total == 0u) return;
+    if (total == 0u) {
+        if (tid == 0u) {
+            chunkBeginning[batchId] = 0;
+            chunkEnd[batchId] = 0;
+        }
+        return;
+    }
 
     uint exclusive = sScan[tid] - myCount;
     uint meshletCount = (total + 63u) / 64u;
@@ -151,6 +167,9 @@ void main()
     if (tid == 0u) {
         sBegin = atomicAdd(meshletCounter, int(meshletCount));
     }
+    barrier();
+
+    int beginningId = sBegin;
 
     for (uint i = 0u; i < myCount; i++) {
         uint packed = cachePos[i];
@@ -165,7 +184,10 @@ void main()
     }
     barrier();
 
-    int beginningId = sBegin;
+    if (tid == 0u) {
+        chunkBeginning[batchId] = beginningId * 64;
+        chunkEnd[batchId] = (beginningId + int(meshletCount)) * 64;
+    }
 
     if (tid < meshletCount) {
         int aabbBase = (beginningId + int(tid)) * 6;

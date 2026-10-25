@@ -10,7 +10,10 @@ layout(std430, binding = 0) buffer GBufferEx {
 
 layout(std430, binding = 9) buffer MeshletCounter {
     int meshletCounter;
+    int chunkBeginning[1024*1024];
+    int chunkEnd[1024*1024];
 };
+
 uniform int renderWidth;
 uniform int renderHeight;
 uniform vec3 camPos;

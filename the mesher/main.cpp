@@ -115,7 +115,7 @@ class App {
 	float* particles;
 	bool firstGen = true;
 	int totalTriangleCount;
-	int renderDistance = 1000;
+	int renderDistance = 500;
 	struct ChunkOffset {
 		int vertice;
 		int color;
@@ -161,8 +161,7 @@ public:
 		glGetIntegerv(GL_MAX_SHADER_STORAGE_BUFFER_BINDINGS, &maxSSBOCount);
 		//std::cout << maxSSBOCount << "\n";
 		if (gpuMeshing) {
-			shaders.display.CreateSSBO(9, sizeof(int) * 2);
-			shaders.display.CreateSSBO(9, sizeof(int) * 2);
+			shaders.display.CreatePersistentSSBO(9, sizeof(int) * 2+1024*1024*2*sizeof(int));
 			shaders.display.CreateSSBO(10, maxGPUBatch * sizeof(Math::IVector3));
 			vv = (Math::IVector3*)(MemAlloc(1024 * 1024 * sizeof(Math::IVector3)));
 		}
@@ -183,7 +182,7 @@ public:
 			shaders.display.CreatePersistentSSBO(2, totalTriangleCount * sizeof(uint32_t) * 8);
 			shaders.display.CreatePersistentSSBO(6, totalTriangleCount * sizeof(uint32_t) * 8);
 			shaders.display.CreatePersistentSSBO(7, totalMeshletCount * 6 * sizeof(float) * 8);
-				firstGen = false;
+			firstGen = false;
 		}
 		shaders.display.CreateSSBO(20, maxGrassCount * 3 * sizeof(float));
 		ImGui_ImplGlfw_InitForOpenGL(window.GetWindowHandle(), true);
@@ -194,19 +193,107 @@ public:
 		glCullFace(GL_BACK);
 		glFrontFace(GL_CCW);
 	}
-	void GenerateTerrain() {
-
+	inline void GenerateTerrain() {
 		off = (ChunkOffset*)MemAlloc(wx * wy * wz * sizeof(ChunkOffset));
 		chunks = (Chunk*)MemAlloc(wx * wz * wy * sizeof(Chunk));
 	}
-	void RecalculateParticles(int x, int y, int z) {
+	inline void uploadChunkSSBO(uint32_t neighbourId) {
+		Anubis::SwitchShaderStage(shaders.display.shaderId);
+		shaders.display.UpdateSSBO(
+			3,
+			&world.handle.handle[neighbourId],
+			sizeof(World::GlobalHandle::Region),
+			neighbourId * sizeof(World::GlobalHandle::Region)
+		);
+	};
+
+	inline void ChunkPush(int nx, int nz) {
+
+
+		int lod = 1;
+		float dist = Vector2Distance({ (float)nx * chunkSize + chunkSize / 2,(float)nz * chunkSize + chunkSize / 2 }, { float(camera.position.x),float(camera.position.z) });
+		bool grass = false;
+
+		if (dist < 1920) grass = true;
+		if (dist > 960) lod = 2;
+		if (dist > 960 * 2) lod = 4;
+		if (dist > 960 * 4) lod = 8;
+		if (dist > 960 * 8) lod = 16;
+		if (dist > 960 * 12) lod = 32;
+		if (dist > 960 * 24) lod = 64;
+		if (world.array[nx][nz]) {
+			world.array[nx][nz] = false;
+			world.setLod[nx][nz] = lod;
+			for (int ny = 0; ny < wy; ny++) {
+				int neighbourId = ny * (wx * wz) + nz * wx + nx;
+
+				int beginTri = chunks[neighbourId].beginningTri;
+				int endTri = chunks[neighbourId].endTri;
+				int triCount = endTri - beginTri;
+
+				if (chunks[neighbourId].voxelCount!=0) {
+					std::cout << "Mem set color and vertices\n";
+					memset((uint8_t*)shaders.display.ssboPointers[2] + (size_t)beginTri * sizeof(uint32_t),
+						0, (size_t)triCount * sizeof(uint32_t));
+
+					memset((uint8_t*)shaders.display.ssboPointers[6] + (size_t)beginTri * sizeof(uint32_t),
+						0, (size_t)triCount * sizeof(uint32_t));
+
+					int beginMeshlet = beginTri / 64;
+					int endMeshlet = (endTri + 63) / 64;
+					int meshletCount = endMeshlet - beginMeshlet;
+
+					if (meshletCount > 0) {
+						std::cout << "Mem set AABB and \n";
+						memset((uint8_t*)shaders.display.ssboPointers[5] + (size_t)beginMeshlet * sizeof(int),
+							0, (size_t)meshletCount * sizeof(int));
+
+						memset((uint8_t*)shaders.display.ssboPointers[7] + (size_t)beginMeshlet * 6 * sizeof(float),
+							0, (size_t)meshletCount * 6 * sizeof(float));
+					}
+				}
+
+				chunks[neighbourId].ClearChunkData(&world.chunkData[neighbourId]);
+				chunks[neighbourId].grassList.clear();
+				uploadChunkSSBO(neighbourId);
+			}
+		}
+	}
+	inline void DeleteWorld() {
+
+		for (int nx = 0; nx < wx; nx++) {
+			for (int nz = 0; nz < wz; nz++) {
+
+				world.array[nx][nz] = false;
+
+				for (int ny = 0; ny < wy; ny++) {
+					int neighbourId = ny * (wx * wz) + nz * wx + nx;
+					chunks[neighbourId].ClearChunkData(&world.chunkData[neighbourId]);
+					chunks[neighbourId].grassList.clear();
+					uploadChunkSSBO(neighbourId);
+				}
+			}
+		}
+		free(off);
+		free(chunks);
+		off = (ChunkOffset*)MemAlloc(wx * wy * wz * sizeof(ChunkOffset));
+		chunks = (Chunk*)MemAlloc(wx * wz * wy * sizeof(Chunk));
+		Anubis::SwitchShaderStage(shaders.display.shaderId);
+		memset(shaders.display.ssboPointers[9], 0, (1024 * 1024 * 2 + 1) * sizeof(int));
+		memset(shaders.display.ssboPointers[5], 0, (totalMeshletCount + 1) * sizeof(int) * 8);
+		memset(shaders.display.ssboPointers[2], 0, totalTriangleCount * sizeof(uint32_t) * 8);
+		memset(shaders.display.ssboPointers[6], 0, totalTriangleCount * sizeof(uint32_t) * 8);
+		memset(shaders.display.ssboPointers[7], 0, totalMeshletCount * 6 * sizeof(float) * 8);
+		shaders.display.UpdateSSBO(20, 0, maxGrassCount * 3 * sizeof(float), 0);
+		grass = 0;
+	}
+	inline void RecalculateParticles(int x, int y, int z) {
 		Anubis::SwitchShaderStage(shaders.display.shaderId);
 		int total = 0;
 		int tt = chunks[y * (wx * wz) + z * wx + x].grassList.size();
 		if (tt <= 0) return;
 		particles = (float*)MemAlloc(tt * 2 * 3 * sizeof(float));
-		std::cout << tt << "\n";
-
+		
 		for (auto t : chunks[y * (wx * wz) + z * wx + x].grassList) {
 			for (int i = 0; i < GetRandomValue(1, 2); i++) {
 				particles[total * 3] = (t.x + float(GetRandomValue(-10, 10)) / 10.0f);
@@ -224,7 +311,7 @@ public:
 		}
 		free(particles); 
 	}
-	bool CustomToggle(const char* label, bool* value) {
+	inline bool CustomToggle(const char* label, bool* value) {
 		ImVec2 pos = ImGui::GetCursorScreenPos();
 		ImVec2 size = ImVec2(32, 32);
 		bool clicked = ImGui::InvisibleButton(label, size);
@@ -238,7 +325,7 @@ public:
 		ImGui::Text("%s", label);
 		return clicked;
 	}
-	uint32_t packRGBA8(uint8_t r, uint8_t g, uint8_t b, uint8_t a) {
+	inline uint32_t packRGBA8(uint8_t r, uint8_t g, uint8_t b, uint8_t a) {
 		return (static_cast<uint32_t>(r)) |
 			(static_cast<uint32_t>(g) << 8) |
 			(static_cast<uint32_t>(b) << 16) |
@@ -449,15 +536,10 @@ public:
 		mesh.Create(Anubis::cubeVertices, floatCount);
 		bool preallocated = false;
 		bool generatedMesh = false;
-		bool array[mwx][mwz];
-		for (int x = 0; x < wx; x++) {
-			for (int y = 0; y < wz; y++) {
-				array[x][y] = false;
-			}
-		}
 		Anubis::SwitchShaderStage(shaders.display.shaderId);
 		shaders.display.CreateSSBO(3, sizeof(world.handle));
 		shaders.display.UpdateSSBO(9, 0, sizeof(int), 0);
+		Math::IVector2 oldChunkPos = { camera.position.x / chunkSize,camera.position.z / chunkSize };
 		while (window.IsOpen()) {
 			double frameStart = glfwGetTime();
 			Anubis::DisplayShader* shader = &shaders.display;
@@ -783,20 +865,24 @@ public:
 
 			auto grassTimeMs = grassT.Stop();
 			START_TIMER(physicsAllocator)
-			auto uploadChunkSSBO = [&](uint32_t neighbourId) {
-			Anubis::SwitchShaderStage(shaders.display.shaderId);
-			shaders.display.UpdateSSBO(
-				3,
-				&world.handle.handle[neighbourId],
-				sizeof(World::GlobalHandle::Region),
-				neighbourId * sizeof(World::GlobalHandle::Region)
-			);
-			};
+			
 			START_TIMER(chunkAllocator)
+			
+			Math::IVector2 currentChunkPos= { int(camera.position.x / chunkSize),int(camera.position.z / chunkSize )};
+			//if (oldChunkPos.x != currentChunkPos.x || oldChunkPos.y != currentChunkPos.y)
+			if (window.GetKeyPressed(KEY_C))
+			{
+
+				std::cout << "Chunk shift begin \n";
+				ChunkPush(camera.position.x / chunkSize, camera.position.z / chunkSize);
+			}
+			oldChunkPos = currentChunkPos;
 			int drd = 0;
 			Math::IVector2 generateArrayId[1024];
 			int generateCount = 0;
 			const float halfAngle = tanf((160 * 0.5f) * DEG2RAD);
+			float cosHalf = cosf(halfAngle);
+			float sinHalf = sinf(halfAngle);
 			Vector2 camPos2D = { camera.position.x, camera.position.z };
 			Vector2 camTarget2D = { camera.target.x,   camera.target.z };
 			Vector2 baseForward2D = { camera.GetForward().x, camera.GetForward().z };
@@ -810,19 +896,19 @@ public:
 			}
 
 			for (int i = 0; i < 2; i++) {
-				float lastDistance = 10000;
+				float lastDistance = renderDistance*chunkSize*2;
 				int chunkX = -1;
 				int chunkZ = -1;
 				for (int x = 0; x < wx; x++) {
 					for (int z = 0; z < wz; z++) {
 						Vector2 point = { x * chunkSize+ chunkSize/2,z * chunkSize + chunkSize /2};
 						float dd = Vector2Distance(point, camPos2D);
-						if (dd < renderDistance) {
+						if (dd < renderDistance*chunkSize) {
 
 							bool inFrustum = false;
 							if (!alwaysInFrustum) {
 
-								Vector2 toPoint = { point.x - camera.position.x, point.y - camera.position.y };
+								Vector2 toPoint = { point.x - camera.position.x, point.y - camera.position.z };
 
 								float alongForward = toPoint.x * forward.x + toPoint.y * forward.y;
 								float alongRight = toPoint.x * right.x + toPoint.y * right.y;
@@ -837,9 +923,9 @@ public:
 
 							if (inFrustum || alwaysInFrustum) {
 
-								if (!array[x][z]) {
-									if (lastDistance > dd || chunkX == -1) {
-										lastDistance = dd;
+								if (!world.array[x][z]) {
+									if (lastDistance > dd*chunkSize || chunkX == -1) {
+										lastDistance = dd * chunkSize;
 										chunkX = x;
 										chunkZ = z;
 									}
@@ -853,8 +939,9 @@ public:
 					int nx = chunkX;
 					if (nz < 0 || nx < 0 || nx >= wx || nz >= wz) continue;
 
-					if (!array[nx][nz]) {
-						array[nx][nz] = true;
+					if (!world.array[nx][nz]) {
+						world.array[nx][nz] = true;
+						world.setLod[nx][nz] = chunks[nz * wx + nx].lod;
 						generateArrayId[generateCount++] = { nx,nz };
 					}
 				}
@@ -864,7 +951,7 @@ public:
 				int nz = generateArrayId[i].y;
 
 				int lod = 1;
-				float dist = Vector2Distance({ (float)nx * chunkSize,(float)nz * chunkSize }, { float(camera.position.x),float(camera.position.z) });
+				float dist = Vector2Distance({ (float)nx * chunkSize + chunkSize / 2,(float)nz * chunkSize+chunkSize/2 }, { float(camera.position.x),float(camera.position.z) });
 				bool grass = false;
 
 				if (dist < 1920) grass = true;
@@ -935,31 +1022,34 @@ public:
 					}
 				}
 			}
-			for (int x = 0; x < wx; x++) {
-				for (int z = 0; z < wz; z++) {
-					if (array[x][z]) {
-						bool neighborsLoaded =
-							x > 0 && x < wx - 1 && z > 0 && z < wz - 1 &&
-							array[x - 1][z] && array[x + 1][z] && array[x][z - 1] && array[x][z + 1];
-						if (neighborsLoaded) {
+			for (int i = 0; i < 2; i++) {
 
-							for (int ny = 0; ny < wy; ny++) {
-								int id = ny * (wx * wz) + z * wx + x;
-								if (!world.chunkData[id].updated && world.chunkData[id].voxelCount != 0) {
+				for (int x = 0; x < wx; x++) {
+					for (int z = 0; z < wz; z++) {
+						if (world.array[x][z]) {
+							bool neighborsLoaded =
+								x > 0 && x < wx - 1 && z > 0 && z < wz - 1 &&
+								world.array[x - 1][z] && world.array[x + 1][z] && world.array[x][z - 1] && world.array[x][z + 1];
+							if (neighborsLoaded) {
 
-									vv[drd].x = chunks[id].gx;
-									vv[drd].y = chunks[id].gy;
-									vv[drd].z = chunks[id].gz;
+								for (int ny = 0; ny < wy; ny++) {
+									int id = ny * (wx * wz) + z * wx + x;
+									if (!world.chunkData[id].updated && world.chunkData[id].voxelCount != 0) {
 
-									if (world.chunkData[id].voxelCount != 0 && !world.chunkData[id].skipped) {
-										world.chunkData[id].updated = true;
-										drd++;
+										vv[drd].x = chunks[id].gx;
+										vv[drd].y = chunks[id].gy;
+										vv[drd].z = chunks[id].gz;
+
+										if (world.chunkData[id].voxelCount != 0 && !world.chunkData[id].skipped) {
+											world.chunkData[id].updated = true;
+											drd++;
+										}
 									}
 								}
 							}
 						}
-					}
 
+					}
 				}
 			}
 			if (drd > 0) {
@@ -981,14 +1071,33 @@ public:
 				shaders.fluidRender.SetInt(wHeight, "renderHeight");
 				shaders.fluidRender.SetInt(frame, "frameIndex");
 				shaders.fluidRender.Use(drd, 1, 1);
+				glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT | GL_BUFFER_UPDATE_BARRIER_BIT);
 
-				Anubis::SwitchShaderStage(shaders.display.shaderId);
+				constexpr GLintptr N = 1024 * 1024;                       // array length in the shader
+				const GLintptr beginOffset = sizeof(int);                  // after meshletCounter
+				const GLintptr endOffset = sizeof(int) + N * sizeof(int);
+
 				glBindBuffer(GL_SHADER_STORAGE_BUFFER, shaders.display.ssboIds[9]);
+
 				glGetBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, sizeof(int), &totalMeshletCount);
+
+				std::vector<int> begin(drd), end(drd);
+				glGetBufferSubData(GL_SHADER_STORAGE_BUFFER, beginOffset,
+					drd * sizeof(int), begin.data());
+				glGetBufferSubData(GL_SHADER_STORAGE_BUFFER, endOffset,
+					drd * sizeof(int), end.data());
+
 				glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
 
 				totalTriangleCount = totalMeshletCount * 64 + 64;
-				
+
+				for (int i = 0; i < drd; i++) {
+					
+
+					int id = vv[i].y * (wx * wz) + vv[i].z * wx + vv[i].x;
+					chunks[id].beginningTri = begin[i];
+					chunks[id].endTri = begin[i];
+				}
 			}
 			offfr++;
 			if (window.GetMouseButtonPressed(1) && offfr>5) {
@@ -1420,6 +1529,7 @@ public:
 				ImGui::Begin("Debug Menu");
 
 				ImGui::SliderInt("Edit Size", &editSize, 1, 300);
+				ImGui::SliderInt("Render Distance", &renderDistance, 1, 1000);
 
 				CustomToggle("Render grass", &graphicsSettings.grassRender);
 				CustomToggle("Hardware/Software rendering", &graphicsSettings.hardwareSoftwareRendering);

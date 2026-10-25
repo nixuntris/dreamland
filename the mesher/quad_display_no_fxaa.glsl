@@ -28,7 +28,10 @@ layout(std430, binding = 8) buffer VMeshletBuffer {
 
 layout(std430, binding = 9) buffer MeshletCounter {
     int meshletCounter;
+    int chunkBeginning[1024*1024];
+    int chunkEnd[1024*1024];
 };
+
 layout(std430, binding = 20) buffer PointMap {
     float particlePoint[];
 };
