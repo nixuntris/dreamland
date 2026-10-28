@@ -763,19 +763,34 @@ public:
 		GenerateBitMap(chunkData);
 	}
 	inline void GenerateBitMap(ChunkData* chunkData) {
-		chunkData->bitMap = (uint8_t*)MemAlloc(size * size * size / 8 * sizeof(uint8_t));
-		for (int x = 0; x < size; x++) {
-			for (int y = 0; y < size; y++) {
-				for (int z = 0; z < size; z++) {
+		const int total = size * size * size;
+		chunkData->bitMap = (uint8_t*)MemAlloc(total / 8 * sizeof(uint8_t));
+		memset(chunkData->bitMap, 0, total / 8);
 
-					int id = (x)+(y)*size + (z)*size * size;
-					chunkData->bitMap[(id / 8)] &= ~(1u << (id % 8));
-					if (chunkData->terrain[id] != 0) chunkData->bitMap[(id / 8)] |= (1 << (id % 8));
-
+		if (chunkData->terrain != nullptr) {
+			for (int x = 0; x < size; x++) {
+				for (int y = 0; y < size; y++) {
+					for (int z = 0; z < size; z++) {
+						int id = x + y * size + z * size * size;
+						if (chunkData->terrain[id] != 0) {
+							chunkData->bitMap[id / 8] |= (1u << (id % 8));
+						}
+					}
 				}
 			}
 		}
-
+		else {
+			for (int x = 0; x < size; x++) {
+				for (int y = 0; y < size; y++) {
+					for (int z = 0; z < size; z++) {
+						int id = x + y * size + z * size * size;
+						if (chunkData->compressedTerrain[id] != 0) {
+							chunkData->bitMap[id / 8] |= (1u << (id % 8));
+						}
+					}
+				}
+			}
+		}
 	}
 	inline bool SetTerrain(ChunkData* chunkdata, int x, int y, int z, uint16_t t) {
 		if (voxelCount == 0 || lod != 1) {
@@ -784,7 +799,13 @@ public:
 
 		int id = x + y * size + z * size * size;
 		bool set = false;
-
+		if (shortenedData) {
+			if (chunkdata->compressedTerrain[id] == 0) {
+				voxelCount++;
+			}
+			chunkdata->compressedTerrain[id] = (uint8_t)t;
+			return true;
+		}
 		if (chunkdata->compressed) {
 			uint8_t compressedValue = 0;
 			for (int i = 0; i < chunkdata->paletteSize; i++) {

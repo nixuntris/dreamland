@@ -208,7 +208,8 @@ public:
 	};
 
 	inline void ChunkPush(int nx, int nz) {
-
+		int drd = 0;
+		
 
 		int lod = 1;
 		float dist = Vector2Distance({ (float)nx * chunkSize + chunkSize / 2,(float)nz * chunkSize + chunkSize / 2 }, { float(camera.position.x),float(camera.position.z) });
@@ -221,15 +222,17 @@ public:
 		if (dist > 960 * 8) lod = 16;
 		if (dist > 960 * 12) lod = 32;
 		if (dist > 960 * 24) lod = 64;
+		std::cout << nx << " " << nz << "\n";
 		if (world.array[nx][nz]) {
-			world.array[nx][nz] = false;
 			world.setLod[nx][nz] = lod;
+			std::cout << "First phase of push\n";
 			for (int ny = 0; ny < wy; ny++) {
 				int neighbourId = ny * (wx * wz) + nz * wx + nx;
 
 				int beginTri = chunks[neighbourId].beginningTri;
 				int endTri = chunks[neighbourId].endTri;
 				int triCount = endTri - beginTri;
+				std::cout << "Second phase of push\n";
 
 				if (chunks[neighbourId].voxelCount!=0) {
 					std::cout << "Mem set color and vertices\n";
@@ -252,10 +255,54 @@ public:
 							0, (size_t)meshletCount * 6 * sizeof(float));
 					}
 				}
-
+				vv[drd] = { nx,ny,nz };
+				drd++;
 				chunks[neighbourId].ClearChunkData(&world.chunkData[neighbourId]);
 				chunks[neighbourId].grassList.clear();
 				uploadChunkSSBO(neighbourId);
+			}
+		}
+
+		if (drd > 0) {
+			shaders.display.UpdateSSBO(10, vv, drd * sizeof(Math::IVector3), 0);
+
+			auto batchUploadEnd = std::chrono::high_resolution_clock::now();
+			Anubis::GpuTimer mesh;
+			mesh.Start();
+			Anubis::SwitchShaderStage(shaders.fluidRender.programID);
+			shaders.fluidRender.SetInt(wx, "wx");
+			shaders.fluidRender.SetInt(wy, "wy");
+			shaders.fluidRender.SetInt(wz, "wz");
+			shaders.fluidRender.SetFloat(timeSpeed, "timeSpeed");
+			shaders.fluidRender.SetInt(wWidth, "renderWidth");
+			shaders.fluidRender.SetInt(wHeight, "renderHeight");
+			shaders.fluidRender.Use(drd, 1, 1);
+			glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT | GL_BUFFER_UPDATE_BARRIER_BIT);
+
+			constexpr GLintptr N = 1024 * 1024;                       // array length in the shader
+			const GLintptr beginOffset = sizeof(int);                  // after meshletCounter
+			const GLintptr endOffset = sizeof(int) + N * sizeof(int);
+
+			glBindBuffer(GL_SHADER_STORAGE_BUFFER, shaders.display.ssboIds[9]);
+
+			glGetBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, sizeof(int), &totalMeshletCount);
+
+			std::vector<int> begin(drd), end(drd);
+			glGetBufferSubData(GL_SHADER_STORAGE_BUFFER, beginOffset,
+				drd * sizeof(int), begin.data());
+			glGetBufferSubData(GL_SHADER_STORAGE_BUFFER, endOffset,
+				drd * sizeof(int), end.data());
+
+			glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
+
+			totalTriangleCount = totalMeshletCount * 64 + 64;
+
+			for (int i = 0; i < drd; i++) {
+
+
+				int id = vv[i].y * (wx * wz) + vv[i].z * wx + vv[i].x;
+				chunks[id].beginningTri = begin[i];
+				chunks[id].endTri = end[i];
 			}
 		}
 	}
@@ -482,6 +529,127 @@ public:
 			window.UpdateBuffer();
 		}
 	}
+
+	void RecalculateParticlesFullDebug() {
+
+		grass = 0;
+		int total = 0;
+		int tt = 0;
+		for (int x = 0; x < wx; x++) {
+			for (int z = 0; z < wz; z++) {
+				for (int y = 0; y < wy; y++) {
+
+					tt += chunks[y * (wx * wz) + z * wx + x].grassList.size();
+				}
+			}
+		}
+		particles = (float*)MemAlloc(tt * 2 * 3 * sizeof(float));
+
+		for (int x = 0; x < wx; x++) {
+			for (int z = 0; z < wz; z++) {
+				for (int y = 0; y < wy; y++) {
+
+					for (auto t : chunks[y * (wx * wz) + z * wx + x].grassList) {
+						for (int i = 0; i < GetRandomValue(1, 2); i++) {
+							particles[total * 3] = (t.x + float(GetRandomValue(-10, 10)) / 10.0f);
+							particles[total * 3 + 1] = (t.y + 1);
+							particles[total * 3 + 2] = (t.z + float(GetRandomValue(-10, 10)) / 10.0f);
+							grass++;
+							total++;
+						}
+
+
+					}
+					chunks[y * (wx * wz) + z * wx + x].grassList.clear();
+				}
+			}
+		}
+		if (grass > 0) {
+
+			shaders.display.UpdateSSBO(20, particles, grass * 3 * sizeof(float), 0);
+		}
+		free(particles);
+	}
+	void PreGenerateFullDebug() {
+#pragma omp parallel for collapse(2)
+		for (int nx = 0; nx < wx; nx++) {
+			for (int nz = 0; nz < wz; nz++) {
+				world.array[nx][nz] = true;
+
+
+				int lod = 1;
+				float dist = Vector2Distance({ (float)nx * chunkSize + chunkSize / 2,(float)nz * chunkSize + chunkSize / 2 }, { float(camera.position.x),float(camera.position.z) });
+				bool grass = false;
+
+				if (dist < 1920) grass = true;
+				if (dist > 960) lod = 2;
+				if (dist > 960 * 2) lod = 4;
+				if (dist > 960 * 4) lod = 8;
+				if (dist > 960 * 8) lod = 16;
+				if (dist > 960 * 12) lod = 32;
+				if (dist > 960 * 24) lod = 64;
+				GenerationData gen;
+				gen.GenerateMountains(nx, nz);
+				gen.highestChunkY += 2;
+
+				for (int y = 0; y < gen.highestChunkY && y < wy; y++) {
+					chunks[y * (wx * wz) + nz * wx + nx].GenerateMountains(&world.chunkData[y * (wx * wz) + nz * wx + nx], gen, nx, y, nz, lod, grass);
+					
+				};
+				for (int y = 0; y < gen.highestChunkY && y < wy; y++) {
+					chunks[y * (wx * wz) + nz * wx + nx].GenerateLod(&world.chunkData[y * (wx * wz) + nz * wx + nx], nx, y, nz);
+					chunks[y * (wx * wz) + nz * wx + nx].Compress(&world.chunkData[y * (wx * wz) + nz * wx + nx]);
+
+				};
+				free(gen.heightMap);
+				
+			}
+		}
+		for (int nx = 0; nx < wx; nx++) {
+			for (int nz = 0; nz < wz; nz++) {
+				for (int ny = 0; ny < wy; ny++) {
+
+					int neighbourId = ny * (wx * wz) + nz * wx + nx;
+					if (nx < 0 || ny < 0 || nz < 0 || nx >= wx || ny >= wy || nz >= wz) continue;
+					if (chunks[neighbourId].lod == 0) continue;
+					if (chunks[neighbourId].hasFluid) continue;
+					if (chunks[neighbourId].voxelCount == chunks[neighbourId].size * chunks[neighbourId].size * chunks[neighbourId].size) continue;
+
+					chunks[neighbourId].hasFluid = true;
+					int size = chunkSize / chunks[neighbourId].lod;
+					if (world.chunkData[neighbourId].skipped) {
+						world.handle.handle[neighbourId].lod = 3000;
+					}
+					if (world.chunkData[neighbourId].voxelCount != 0 && !world.chunkData[neighbourId].skipped)
+					{
+
+						if (chunks[neighbourId].shortenedData) {
+							world.chunkData[neighbourId].fluidByteMap.Clear({ size,size,size });
+							world.chunkData[neighbourId].fluidByteMap.Upload(world.chunkData[neighbourId].compressedTerrain);
+							world.chunkData[neighbourId].fluidByteMap.GetBindlessHandle();
+							world.handle.handle[neighbourId].handle = world.chunkData[neighbourId].fluidByteMap.handle;
+
+						}
+						else {
+							world.chunkData[neighbourId].fluidShortMap.Clear({ size,size,size });
+							uint16_t* tt = chunks[neighbourId].DecompressChunk(&world.chunkData[neighbourId]);
+							world.chunkData[neighbourId].fluidShortMap.Upload(tt);
+							free(tt);
+							world.chunkData[neighbourId].fluidShortMap.GetBindlessHandle();
+							world.handle.handle[neighbourId].handle = world.chunkData[neighbourId].fluidShortMap.handle;
+
+						}
+
+						//so, basically, the bottleneck is the upload ,and i need to create multiple at once instead of one
+						world.handle.handle[neighbourId].lod = world.chunkData[neighbourId].lod;
+					}
+				}
+			}
+		}
+		
+		shaders.display.UpdateSSBO(3, &world.handle, sizeof(world.handle), 0);
+		RecalculateParticlesFullDebug();
+	}
 	void Run() {
 		const std::vector<Color> palette = {
 					{0, 255, 0, 255},       // 0: GREEN GRASS
@@ -540,6 +708,7 @@ public:
 		shaders.display.CreateSSBO(3, sizeof(world.handle));
 		shaders.display.UpdateSSBO(9, 0, sizeof(int), 0);
 		Math::IVector2 oldChunkPos = { camera.position.x / chunkSize,camera.position.z / chunkSize };
+		PreGenerateFullDebug();
 		while (window.IsOpen()) {
 			double frameStart = glfwGetTime();
 			Anubis::DisplayShader* shader = &shaders.display;
@@ -976,6 +1145,162 @@ public:
 				};
 				free(gen.heightMap);
 			}
+			if (window.GetMouseButtonPressed(0) && !menuOpen && selectedColorIndex >= 0) {
+
+				Vector3 ppp = { camera.target.x,camera.target.y,camera.target.z };
+
+				bool doneChanges = false;
+				for (int dx = -editSize; dx < editSize; dx++) {
+					for (int dy = -editSize; dy < editSize; dy++) {
+						for (int dz = -editSize; dz < editSize; dz++) {
+
+							Vector3 pp = ppp;
+							pp.x += dx;
+							pp.y += dy;
+							pp.z += dz;
+
+							int x = pp.x / chunkSize;
+							int y = pp.y / chunkSize;
+							int z = pp.z / chunkSize;
+
+							int id = y * (wx * wz) + z * wx + x;
+
+							if (id >= wx * wy * wz || id < 0) continue;
+							if (chunks[id].lod == 1 || chunks[id].lod == 0) {
+
+								bool alreadyOnList = false;
+								for (auto t : chunksToUpdate) {
+									if (t == id) {
+										alreadyOnList = true;
+									}
+								}
+
+								chunks[id].lod = 1;
+								if (!alreadyOnList) {
+									chunksToUpdate.push_back(id);
+									chunksToUpdateIds.push_back({ float(x), (float)y, float(z) });
+
+									if (chunks[id].voxelCount == 0) {
+										chunks[id].gx = x;
+										chunks[id].gy = y;
+										chunks[id].gz = z;
+										chunks[id].size = chunkSize / chunks[id].lod;
+
+										world.chunkData[id].terrain = (uint16_t*)MemAlloc(chunkSize * chunkSize * chunkSize * sizeof(uint16_t));
+										for (int i = 0; i < chunkSize * chunkSize * chunkSize; i++) {
+											world.chunkData[id].terrain[i] = 0;
+										}
+										chunks[id].voxelCount = 1;
+										chunks[id].updated = true;
+
+										if (chunks[id].shortenedData) {
+											world.chunkData[id].fluidByteMap.Clear({ chunkSize,chunkSize,chunkSize });
+											world.chunkData[id].fluidByteMap.Upload(world.chunkData[id].compressedTerrain);
+											world.chunkData[id].fluidByteMap.GetBindlessHandle();
+											world.handle.handle[id].handle = world.chunkData[id].fluidByteMap.handle;
+
+										}
+										else {
+											world.chunkData[id].fluidShortMap.Clear({ chunkSize,chunkSize,chunkSize });
+											uint16_t* tt = chunks[id].DecompressChunk(&world.chunkData[id]);
+											world.chunkData[id].fluidShortMap.Upload(tt);
+											free(tt);
+											world.chunkData[id].fluidShortMap.GetBindlessHandle();
+											world.handle.handle[id].handle = world.chunkData[id].fluidShortMap.handle;
+
+										}
+
+										world.handle.handle[id].lod = 1;
+									}
+								}
+								if (chunks[id].hasFluid) {
+									if (selectedColorIndex == 0) world.chunkData[id].fluidByteMap.EditGPURegion({ int(fabs(pp.x)) % chunkSize, int(fabs(pp.y)) % chunkSize, int(fabs(pp.z)) % chunkSize }, { 1,1,1 }, 0);
+
+
+									else world.chunkData[id].fluidByteMap.EditGPURegion({ int(fabs(pp.x)) % chunkSize, int(fabs(pp.y)) % chunkSize, int(fabs(pp.z)) % chunkSize }, { 1,1,1 }, selectedColorIndex + 1);
+
+								}
+								if (selectedColorIndex == 0) {
+									if (chunks[id].SetTerrain(&world.chunkData[id], int(fabs(pp.x)) % chunkSize, int(fabs(pp.y)) % chunkSize, int(fabs(pp.z)) % chunkSize, 0) && !doneChanges) {
+										doneChanges = true;
+
+									}
+								}
+								else {
+									if (chunks[id].SetTerrain(&world.chunkData[id], int(fabs(pp.x)) % chunkSize, int(fabs(pp.y)) % chunkSize, int(fabs(pp.z)) % chunkSize, selectedColorIndex + 1) && !doneChanges) {
+										doneChanges = true;
+
+									}
+								}
+								if (chunks[id].updated) {
+									chunks[id].voxelCount += 1;
+								}
+							}
+						}
+					}
+				}
+				if (doneChanges) {
+					Vector3 snappedPos = {
+						std::floor(ppp.x) + 2.5,
+						std::floor(ppp.y) + 2.5,
+						std::floor(ppp.z) + 2.5
+					};
+					decals.push_back(snappedPos);
+					decalTypes.push_back(selectedColorIndex + 1);
+				}
+			}
+			else if (chunksToUpdate.size() != 0)
+			{
+
+				int r = 0;
+				for (auto t : chunksToUpdate) {
+					
+					if (t >= wx * wy * wz || t < 0) continue;
+
+					std::cout << chunks[t].beginningTri << "\n";
+					std::cout << chunks[t].endTri << "\n";
+			//			chunks[t].cpumesh.colorCount = 0;
+			//			chunks[t].cpumesh.vertexCount = 0;
+			//			chunks[t].cpumesh.triangleCount = 0;
+			//			chunks[t].cpumesh.realTriangleCount = 0;
+						free(world.chunkData[t].bitMap);
+				//		free(chunks[t].cpumesh.packedVertex);
+
+				//		free(chunks[t].cpumesh.gpuBasedColoring);
+/////
+				//		free(chunks[t].cpumesh.MeshletAABB);
+
+				//		free(chunks[t].cpumesh.meshletPosition);
+
+				//		chunks[t].cpumesh.realTriangleCount = 0;
+				//		chunks[t].cpumesh.vertexCount = 0;
+				//		chunks[t].cpumesh.colorCount = 0;
+					
+
+
+					//chunks[t].GenerateLod(&world.chunkData[t], chunks[t].gx, chunks[t].gy, chunks[t].gz);
+
+					chunks[t].GenerateBitMap(&world.chunkData[t]);
+					r++;
+				}
+				for (auto t : chunksToUpdate) {
+
+					if (t >= wx * wy * wz || t < 0) continue;
+					chunks[t].lod = 1;
+				//	chunks[t].SoftwareMesher(&world, chunks[t].gx, chunks[t].gy, chunks[t].gz);
+
+				}
+
+
+				//Update();
+				chunksToUpdate.clear();
+				decals.clear();
+				decalTypes.clear();
+				chunksToUpdate.resize(0);
+				decals.resize(0);
+				decalTypes.resize(0);
+				shaders.display.UpdateSSBO(3, &world.handle, sizeof(world.handle), 0);
+			}
 			//END_TIMER(chunkAllocator)
 			for (int i = 0; i < generateCount; i++) {
 				int nx = generateArrayId[i].x;
@@ -1096,7 +1421,7 @@ public:
 
 					int id = vv[i].y * (wx * wz) + vv[i].z * wx + vv[i].x;
 					chunks[id].beginningTri = begin[i];
-					chunks[id].endTri = begin[i];
+					chunks[id].endTri = end[i];
 				}
 			}
 			offfr++;
