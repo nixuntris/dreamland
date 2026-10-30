@@ -206,8 +206,64 @@ public:
 			neighbourId * sizeof(World::GlobalHandle::Region)
 		);
 	};
+	inline void UpdateLODChunks(int nx, int nz) {
+		for (int x = 0; x < wx; x++) {
+			for (int z = 0; z < wz; z++) {
+				int lod = 0;
+				float dist = Vector2Distance({ (float)nx * chunkSize + chunkSize / 2,(float)nz * chunkSize + chunkSize / 2 }, { float(camera.position.x),float(camera.position.z) });
+				bool grass = false;
 
-	inline void ChunkPush(int nx, int nz) {
+				if (dist < 1920) grass = true;
+				if (dist > 960) lod = 2;
+				if (dist > 960 * 2) lod = 4;
+				if (dist > 960 * 4) lod = 8;
+				if (dist > 960 * 8) lod = 16;
+				if (dist > 960 * 12) lod = 32;
+				if (dist > 960 * 24) lod = 64;
+				if (world.setLod[x][z] != lod) {
+					if (lod < world.setLod[x][z]) {
+						//downscale, easy peasy
+						for (int y = 0; y < wy; y++) {
+							int id = y * (wx * wz) + z * wx + x;
+							chunks[id].DownscaleLoD(&world.chunkData[id]);
+						}
+					}
+					else if (lod > world.setLod[x][z]) {
+						//upscale, spooky operation
+					}
+					else {
+						//why is this even noted down?
+					}
+				}
+				ChunkColumnRegenerate(nx, nz);
+			}
+		}
+	}
+
+	inline void SetLODChunks(int nx, int nz, int lod) {
+		for (int x = 0; x < wx; x++) {
+			for (int z = 0; z < wz; z++) {
+				if (world.setLod[x][z] != lod) {
+					if (lod < world.setLod[x][z]) {
+						//downscale, easy peasy
+						for (int y = 0; y < wy; y++) {
+							int id = y * (wx * wz) + z * wx + x;
+							chunks[id].DownscaleLoD(&world.chunkData[id]);
+						}
+					}
+					else if (lod > world.setLod[x][z]) {
+						//upscale, spooky operation
+					}
+					else {
+						//why is this even noted down?
+					}
+				}
+				ChunkColumnRegenerate(nx, nz);
+			}
+		}
+	}
+
+	inline void ChunkColumnRegenerate(int nx, int nz) {
 		int drd = 0;
 		
 
@@ -1038,12 +1094,15 @@ public:
 			START_TIMER(chunkAllocator)
 			
 			Math::IVector2 currentChunkPos= { int(camera.position.x / chunkSize),int(camera.position.z / chunkSize )};
-			//if (oldChunkPos.x != currentChunkPos.x || oldChunkPos.y != currentChunkPos.y)
+			if (oldChunkPos.x != currentChunkPos.x || oldChunkPos.y != currentChunkPos.y) {
+				UpdateLODChunks(camera.position.x/chunkSize,camera.position.z/chunkSize);
+			}
+			if (window.GetKeyPressed(KEY_V)) {
+				SetLODChunks(camera.position.x / chunkSize, camera.position.z / chunkSize, 8);
+			}
 			if (window.GetKeyPressed(KEY_C))
 			{
-
-				std::cout << "Chunk shift begin \n";
-				ChunkPush(camera.position.x / chunkSize, camera.position.z / chunkSize);
+				ChunkColumnRegenerate(camera.position.x / chunkSize, camera.position.z / chunkSize);
 			}
 			oldChunkPos = currentChunkPos;
 			int drd = 0;
