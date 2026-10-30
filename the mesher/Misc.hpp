@@ -3,6 +3,7 @@
 #include "Anubis/Anubis.hpp"
 #include "Anubis/AnubisShaders.hpp"
 #include "Anubis/AnubisMath.hpp"
+#include <sys/stat.h> 
 struct ShaderManager {
 	Anubis::DisplayShader display;
 	Anubis::DisplayShader displayNoFXAA;
@@ -22,23 +23,41 @@ struct ShaderManager {
 	Anubis::ComputeShader renderPhysicalObjects;
 	Anubis::ComputeShader clearPhysicalObjects;
 	void Load() {
-		display.LoadFromFile("quad_display_shader.fs", "Anubis/BaseShaders/quad_display_shader.vs");
-		displayNoFXAA.LoadFromFile("quad_display_no_fxaa.glsl", "Anubis/BaseShaders/quad_display_shader.vs");
-		rasterizer.Setup("Rasterize.glsl");
-		frustumCull.Setup("frustumCull.glsl");
-		hizBuilder.Setup("HizBuilder.glsl");
-		meshletRenderer.Setup("renderAABB.glsl");
-		grassRenderer.Setup("grassParticle.glsl");
-		hwRender.LoadFromFile("fes.fs", "ver.vs");
-		hwRenderForObjects.LoadFromFile("hwMesh.fs", "hwMesh.vs");
-		secondaryRaysRender.Setup("SecondaryRays.glsl");
-		fluidRender.Setup("RenderFluids.glsl");
-		generateTerrain.Setup("GenerateTerrain.glsl");
-		fillOut.Setup("FillOutPhysicsData.glsl");
-		renderPhysicalObjects.Setup("PhysicsObject.glsl");
-		clearPhysicalObjects.Setup("ClearPhysicalObject.glsl");
-		clouds.Setup("Clouds.glsl");
-		bilboards.Setup("bilboard.glsl");
+
+		std::string shaderDir = "";
+		struct stat info;
+		if (stat("shaders", &info) == 0 && (info.st_mode & S_IFDIR)) {
+			shaderDir = "shaders/";
+			std::cout << "Found shader dir\n";
+		}
+
+		auto path = [&](const std::string& name) -> std::string {
+			return shaderDir + name;
+			};
+
+		display.LoadFromFile(
+			path("quad_display_shader.fs").c_str(),
+			"Anubis/BaseShaders/quad_display_shader.vs"
+		);
+		displayNoFXAA.LoadFromFile(
+			path("quad_display_no_fxaa.glsl").c_str(),
+			"Anubis/BaseShaders/quad_display_shader.vs"
+		);
+		rasterizer.Setup(path("Rasterize.glsl").c_str());
+		frustumCull.Setup(path("frustumCull.glsl").c_str());
+		hizBuilder.Setup(path("HizBuilder.glsl").c_str());
+		meshletRenderer.Setup(path("renderAABB.glsl").c_str());
+		grassRenderer.Setup(path("grassParticle.glsl").c_str());
+		hwRender.LoadFromFile(path("fes.fs").c_str(), path("ver.vs").c_str());
+		hwRenderForObjects.LoadFromFile(path("hwMesh.fs").c_str(), path("hwMesh.vs").c_str());
+		secondaryRaysRender.Setup(path("SecondaryRays.glsl").c_str());
+		fluidRender.Setup(path("RenderFluids.glsl").c_str());
+		generateTerrain.Setup(path("GenerateTerrain.glsl").c_str());
+		fillOut.Setup(path("FillOutPhysicsData.glsl").c_str());
+		renderPhysicalObjects.Setup(path("PhysicsObject.glsl").c_str());
+		clearPhysicalObjects.Setup(path("ClearPhysicalObject.glsl").c_str());
+		clouds.Setup(path("Clouds.glsl").c_str());
+		bilboards.Setup(path("bilboard.glsl").c_str());
 	}
 
 };

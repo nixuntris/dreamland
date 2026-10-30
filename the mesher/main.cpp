@@ -1095,7 +1095,7 @@ public:
 			
 			Math::IVector2 currentChunkPos= { int(camera.position.x / chunkSize),int(camera.position.z / chunkSize )};
 			if (oldChunkPos.x != currentChunkPos.x || oldChunkPos.y != currentChunkPos.y) {
-				UpdateLODChunks(camera.position.x/chunkSize,camera.position.z/chunkSize);
+			//	UpdateLODChunks(camera.position.x/chunkSize,camera.position.z/chunkSize);
 			}
 			if (window.GetKeyPressed(KEY_V)) {
 				SetLODChunks(camera.position.x / chunkSize, camera.position.z / chunkSize, 8);

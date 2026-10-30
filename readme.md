@@ -1,8 +1,9 @@
 This is my voxel engine I call "dreamland".
 It's meant to be a sandbox game, somewhat akin to what John Lin aimed for. The most up to date explanation of the technical details are up on: https://jankysoftware.org/ under voxel rasterizer. 
 The general idea is that it's an attempt at implementing virtualized geometry for voxels, it's a very messy as of now, and incomplete.
+
 # Installation:
-On the release tab there is a list of ships, they are bi-weekly.
+On the release tab there is a list of builds, they are prepared bi-weekly(Unless a major change happens which might cause more releases).
 Just download the compressed folder, and there is a pre-compiled binary to launch.
 
 # Usage:
