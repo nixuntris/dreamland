@@ -95,6 +95,7 @@ void main()
         gpuBatch[batchId * 3 + 1],
         gpuBatch[batchId * 3 + 2]
     );
+
     int chunkIndex = chunk.y * (wx * wz) + chunk.z * wx + chunk.x;
     int lod = handles[chunkIndex].lod;
 
@@ -125,16 +126,28 @@ void main()
                 ivec3 p = chunkOrigin + lp;
 
                 uint value = readVoxelData(p);
-                if (value == 0u) continue;
+
+                if (value == 0u)
+                    continue;
 
                 uint mask = 0u;
+
                 for (int f = 0; f < 6; f++) {
-                    if (readVoxelData(p + faceOffsets[f]) == 0u)
+                    ivec3 neighborPos = p + faceOffsets[f] * lod;
+
+                    if (readVoxelData(neighborPos) == 0u)
                         mask |= 1u << f;
                 }
-                if (mask == 0u) continue;
 
-                cachePos[myCount] = uint(lp.x) | (uint(lp.y) << 5) | (uint(lp.z) << 10) | (mask << 15);
+                if (mask == 0u)
+                    continue;
+
+                cachePos[myCount] =
+                    uint(lp.x) |
+                    (uint(lp.y) << 5) |
+                    (uint(lp.z) << 10) |
+                    (mask << 15);
+
                 cacheVal[myCount] = value - 1u;
                 myCount++;
             }
@@ -146,13 +159,17 @@ void main()
 
     for (uint offset = 1u; offset < uint(threadCount); offset <<= 1) {
         uint v = sScan[tid];
-        if (tid >= offset) v += sScan[tid - offset];
+
+        if (tid >= offset)
+            v += sScan[tid - offset];
+
         barrier();
         sScan[tid] = v;
         barrier();
     }
 
     uint total = sScan[threadCount - 1];
+
     if (total == 0u) {
         if (tid == 0u) {
             chunkBeginning[batchId] = 0;
@@ -164,24 +181,33 @@ void main()
     uint exclusive = sScan[tid] - myCount;
     uint meshletCount = (total + 63u) / 64u;
 
-    if (tid == 0u) {
+    if (tid == 0u)
         sBegin = atomicAdd(meshletCounter, int(meshletCount));
-    }
+
     barrier();
 
     int beginningId = sBegin;
 
     for (uint i = 0u; i < myCount; i++) {
         uint packed = cachePos[i];
-        ivec3 lp = ivec3(int(packed & 31u), int((packed >> 5) & 31u), int((packed >> 10) & 31u));
+
+        ivec3 lp = ivec3(
+            int(packed & 31u),
+            int((packed >> 5) & 31u),
+            int((packed >> 10) & 31u)
+        );
+
         uint m = (exclusive + i) >> 6;
-        atomicMin(sMin[m * 3u],      lp.x);
+
+        atomicMin(sMin[m * 3u], lp.x);
         atomicMin(sMin[m * 3u + 1u], lp.y);
         atomicMin(sMin[m * 3u + 2u], lp.z);
-        atomicMax(sMax[m * 3u],      lp.x);
+
+        atomicMax(sMax[m * 3u], lp.x);
         atomicMax(sMax[m * 3u + 1u], lp.y);
         atomicMax(sMax[m * 3u + 2u], lp.z);
     }
+
     barrier();
 
     if (tid == 0u) {
@@ -191,24 +217,47 @@ void main()
 
     if (tid < meshletCount) {
         int aabbBase = (beginningId + int(tid)) * 6;
-        AABBCorners[aabbBase]     = float(sMin[tid * 3u]      + chunkOrigin.x);
-        AABBCorners[aabbBase + 1] = float(sMin[tid * 3u + 1u] + chunkOrigin.y);
-        AABBCorners[aabbBase + 2] = float(sMin[tid * 3u + 2u] + chunkOrigin.z);
-        AABBCorners[aabbBase + 3] = float(sMax[tid * 3u]      + chunkOrigin.x);
-        AABBCorners[aabbBase + 4] = float(sMax[tid * 3u + 1u] + chunkOrigin.y);
-        AABBCorners[aabbBase + 5] = float(sMax[tid * 3u + 2u] + chunkOrigin.z);
+
+        AABBCorners[aabbBase] =
+            float(sMin[tid * 3u] + chunkOrigin.x);
+
+        AABBCorners[aabbBase + 1] =
+            float(sMin[tid * 3u + 1u] + chunkOrigin.y);
+
+        AABBCorners[aabbBase + 2] =
+            float(sMin[tid * 3u + 2u] + chunkOrigin.z);
+
+        AABBCorners[aabbBase + 3] =
+            float(sMax[tid * 3u] + chunkOrigin.x + lod);
+
+        AABBCorners[aabbBase + 4] =
+            float(sMax[tid * 3u + 1u] + chunkOrigin.y + lod);
+
+        AABBCorners[aabbBase + 5] =
+            float(sMax[tid * 3u + 2u] + chunkOrigin.z + lod);
     }
 
     uint outBase = uint(beginningId) * 64u;
 
     for (uint i = 0u; i < myCount; i++) {
         uint packed = cachePos[i];
-        ivec3 lp = ivec3(int(packed & 31u), int((packed >> 5) & 31u), int((packed >> 10) & 31u));
-        uint mask = (packed >> 15) & 0x3Fu;
 
+        ivec3 lp = ivec3(
+            int(packed & 31u),
+            int((packed >> 5) & 31u),
+            int((packed >> 10) & 31u)
+        );
+
+        uint mask = (packed >> 15) & 0x3Fu;
         uint idx = exclusive + i;
         uint m = idx >> 6;
-        ivec3 minXYZ = ivec3(sMin[m * 3u], sMin[m * 3u + 1u], sMin[m * 3u + 2u]);
+
+        ivec3 minXYZ = ivec3(
+            sMin[m * 3u],
+            sMin[m * 3u + 1u],
+            sMin[m * 3u + 2u]
+        );
+
         ivec3 local = lp - minXYZ;
 
         uint packedVertex =
@@ -217,6 +266,7 @@ void main()
             ((uint(local.z) & 0x3FFu) << 20);
 
         uint outIndex = outBase + idx;
+
         colors[outIndex] = PackMetaData(mask, uint(lod), cacheVal[i]);
         vertices[outIndex] = packedVertex;
     }

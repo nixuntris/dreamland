@@ -844,104 +844,102 @@ public:
 		}
 		return set;
 	}
-	inline void DownscaleLoD(ChunkData* chunkData)
+	inline void DownscaleLoD(ChunkData* chunkData, int targetLod)
 	{
-		if (size <= 1) return;
-		if (lod != 1) return; 
 		if (chunkData->voxelCount == 0) return;
-
-		const int srcSize = size;
-		const int dstSize = size / 2;
 
 		START_TIMER(downscale_lod)
 
-		const bool srcIsByte = shortenedData || chunkData->compressed;
+			while (lod < targetLod) {
+				const int srcSize = size;
+				const int dstSize = size / 2;
+				if (dstSize == 0) break;
 
+				const bool srcIsByte = shortenedData || chunkData->compressed;
 
-		auto sampleSource = [&](int sx, int sy, int sz) -> uint16_t {
-			int id = sx + sy * srcSize + sz * srcSize * srcSize;
-			if (shortenedData) {
-				return chunkData->compressedTerrain[id];
-			}
-			if (chunkData->compressed) {
-				uint8_t cv = chunkData->compressedTerrain[id];
-				return cv == 0 ? 0 : chunkData->palette[cv - 1];
-			}
-			return chunkData->terrain[id];
-			};
-
-		auto downsample = [&](int dx, int dy, int dz) -> uint16_t {
-			for (int cz = 0; cz < 2; cz++) {
-				int sz = dz * 2 + cz; if (sz >= srcSize) continue;
-				for (int cy = 0; cy < 2; cy++) {
-					int sy = dy * 2 + cy; if (sy >= srcSize) continue;
-					for (int cx = 0; cx < 2; cx++) {
-						int sx = dx * 2 + cx; if (sx >= srcSize) continue;
-						uint16_t v = sampleSource(sx, sy, sz);
-						if (v != 0) return v;
+				auto sampleSource = [&](int sx, int sy, int sz) -> uint16_t {
+					int id = sx + sy * srcSize + sz * srcSize * srcSize;
+					if (shortenedData) {
+						return chunkData->compressedTerrain[id];
 					}
-				}
-			}
-			return 0;
-			};
+					if (chunkData->compressed) {
+						uint8_t cv = chunkData->compressedTerrain[id];
+						return cv == 0 ? 0 : chunkData->palette[cv - 1];
+					}
+					return chunkData->terrain[id];
+					};
 
-		if (srcIsByte) {
-			uint8_t* buf = chunkData->compressedTerrain;
-
-			if (chunkData->compressed) {
-				uint8_t lookup[65536];
-				memset(lookup, 0, sizeof(lookup));
-				for (int i = 0; i < chunkData->paletteSize; i++)
-					lookup[chunkData->palette[i]] = (uint8_t)(i + 1);
-
-				for (int z = 0; z < dstSize; z++) {
-					for (int y = 0; y < dstSize; y++) {
-						for (int x = 0; x < dstSize; x++) {
-							uint16_t v = downsample(x, y, z);
-							buf[x + y * dstSize + z * dstSize * dstSize] =
-								(v == 0) ? 0 : lookup[v];
+				auto downsample = [&](int dx, int dy, int dz) -> uint16_t {
+					for (int cz = 0; cz < 2; cz++) {
+						int sz = dz * 2 + cz; if (sz >= srcSize) continue;
+						for (int cy = 0; cy < 2; cy++) {
+							int sy = dy * 2 + cy; if (sy >= srcSize) continue;
+							for (int cx = 0; cx < 2; cx++) {
+								int sx = dx * 2 + cx; if (sx >= srcSize) continue;
+								uint16_t v = sampleSource(sx, sy, sz);
+								if (v != 0) return v;
+							}
 						}
 					}
-				}
-			}
-			else {
-				for (int z = 0; z < dstSize; z++) {
-					for (int y = 0; y < dstSize; y++) {
-						for (int x = 0; x < dstSize; x++) {
-							uint16_t v = downsample(x, y, z);
-							buf[x + y * dstSize + z * dstSize * dstSize] = (uint8_t)v;
-						}
+					return 0;
+					};
+
+				if (srcIsByte) {
+					uint8_t* dst = chunkData->compressedTerrain;
+
+					if (chunkData->compressed) {
+						uint8_t lookup[65536];
+						memset(lookup, 0, sizeof(lookup));
+						for (int i = 0; i < chunkData->paletteSize; i++)
+							lookup[chunkData->palette[i]] = (uint8_t)(i + 1);
+
+						std::vector<uint8_t> scratch(dstSize * dstSize * dstSize);
+						for (int z = 0; z < dstSize; z++)
+							for (int y = 0; y < dstSize; y++)
+								for (int x = 0; x < dstSize; x++) {
+									uint16_t v = downsample(x, y, z);
+									scratch[x + y * dstSize + z * dstSize * dstSize] =
+										(v == 0) ? 0 : lookup[v];
+								}
+						memcpy(dst, scratch.data(), scratch.size());
+					}
+					else {
+						std::vector<uint8_t> scratch(dstSize * dstSize * dstSize);
+						for (int z = 0; z < dstSize; z++)
+							for (int y = 0; y < dstSize; y++)
+								for (int x = 0; x < dstSize; x++)
+									scratch[x + y * dstSize + z * dstSize * dstSize] =
+									(uint8_t)downsample(x, y, z);
+						memcpy(dst, scratch.data(), scratch.size());
 					}
 				}
-			}
-		}
-		else {
-			uint16_t* buf = chunkData->terrain;
-			for (int z = 0; z < dstSize; z++) {
-				for (int y = 0; y < dstSize; y++) {
-					for (int x = 0; x < dstSize; x++) {
-						buf[x + y * dstSize + z * dstSize * dstSize] =
-							downsample(x, y, z);
-					}
+				else {
+					uint16_t* dst = chunkData->terrain;
+					std::vector<uint16_t> scratch(dstSize * dstSize * dstSize);
+					for (int z = 0; z < dstSize; z++)
+						for (int y = 0; y < dstSize; y++)
+							for (int x = 0; x < dstSize; x++)
+								scratch[x + y * dstSize + z * dstSize * dstSize] =
+								downsample(x, y, z);
+					memcpy(dst, scratch.data(), scratch.size() * sizeof(uint16_t));
 				}
+
+				size = dstSize;
+				lod *= 2;
+				chunkData->lod = lod;
+
+				voxelCount = 0;
+				const int total = dstSize * dstSize * dstSize;
+				if (shortenedData || chunkData->compressed) {
+					uint8_t* buf = chunkData->compressedTerrain;
+					for (int i = 0; i < total; i++) voxelCount += (buf[i] != 0);
+				}
+				else {
+					uint16_t* buf = chunkData->terrain;
+					for (int i = 0; i < total; i++) voxelCount += (buf[i] != 0);
+				}
+				chunkData->voxelCount = voxelCount;
 			}
-		}
-
-		size = dstSize;
-		lod = lod * 2;
-		chunkData->lod = lod;
-
-		voxelCount = 0;
-		const int total = dstSize * dstSize * dstSize;
-		if (shortenedData || chunkData->compressed) {
-			uint8_t* buf = chunkData->compressedTerrain;
-			for (int i = 0; i < total; i++) voxelCount += (buf[i] != 0);
-		}
-		else {
-			uint16_t* buf = chunkData->terrain;
-			for (int i = 0; i < total; i++) voxelCount += (buf[i] != 0);
-		}
-		chunkData->voxelCount = voxelCount;
 
 		if (chunkData->bitMap) {
 			MemFree(chunkData->bitMap);

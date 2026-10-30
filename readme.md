@@ -11,7 +11,6 @@ First screen will be a small menu that allows you to choose different options fo
 The second option is resolution, you can pick from 640x480 to 3840x2160p
 Then just press the "Play" button and the world will generate, just wait a bit.
 
-
 # Major:
 It will not launch on nvidia cards, bindless textures have an odd behavior of having different syntax between AMD and Nvidia. This will be fixed in the future but it requires a pre-processor, which I haven't written yet.
 It hasn't been tested on intel cards, I develop on AMD hardware.

@@ -206,64 +206,124 @@ public:
 			neighbourId * sizeof(World::GlobalHandle::Region)
 		);
 	};
-	inline void UpdateLODChunks(int nx, int nz) {
-		for (int x = 0; x < wx; x++) {
-			for (int z = 0; z < wz; z++) {
-				int lod = 0;
-				float dist = Vector2Distance({ (float)nx * chunkSize + chunkSize / 2,(float)nz * chunkSize + chunkSize / 2 }, { float(camera.position.x),float(camera.position.z) });
-				bool grass = false;
 
-				if (dist < 1920) grass = true;
-				if (dist > 960) lod = 2;
-				if (dist > 960 * 2) lod = 4;
-				if (dist > 960 * 4) lod = 8;
-				if (dist > 960 * 8) lod = 16;
-				if (dist > 960 * 12) lod = 32;
-				if (dist > 960 * 24) lod = 64;
-				if (world.setLod[x][z] != lod) {
-					if (lod < world.setLod[x][z]) {
-						//downscale, easy peasy
-						for (int y = 0; y < wy; y++) {
-							int id = y * (wx * wz) + z * wx + x;
-							chunks[id].DownscaleLoD(&world.chunkData[id]);
-						}
-					}
-					else if (lod > world.setLod[x][z]) {
-						//upscale, spooky operation
-					}
-					else {
-						//why is this even noted down?
-					}
+	inline void SetLODChunks(int x, int z, int lod) {
+		for (int y = 0; y < wy; y++) {
+			int id = y * (wx * wz) + z * wx + x;
+			ChunkDeleteMeshData(x, y, z);
+			chunks[y * (wx * wz) + z * wx + x].ClearChunkData(&world.chunkData[y * (wx * wz) + z * wx + x]);
+			world.chunkData[id].fluidShortMap.Delete();
+			world.chunkData[id].fluidByteMap.Delete();
+			chunks[id].endTri = 0;
+			chunks[id].oldTri = 0;
+			world.chunkData[id].updated = false;
+		}
+		world.setLod[x][z] = lod;
+
+
+		world.array[x][z] = true;
+		float dist = Vector2Distance({ (float)x * chunkSize + chunkSize / 2,(float)z * chunkSize + chunkSize / 2 }, { float(camera.position.x),float(camera.position.z) });
+		bool grass = false;
+
+		if (dist < 1920) grass = true;
+
+
+		GenerationData gen;
+		gen.GenerateMountains(x, z);
+		gen.highestChunkY += 2;
+
+		for (int y = 0; y < gen.highestChunkY && y < wy; y++) {
+			chunks[y * (wx * wz) + z * wx + x].GenerateMountains(&world.chunkData[y * (wx * wz) + z * wx + x], gen, x, y, z, lod, grass);
+
+		};
+		for (int y = 0; y < gen.highestChunkY && y < wy; y++) {
+			chunks[y * (wx * wz) + z * wx + x].GenerateLod(&world.chunkData[y * (wx * wz) + z * wx + x], x, y, z);
+			chunks[y * (wx * wz) + z * wx + x].Compress(&world.chunkData[y * (wx * wz) + z * wx + x]);
+
+		};
+		free(gen.heightMap);
+
+			
+		
+		for (int ny = 0; ny < wy; ny++) {
+
+			int neighbourId = ny * (wx * wz) + z * wx + x;
+			if (x < 0 || ny < 0 || z < 0 || x >= wx || ny >= wy || z >= wz) continue;
+			if (chunks[neighbourId].lod == 0) continue;
+			if (chunks[neighbourId].hasFluid) continue;
+			if (chunks[neighbourId].voxelCount == chunks[neighbourId].size * chunks[neighbourId].size * chunks[neighbourId].size) continue;
+
+			chunks[neighbourId].hasFluid = true;
+			int size = chunkSize / chunks[neighbourId].lod;
+			if (world.chunkData[neighbourId].skipped) {
+				world.handle.handle[neighbourId].lod = 3000;
+			}
+			if (world.chunkData[neighbourId].voxelCount != 0 && !world.chunkData[neighbourId].skipped)
+			{
+
+				if (chunks[neighbourId].shortenedData) {
+					world.chunkData[neighbourId].fluidByteMap.Clear({ size,size,size });
+					world.chunkData[neighbourId].fluidByteMap.Upload(world.chunkData[neighbourId].compressedTerrain);
+					world.chunkData[neighbourId].fluidByteMap.GetBindlessHandle();
+					world.handle.handle[neighbourId].handle = world.chunkData[neighbourId].fluidByteMap.handle;
+
 				}
-				ChunkColumnRegenerate(nx, nz);
+				else {
+					world.chunkData[neighbourId].fluidShortMap.Clear({ size,size,size });
+					uint16_t* tt = chunks[neighbourId].DecompressChunk(&world.chunkData[neighbourId]);
+					world.chunkData[neighbourId].fluidShortMap.Upload(tt);
+					free(tt);
+					world.chunkData[neighbourId].fluidShortMap.GetBindlessHandle();
+					world.handle.handle[neighbourId].handle = world.chunkData[neighbourId].fluidShortMap.handle;
+
+				}
+
+				world.handle.handle[neighbourId].lod = world.chunkData[neighbourId].lod;
+			}
+		
+		}
+	}
+	inline void ChunkDeleteMeshData(int nx, int ny, int nz) {
+
+		int neighbourId = ny * (wx * wz) + nz * wx + nx;
+
+		int beginTri = chunks[neighbourId].beginningTri;
+		int endTri = chunks[neighbourId].endTri;
+		int triCount = endTri - beginTri;
+
+		if (chunks[neighbourId].voxelCount != 0) {
+			memset((uint8_t*)shaders.display.ssboPointers[2] + (size_t)beginTri * sizeof(uint32_t),
+				0, (size_t)triCount * sizeof(uint32_t));
+
+			memset((uint8_t*)shaders.display.ssboPointers[6] + (size_t)beginTri * sizeof(uint32_t),
+				0, (size_t)triCount * sizeof(uint32_t));
+
+			int beginMeshlet = beginTri / 64;
+			int endMeshlet = (endTri + 63) / 64;
+			int meshletCount = endMeshlet - beginMeshlet;
+
+			if (meshletCount > 0) {
+				memset((uint8_t*)shaders.display.ssboPointers[5] + (size_t)beginMeshlet * sizeof(int),
+					0, (size_t)meshletCount * sizeof(int));
+
+				memset((uint8_t*)shaders.display.ssboPointers[7] + (size_t)beginMeshlet * 6 * sizeof(float),
+					0, (size_t)meshletCount * 6 * sizeof(float));
 			}
 		}
 	}
+	inline void DeleteColumn(int nx, int nz) {
+		world.array[nx][nz] = false;
 
-	inline void SetLODChunks(int nx, int nz, int lod) {
-		for (int x = 0; x < wx; x++) {
-			for (int z = 0; z < wz; z++) {
-				if (world.setLod[x][z] != lod) {
-					if (lod < world.setLod[x][z]) {
-						//downscale, easy peasy
-						for (int y = 0; y < wy; y++) {
-							int id = y * (wx * wz) + z * wx + x;
-							chunks[id].DownscaleLoD(&world.chunkData[id]);
-						}
-					}
-					else if (lod > world.setLod[x][z]) {
-						//upscale, spooky operation
-					}
-					else {
-						//why is this even noted down?
-					}
-				}
-				ChunkColumnRegenerate(nx, nz);
-			}
+		for (int ny = 0; ny < wy; ny++) {
+			int neighbourId = ny * (wx * wz) + nz * wx + nx;
+			ChunkDeleteMeshData(nx, ny, nz);
+			chunks[neighbourId].ClearChunkData(&world.chunkData[neighbourId]);
+			chunks[neighbourId].grassList.clear();
+			
+			uploadChunkSSBO(neighbourId);
 		}
 	}
-
-	inline void ChunkColumnRegenerate(int nx, int nz) {
+	inline void ChunkColumnRegenerate(int nx, int nz, bool clearChunkData = true, bool uploadData=true) {
 		int drd = 0;
 		
 
@@ -278,44 +338,18 @@ public:
 		if (dist > 960 * 8) lod = 16;
 		if (dist > 960 * 12) lod = 32;
 		if (dist > 960 * 24) lod = 64;
-		std::cout << nx << " " << nz << "\n";
 		if (world.array[nx][nz]) {
 			world.setLod[nx][nz] = lod;
-			std::cout << "First phase of push\n";
 			for (int ny = 0; ny < wy; ny++) {
 				int neighbourId = ny * (wx * wz) + nz * wx + nx;
-
-				int beginTri = chunks[neighbourId].beginningTri;
-				int endTri = chunks[neighbourId].endTri;
-				int triCount = endTri - beginTri;
-				std::cout << "Second phase of push\n";
-
-				if (chunks[neighbourId].voxelCount!=0) {
-					std::cout << "Mem set color and vertices\n";
-					memset((uint8_t*)shaders.display.ssboPointers[2] + (size_t)beginTri * sizeof(uint32_t),
-						0, (size_t)triCount * sizeof(uint32_t));
-
-					memset((uint8_t*)shaders.display.ssboPointers[6] + (size_t)beginTri * sizeof(uint32_t),
-						0, (size_t)triCount * sizeof(uint32_t));
-
-					int beginMeshlet = beginTri / 64;
-					int endMeshlet = (endTri + 63) / 64;
-					int meshletCount = endMeshlet - beginMeshlet;
-
-					if (meshletCount > 0) {
-						std::cout << "Mem set AABB and \n";
-						memset((uint8_t*)shaders.display.ssboPointers[5] + (size_t)beginMeshlet * sizeof(int),
-							0, (size_t)meshletCount * sizeof(int));
-
-						memset((uint8_t*)shaders.display.ssboPointers[7] + (size_t)beginMeshlet * 6 * sizeof(float),
-							0, (size_t)meshletCount * 6 * sizeof(float));
-					}
-				}
+				ChunkDeleteMeshData(nx, ny, nz);
 				vv[drd] = { nx,ny,nz };
 				drd++;
-				chunks[neighbourId].ClearChunkData(&world.chunkData[neighbourId]);
-				chunks[neighbourId].grassList.clear();
-				uploadChunkSSBO(neighbourId);
+				if (clearChunkData) {
+					chunks[neighbourId].ClearChunkData(&world.chunkData[neighbourId]);
+					chunks[neighbourId].grassList.clear();
+				}
+				if (uploadData) uploadChunkSSBO(neighbourId);
 			}
 		}
 
@@ -626,24 +660,30 @@ public:
 		}
 		free(particles);
 	}
-	void PreGenerateFullDebug() {
+	void PreGenerateFullDebug(int setLod=0) {
 #pragma omp parallel for collapse(2)
 		for (int nx = 0; nx < wx; nx++) {
 			for (int nz = 0; nz < wz; nz++) {
 				world.array[nx][nz] = true;
-
-
-				int lod = 1;
 				float dist = Vector2Distance({ (float)nx * chunkSize + chunkSize / 2,(float)nz * chunkSize + chunkSize / 2 }, { float(camera.position.x),float(camera.position.z) });
 				bool grass = false;
 
 				if (dist < 1920) grass = true;
-				if (dist > 960) lod = 2;
-				if (dist > 960 * 2) lod = 4;
-				if (dist > 960 * 4) lod = 8;
-				if (dist > 960 * 8) lod = 16;
-				if (dist > 960 * 12) lod = 32;
-				if (dist > 960 * 24) lod = 64;
+
+
+				int lod = 1;
+				if (setLod != 0) {
+					lod = setLod;
+				}
+				else {
+
+					if (dist > 960) lod = 2;
+					if (dist > 960 * 2) lod = 4;
+					if (dist > 960 * 4) lod = 8;
+					if (dist > 960 * 8) lod = 16;
+					if (dist > 960 * 12) lod = 32;
+					if (dist > 960 * 24) lod = 64;
+				}
 				GenerationData gen;
 				gen.GenerateMountains(nx, nz);
 				gen.highestChunkY += 2;
@@ -657,6 +697,7 @@ public:
 					chunks[y * (wx * wz) + nz * wx + nx].Compress(&world.chunkData[y * (wx * wz) + nz * wx + nx]);
 
 				};
+				world.setLod[nx][nz] = lod;
 				free(gen.heightMap);
 				
 			}
@@ -1095,10 +1136,33 @@ public:
 			
 			Math::IVector2 currentChunkPos= { int(camera.position.x / chunkSize),int(camera.position.z / chunkSize )};
 			if (oldChunkPos.x != currentChunkPos.x || oldChunkPos.y != currentChunkPos.y) {
-			//	UpdateLODChunks(camera.position.x/chunkSize,camera.position.z/chunkSize);
-			}
-			if (window.GetKeyPressed(KEY_V)) {
-				SetLODChunks(camera.position.x / chunkSize, camera.position.z / chunkSize, 8);
+				int lodchanged = 0;
+				for (int x = 0; x < wx; x++) {
+					for (int z = 0; z < wz; z++) {
+
+						int lod = 1;
+						float dist = Vector2Distance({ (float)x * chunkSize + chunkSize / 2,(float)z * chunkSize + chunkSize / 2 }, { float(camera.position.x),float(camera.position.z) });
+
+						if (dist > 960) lod = 2;
+						if (dist > 960 * 2) lod = 4;
+						if (dist > 960 * 4) lod = 8;
+						if (dist > 960 * 8) lod = 16;
+						if (dist > 960 * 12) lod = 32;
+						if (dist > 960 * 24) lod = 64;
+						if (world.setLod[x][z] != lod) {
+							SetLODChunks(x, z, lod);
+							for (int y = 0; y < wy; y++) {
+								int neighbourId = y * (wx * wz) + z * wx + x;
+								if (world.chunkData[neighbourId].voxelCount!=0) uploadChunkSSBO(neighbourId);
+								
+							}
+							lodchanged++;
+						}
+
+					}
+				}
+				std::cout << lodchanged << "\n";
+
 			}
 			if (window.GetKeyPressed(KEY_C))
 			{
