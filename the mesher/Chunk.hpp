@@ -503,7 +503,7 @@ public:
 							if (chunkData->terrain[
 								IDX(x, y + 1, z, chunkSize)
 							] == 0) {
-								if ((x + y + Math::GetRandomValueStreamlined(-1, 1)) % 2 == 0 && grass) grassList.push_back({ (float)x + gx * chunkSize,(float)y + gy * chunkSize,(float)z + gz * chunkSize });
+							//	if ((x + y + Math::GetRandomValueStreamlined(-1, 1)) % 2 == 0 && grass) grassList.push_back({ (float)x + gx * chunkSize,(float)y + gy * chunkSize,(float)z + gz * chunkSize });
 							}
 						}
 						else if (worldY < 400 + grassLineOffset) {

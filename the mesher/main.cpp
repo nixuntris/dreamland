@@ -206,82 +206,83 @@ public:
 			neighbourId * sizeof(World::GlobalHandle::Region)
 		);
 	};
-
 	inline void SetLODChunks(int x, int z, int lod) {
 		for (int y = 0; y < wy; y++) {
 			int id = y * (wx * wz) + z * wx + x;
+
 			ChunkDeleteMeshData(x, y, z);
-			chunks[y * (wx * wz) + z * wx + x].ClearChunkData(&world.chunkData[y * (wx * wz) + z * wx + x]);
+
+			chunks[id].ClearChunkData(&world.chunkData[id]);
+
 			world.chunkData[id].fluidShortMap.Delete();
 			world.chunkData[id].fluidByteMap.Delete();
+
 			chunks[id].endTri = 0;
 			chunks[id].oldTri = 0;
 			world.chunkData[id].updated = false;
 		}
+
 		world.setLod[x][z] = lod;
-
-
 		world.array[x][z] = true;
-		float dist = Vector2Distance({ (float)x * chunkSize + chunkSize / 2,(float)z * chunkSize + chunkSize / 2 }, { float(camera.position.x),float(camera.position.z) });
+
+		float dist = Vector2Distance(
+			{ (float)x * chunkSize + chunkSize / 2, (float)z * chunkSize + chunkSize / 2 },
+			{ float(camera.position.x), float(camera.position.z) });
 		bool grass = false;
-
 		if (dist < 1920) grass = true;
-
-
 		GenerationData gen;
 		gen.GenerateMountains(x, z);
-		gen.highestChunkY += 2;
-
-		for (int y = 0; y < gen.highestChunkY && y < wy; y++) {
+#pragma omp parallel for num_threads(4)
+		for (int y = 0; y < gen.highestChunkY; y++) {
 			chunks[y * (wx * wz) + z * wx + x].GenerateMountains(&world.chunkData[y * (wx * wz) + z * wx + x], gen, x, y, z, lod, grass);
+			chunks[y * (wx * wz) + z * wx + x].GenerateLod(
+				&world.chunkData[y * (wx * wz) + z * wx + x], x, y, z);
+			chunks[y * (wx * wz) + z * wx + x].Compress(
+				&world.chunkData[y * (wx * wz) + z * wx + x]);
+		}
 
-		};
-		for (int y = 0; y < gen.highestChunkY && y < wy; y++) {
-			chunks[y * (wx * wz) + z * wx + x].GenerateLod(&world.chunkData[y * (wx * wz) + z * wx + x], x, y, z);
-			chunks[y * (wx * wz) + z * wx + x].Compress(&world.chunkData[y * (wx * wz) + z * wx + x]);
-
-		};
 		free(gen.heightMap);
 
-			
-		
 		for (int ny = 0; ny < wy; ny++) {
-
 			int neighbourId = ny * (wx * wz) + z * wx + x;
 			if (x < 0 || ny < 0 || z < 0 || x >= wx || ny >= wy || z >= wz) continue;
 			if (chunks[neighbourId].lod == 0) continue;
 			if (chunks[neighbourId].hasFluid) continue;
-			if (chunks[neighbourId].voxelCount == chunks[neighbourId].size * chunks[neighbourId].size * chunks[neighbourId].size) continue;
+			if (chunks[neighbourId].voxelCount ==
+				chunks[neighbourId].size * chunks[neighbourId].size * chunks[neighbourId].size)
+				continue;
 
 			chunks[neighbourId].hasFluid = true;
 			int size = chunkSize / chunks[neighbourId].lod;
 			if (world.chunkData[neighbourId].skipped) {
 				world.handle.handle[neighbourId].lod = 3000;
 			}
-			if (world.chunkData[neighbourId].voxelCount != 0 && !world.chunkData[neighbourId].skipped)
-			{
+			if (world.chunkData[neighbourId].voxelCount != 0 &&
+				!world.chunkData[neighbourId].skipped) {
 
 				if (chunks[neighbourId].shortenedData) {
-					world.chunkData[neighbourId].fluidByteMap.Clear({ size,size,size });
-					world.chunkData[neighbourId].fluidByteMap.Upload(world.chunkData[neighbourId].compressedTerrain);
+					world.chunkData[neighbourId].fluidByteMap.Clear({ size, size, size });
+					world.chunkData[neighbourId].fluidByteMap.Upload(
+						world.chunkData[neighbourId].compressedTerrain);
 					world.chunkData[neighbourId].fluidByteMap.GetBindlessHandle();
-					world.handle.handle[neighbourId].handle = world.chunkData[neighbourId].fluidByteMap.handle;
-
+					world.handle.handle[neighbourId].handle =
+						world.chunkData[neighbourId].fluidByteMap.handle;
 				}
 				else {
-					world.chunkData[neighbourId].fluidShortMap.Clear({ size,size,size });
-					uint16_t* tt = chunks[neighbourId].DecompressChunk(&world.chunkData[neighbourId]);
+					world.chunkData[neighbourId].fluidShortMap.Clear({ size, size, size });
+					uint16_t* tt = chunks[neighbourId].DecompressChunk(
+						&world.chunkData[neighbourId]);
 					world.chunkData[neighbourId].fluidShortMap.Upload(tt);
 					free(tt);
 					world.chunkData[neighbourId].fluidShortMap.GetBindlessHandle();
-					world.handle.handle[neighbourId].handle = world.chunkData[neighbourId].fluidShortMap.handle;
-
+					world.handle.handle[neighbourId].handle =
+						world.chunkData[neighbourId].fluidShortMap.handle;
 				}
 
 				world.handle.handle[neighbourId].lod = world.chunkData[neighbourId].lod;
 			}
-		
 		}
+
 	}
 	inline void ChunkDeleteMeshData(int nx, int ny, int nz) {
 
@@ -1137,6 +1138,7 @@ public:
 			Math::IVector2 currentChunkPos= { int(camera.position.x / chunkSize),int(camera.position.z / chunkSize )};
 			if (oldChunkPos.x != currentChunkPos.x || oldChunkPos.y != currentChunkPos.y) {
 				int lodchanged = 0;
+				
 				for (int x = 0; x < wx; x++) {
 					for (int z = 0; z < wz; z++) {
 
@@ -1149,7 +1151,7 @@ public:
 						if (dist > 960 * 8) lod = 16;
 						if (dist > 960 * 12) lod = 32;
 						if (dist > 960 * 24) lod = 64;
-						if (world.setLod[x][z] != lod) {
+						if (world.setLod[x][z] != lod && lodchanged<10) {
 							SetLODChunks(x, z, lod);
 							for (int y = 0; y < wy; y++) {
 								int neighbourId = y * (wx * wz) + z * wx + x;
