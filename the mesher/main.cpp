@@ -25,7 +25,7 @@ void ExampleUpdate(Particle& p) {
 //	p.position.y -= 0.16f;
 }
 const int MAX_PARTICLES = 1000000;
-
+const bool DEBUG_FEATURES_ON = false;
 class ParticleRender {
 public:
 	Particle *particles;
@@ -222,7 +222,7 @@ public:
 		gen.GenerateMountains(x, z);
 #pragma omp parallel for num_threads(4)
 		for (int y = 0; y < gen.highestChunkY; y++) {
-			chunks[y * (wx * wz) + z * wx + x].GenerateDesert(&world.chunkData[y * (wx * wz) + z * wx + x], gen, x, y, z, lod, grass);
+			chunks[y * (wx * wz) + z * wx + x].GenerateMountains(&world.chunkData[y * (wx * wz) + z * wx + x], gen, x, y, z, lod, grass);
 			chunks[y * (wx * wz) + z * wx + x].GenerateLod(
 				&world.chunkData[y * (wx * wz) + z * wx + x], x, y, z);
 			chunks[y * (wx * wz) + z * wx + x].Compress(
@@ -480,6 +480,7 @@ public:
 		int menuResolutionIndex = 0;
 		int worldSize = 0;
 		bool running = true;
+		bool pregenerate = true;
 		while (running && window.IsOpen()) {
 			window.EnableCursor();
 			oldMouse = window.GetMousePos();
@@ -525,6 +526,12 @@ public:
 				if (ImGui::Button(label, ImVec2(-1, 0))) {
 					worldSize = i;
 				}
+				if (ImGui::IsItemHovered() && pregenerate) {
+					if (i > 2) {
+						ImGui::SetTooltip("Very large worlds aren't recommended to be pre-generated");
+
+					}
+				}
 				if (selected) ImGui::PopStyleColor();
 			}
 
@@ -550,6 +557,16 @@ public:
 			ImGui::Spacing();
 			ImGui::Separator();
 			ImGui::Spacing();
+
+			if (ImGui::CollapsingHeader("Advanced")) {
+				ImGui::Indent();
+				ImGui::Checkbox("Pregenerate World", &pregenerate);
+				if (ImGui::IsItemHovered()) {
+					ImGui::SetTooltip("Generate all chunks during loading before the game starts.\n");
+				}
+				ImGui::Unindent();
+				ImGui::Spacing();
+			}
 
 			ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.15f, 0.65f, 0.25f, 1.0f));
 			ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.20f, 0.80f, 0.30f, 1.0f));
@@ -582,13 +599,19 @@ public:
 				for (int i = 0; i < 10000; i++) {
 					particleRenderer.PushRenderParticle({ (float)GetRandomValue(wx * 32 + 32, wx * 32 - 32),100,(float)GetRandomValue(wx * 32 + 32, wx * 32 - 32) }, { 255,255,255,255 }, ExampleUpdate);
 				}
+
 				currentResolutionWindow = menuResolutionIndex;
 				wWidth = graphicsSettings.resolutions[currentResolutionWindow].width;
 				wHeight = graphicsSettings.resolutions[currentResolutionWindow].height;
 				window.Resize(wWidth,wHeight);
 				world.Setup();
 				camera.position = { (double)wx * chunkSize/2,200,(double)wz * chunkSize / 2 };
-				Run();
+				if (pregenerate) {
+					Run(true);
+				}
+				else {
+					Run();
+				}
 				
 			}
 			ImGui::PopStyleColor(2);
@@ -647,88 +670,167 @@ public:
 		free(particles);
 	}
 	void PreGenerateFullDebug(int setLod=0) {
-		memset(&world.handle, 0, sizeof(world.handle));
-#pragma omp parallel for collapse(2)
-		for (int nx = 0; nx < wx; nx++) {
-			for (int nz = 0; nz < wz; nz++) {
-				world.array[nx][nz] = true;
-				float dist = Vector2Distance({ (float)nx * chunkSize + chunkSize / 2,(float)nz * chunkSize + chunkSize / 2 }, { float(camera.position.x),float(camera.position.z) });
-				bool grass = false;
+		START_TIMER(data_gen)
+#pragma omp parallel 
+		{
 
-				if (dist < 1920) grass = true;
+#pragma omp single
+			{
+				std::cout << "Actual threads: " << omp_get_num_threads() << "\n";
+			}
+#pragma omp for collapse(2)
+			for (int nx = 0; nx < wx; nx++) {
+				for (int nz = 0; nz < wz; nz++) {
+world.array[nx][nz] = true;
+					float dist = Vector2Distance({ (float)nx * chunkSize + chunkSize / 2,(float)nz * chunkSize + chunkSize / 2 }, { float(camera.position.x),float(camera.position.z) });
+					bool grass = false;
+
+					if (dist < 1920) grass = true;
 
 
-				int lod = 1;
-				if (setLod != 0) {
-					lod = setLod;
+					int lod = 1;
+					if (setLod != 0) {
+						lod = setLod;
+					}
+					else {
+
+						if (dist > 960) lod = 2;
+						if (dist > 960 * 2) lod = 4;
+						if (dist > 960 * 4) lod = 8;
+						if (dist > 960 * 8) lod = 16;
+						if (dist > 960 * 12) lod = 32;
+						if (dist > 960 * 24) lod = 64;
+					}
+					GenerationData gen;
+					gen.GenerateMountains(nx, nz);
+					gen.highestChunkY += 2;
+
+					for (int y = 0; y < wy; y++) {
+						world.chunkData[y * (wx * wz) + nz * wx + nx].lod = 0;
+					}
+					for (int y = 0; y < gen.highestChunkY && y < wy; y++) {
+						chunks[y * (wx * wz) + nz * wx + nx].GenerateMountains(&world.chunkData[y * (wx * wz) + nz * wx + nx], gen, nx, y, nz, lod, grass);
+
+					};
+					for (int y = 0; y < gen.highestChunkY && y < wy; y++) {
+						 chunks[y * (wx * wz) + nz * wx + nx].GenerateLod(&world.chunkData[y * (wx * wz) + nz * wx + nx], nx, y, nz);
+						chunks[y * (wx * wz) + nz * wx + nx].Compress(&world.chunkData[y * (wx * wz) + nz * wx + nx]);
+
+					};
+					world.setLod[nx][nz] = lod;
+					free(gen.heightMap);
+
 				}
-				else {
-
-					if (dist > 960) lod = 2;
-					if (dist > 960 * 2) lod = 4;
-					if (dist > 960 * 4) lod = 8;
-					if (dist > 960 * 8) lod = 16;
-					if (dist > 960 * 12) lod = 32;
-					if (dist > 960 * 24) lod = 64;
-				}
-				GenerationData gen;
-				gen.GenerateMountains(nx, nz);
-				gen.highestChunkY += 2;
-
-				for (int y = 0; y < wy; y++) {
-					world.chunkData[y * (wx * wz) + nz * wx + nx].lod = 0;
-				}
-				for (int y = 0; y < gen.highestChunkY && y < wy; y++) {
-					chunks[y * (wx * wz) + nz * wx + nx].GenerateDesert(&world.chunkData[y * (wx * wz) + nz * wx + nx], gen, nx, y, nz, lod, grass);
-					
-				};
-				for (int y = 0; y < gen.highestChunkY && y < wy; y++) {
-					chunks[y * (wx * wz) + nz * wx + nx].GenerateLod(&world.chunkData[y * (wx * wz) + nz * wx + nx], nx, y, nz);
-					chunks[y * (wx * wz) + nz * wx + nx].Compress(&world.chunkData[y * (wx * wz) + nz * wx + nx]);
-
-				};
-				world.setLod[nx][nz] = lod;
-				free(gen.heightMap);
-				
 			}
 		}
+		END_TIMER(data_gen)
+		START_TIMER(upload)
+		int maxCount = wx * wy * wz;
+
+		Anubis::GPUONLYByteMap** byteMapBatch = new Anubis::GPUONLYByteMap * [maxCount];
+		uint8_t** byteMapData = new uint8_t * [maxCount];
+		Math::IVector3* byteMapSizes = new Math::IVector3[maxCount];
+		int byteMapCount = 0;
+
+		Anubis::GPUONLYShortMap** shortMapBatch = new Anubis::GPUONLYShortMap * [maxCount];
+		uint16_t** shortMapData = new uint16_t * [maxCount];
+		Math::IVector3* shortMapSizes = new Math::IVector3[maxCount];
+		int shortMapCount = 0;
+
 		for (int nx = 0; nx < wx; nx++) {
 			for (int nz = 0; nz < wz; nz++) {
-				for (int ny = 0; ny < wy; ny++) {																				
+				for (int ny = 0; ny < wy; ny++) {
 
 					int neighbourId = ny * (wx * wz) + nz * wx + nx;
 					if (chunks[neighbourId].lod == 0) continue;
+
 					int size = chunkSize / chunks[neighbourId].lod;
-					if (world.chunkData[neighbourId].skipped || world.chunkData[neighbourId].voxelCount >= chunkSize * chunkSize * chunkSize) {
+
+					if (world.chunkData[neighbourId].skipped ||
+						world.chunkData[neighbourId].voxelCount >= chunkSize * chunkSize * chunkSize) {
 						world.handle.handle[neighbourId].lod = 3000;
 					}
+
 					chunks[neighbourId].hasFluid = true;
-					if (world.chunkData[neighbourId].voxelCount != 0 && !world.chunkData[neighbourId].skipped)
-					{
+
+					if (world.chunkData[neighbourId].voxelCount != 0 &&
+						!world.chunkData[neighbourId].skipped) {
 
 						if (chunks[neighbourId].shortenedData) {
-							world.chunkData[neighbourId].fluidByteMap.Clear({ size,size,size });
-							world.chunkData[neighbourId].fluidByteMap.Upload(world.chunkData[neighbourId].compressedTerrain);
-							world.chunkData[neighbourId].fluidByteMap.GetBindlessHandle();
-							world.handle.handle[neighbourId].handle = world.chunkData[neighbourId].fluidByteMap.handle;
+							auto& map = world.chunkData[neighbourId].fluidByteMap;
 
+							map.Clear({ size, size, size });
+
+							byteMapBatch[byteMapCount] = &map;
+							byteMapData[byteMapCount] = world.chunkData[neighbourId].compressedTerrain;
+							byteMapSizes[byteMapCount] = { size, size, size };
+
+							byteMapCount++;
 						}
 						else {
-							world.chunkData[neighbourId].fluidShortMap.Clear({ size,size,size });
-							uint16_t* tt = chunks[neighbourId].DecompressChunk(&world.chunkData[neighbourId]);
-							world.chunkData[neighbourId].fluidShortMap.Upload(tt);
-							free(tt);
-							world.chunkData[neighbourId].fluidShortMap.GetBindlessHandle();
-							world.handle.handle[neighbourId].handle = world.chunkData[neighbourId].fluidShortMap.handle;
+							auto& map = world.chunkData[neighbourId].fluidShortMap;
 
+							map.Clear({ size, size, size });
+
+							shortMapBatch[shortMapCount] = &map;
+							shortMapData[shortMapCount] = chunks[neighbourId].DecompressChunk(
+								&world.chunkData[neighbourId]
+							);
+							shortMapSizes[shortMapCount] = { size, size, size };
+
+							shortMapCount++;
 						}
-
-						world.handle.handle[neighbourId].lod = world.chunkData[neighbourId].lod;
 					}
 				}
 			}
 		}
-		
+
+		if (byteMapCount > 0) {
+			UploadByteMaps(byteMapBatch, byteMapData, byteMapSizes, byteMapCount);
+
+			for (int i = 0; i < byteMapCount; i++) {
+				byteMapBatch[i]->GetBindlessHandle();
+
+				for (int nx = 0; nx < wx; nx++) {
+					for (int nz = 0; nz < wz; nz++) {
+						for (int ny = 0; ny < wy; ny++) {
+							int id = ny * (wx * wz) + nz * wx + nx;
+							if (&world.chunkData[id].fluidByteMap == byteMapBatch[i]) {
+								world.handle.handle[id].handle = byteMapBatch[i]->handle;
+								world.handle.handle[id].lod = world.chunkData[id].lod;
+							}
+						}
+					}
+				}
+			}
+		}
+
+		if (shortMapCount > 0) {
+			UploadShortMaps(shortMapBatch, shortMapData, shortMapSizes, shortMapCount);
+
+			for (int i = 0; i < shortMapCount; i++) {
+				shortMapBatch[i]->GetBindlessHandle();
+
+				for (int nx = 0; nx < wx; nx++) {
+					for (int nz = 0; nz < wz; nz++) {
+						for (int ny = 0; ny < wy; ny++) {
+							int id = ny * (wx * wz) + nz * wx + nx;
+							if (&world.chunkData[id].fluidShortMap == shortMapBatch[i]) {
+								world.handle.handle[id].handle = shortMapBatch[i]->handle;
+								world.handle.handle[id].lod = world.chunkData[id].lod;
+							}
+						}
+					}
+				}
+
+				free(shortMapData[i]);
+			}
+		}
+		free(byteMapBatch);
+		free(shortMapBatch);
+		free(shortMapSizes);
+		free(byteMapSizes);
+		END_TIMER(upload)
 		shaders.display.UpdateSSBO(3, &world.handle, sizeof(world.handle), 0);
 		RecalculateParticlesFullDebug();
 	}
@@ -753,7 +855,7 @@ public:
 
 		shaders.frustumCull.Use(totalMeshletCount / 32, 1, 1);
 	}
-	void Run() {
+	void Run(bool pregenerate=false) {
 		const std::vector<Color> palette = {
 					{0, 255, 0, 255},       // 0: GREEN GRASS
 					{128, 128, 128, 255},   // 1: GRAY
@@ -810,9 +912,9 @@ public:
 		shaders.display.CreateSSBO(3, sizeof(world.handle));
 		shaders.display.UpdateSSBO(9, 0, sizeof(int), 0);
 		Math::IVector2 oldChunkPos = { camera.position.x / chunkSize,camera.position.z / chunkSize };
-		PreGenerateFullDebug();
+		if (pregenerate) PreGenerateFullDebug();
 		bool releasedMouseButton = false;
-		Math::IVector3 chunksUpdatedThisFrame[20];
+		Math::IVector3 chunksUpdatedThisFrame[100];
 		int chunkCount = 0;
 		while (window.IsOpen()) {
 			double frameStart = glfwGetTime();
@@ -1153,146 +1255,169 @@ public:
 			}
 			oldChunkPos = currentChunkPos;
 			int drd = 0;
+			if (DEBUG_FEATURES_ON) {
+				Vector3 rayCastPos = pos;
+				bool hitDeadEnd = false;
+				for (int i = 0; i < 100; i++) {
+					rayCastPos.x += forward.x * 2;
+					rayCastPos.y += forward.y * 2;
+					rayCastPos.z += forward.z * 2;
+					int x = rayCastPos.x / chunkSize;
+					int y = rayCastPos.y / chunkSize;
+					int z = rayCastPos.z / chunkSize;
 
-			Vector3 rayCastPos = pos;
-			bool hitDeadEnd = false;
-			for (int i = 0; i < 100; i++) {
-				rayCastPos.x += forward.x * 2;
-				rayCastPos.y += forward.y * 2;
-				rayCastPos.z += forward.z * 2;
-				int x = rayCastPos.x / chunkSize;
-				int y = rayCastPos.y / chunkSize;
-				int z = rayCastPos.z / chunkSize;
-
-				int id = y * (wx * wz) + z * wx + x;
-				if (rayCastPos.x >= 0 && rayCastPos.y >= 0 && rayCastPos.z >= 0 && rayCastPos.x < wx * chunkSize && rayCastPos.y < wy * chunkSize && rayCastPos.z < wz * chunkSize) {
-					if (chunks[id].lod != 0) {
-						if (chunks[id].ReadVoxel(&world.chunkData[id], (int)rayCastPos.x % (chunkSize / chunks[id].lod), (int)rayCastPos.y % (chunkSize / chunks[id].lod), (int)rayCastPos.z % (chunkSize / chunks[id].lod)) != 0) {
-							hitDeadEnd = true;
-							break;
-						}
-					}
-					
-				}
-				else break;
-			}
-			if (!hitDeadEnd) {
-				rayCastPos = { pos.x + forward.x * 25,pos.y + forward.y * 25,pos.z + forward.z*25 };
-			}
-
-			if (window.GetMouseButtonPressed(0) && !menuOpen && selectedColorIndex >= 0) {
-
-				Vector3 ppp = rayCastPos;
-
-				bool doneChanges = false;
-				bool allocatedThisRun = false;
-				for (int dx = 0; dx < editSize; dx++) {
-					for (int dy = 0; dy < editSize; dy++) {
-						for (int dz = 0; dz < editSize; dz++) {
-
-							Vector3 pp = ppp;
-							pp.x += dx;
-							pp.y += dy;
-							pp.z += dz;
-
-							int x = pp.x / chunkSize;
-							int y = pp.y / chunkSize;
-							int z = pp.z / chunkSize;
-
-							int id = y * (wx * wz) + z * wx + x;
-
-							if (id >= wx * wy * wz || id < 0) continue;
-							if (chunks[id].lod == 0 || chunks[id].voxelCount == 0 || world.chunkData[id].skipped) {
-								world.chunkData[id].skipped = false;
-								chunks[id].gx = dx;
-								chunks[id].gy = dy;
-								chunks[id].gz = dz;
-								chunks[id].lod = 1;
-								chunks[id].size = chunkSize / chunks[id].lod;
-								world.chunkData[id].lod = 1;
-								world.chunkData[id].terrain = (uint16_t*)MemAlloc(chunkSize * chunkSize * chunkSize * sizeof(uint16_t));
-								int kx = int(fabs(pp.x)) % chunkSize; 
-								int ky = int(fabs(pp.y)) % chunkSize; 
-								int kz = int(fabs(pp.z)) % chunkSize;
-								int blockid = kx + ky * chunkSize + kz * chunkSize * chunkSize;
-								world.chunkData[id].terrain[blockid] = 3;
-								int size = chunkSize / chunks[id].lod;
-								chunks[id].GenerateBitMap(&world.chunkData[id]);
-								chunks[id].Compress(&world.chunkData[id]);
-								
-								if (chunks[id].shortenedData) {
-									world.chunkData[id].fluidByteMap.Clear({ size,size,size });
-									world.chunkData[id].fluidByteMap.Upload(world.chunkData[id].compressedTerrain);
-									world.chunkData[id].fluidByteMap.GetBindlessHandle();
-									world.handle.handle[id].handle = world.chunkData[id].fluidByteMap.handle;
-								}
-								else {
-									world.chunkData[id].fluidShortMap.Clear({ size,size,size });
-									uint16_t* tt = chunks[id].DecompressChunk(&world.chunkData[id]);
-									world.chunkData[id].fluidShortMap.Upload(tt);
-									free(tt);
-									world.chunkData[id].fluidShortMap.GetBindlessHandle();
-									world.handle.handle[id].handle = world.chunkData[id].fluidShortMap.handle;
-
-								}
-								allocatedThisRun = true;
-								world.handle.handle[id].lod = world.chunkData[id].lod;
-								bool inGen = false;
-								for (int d = 0; d < chunkCount; d++) {
-									if (chunksUpdatedThisFrame[d].x == x && chunksUpdatedThisFrame[d].y == y && chunksUpdatedThisFrame[d].z == z) {
-										inGen = true;
-									}
-								}
-								if (!inGen) {
-									chunksUpdatedThisFrame[chunkCount] = { x,y,z };
-									chunkCount++;
-								}
-							}
-							else if (chunks[id].lod == 1 && chunks[id].voxelCount!=0 && world.chunkData[id].lod==1) {
-								if (chunks[id].ReadVoxel(&world.chunkData[id], int(fabs(pp.x)) % chunkSize, int(fabs(pp.y)) % chunkSize, int(fabs(pp.z)) % chunkSize)==0) {
-									chunks[id].SetTerrain(&world.chunkData[id], int(fabs(pp.x)) % chunkSize, int(fabs(pp.y)) % chunkSize, int(fabs(pp.z)) % chunkSize, 3);
-									doneChanges = true;
-								}
-								bool inGen = false;
-								for (int d = 0; d < chunkCount; d++) {
-									if (chunksUpdatedThisFrame[d].x == x && chunksUpdatedThisFrame[d].y == y && chunksUpdatedThisFrame[d].z == z) {
-										inGen = true;
-									}
-								}
-								if (!inGen) {
-									chunksUpdatedThisFrame[chunkCount] = { x,y,z };
-									chunkCount++;
-								}
-							}
-							
-						}
-					}
-				}
-				releasedMouseButton = true;
-			}
-			if (!window.GetMouseButtonPressed(0) && releasedMouseButton) {
-				releasedMouseButton = false;
-				if (chunkCount > 0) {
-
-					for (int i = 0; i < chunkCount; i++) {
-						int dx = chunksUpdatedThisFrame[i].x;
-						int dy = chunksUpdatedThisFrame[i].y;
-						int dz = chunksUpdatedThisFrame[i].z;
-						int id = dy * (wx * wz) + dz * wx + dx;
+					int id = y * (wx * wz) + z * wx + x;
+					if (rayCastPos.x >= 0 && rayCastPos.y >= 0 && rayCastPos.z >= 0 && rayCastPos.x < wx * chunkSize && rayCastPos.y < wy * chunkSize && rayCastPos.z < wz * chunkSize) {
 						if (chunks[id].lod != 0) {
-							ChunkDeleteMeshData(dx, dy, dz);
-							vv[drd] = { dx,dy,dz };
-							drd++;
-
+							if (chunks[id].ReadVoxel(&world.chunkData[id], (int)rayCastPos.x % (chunkSize / chunks[id].lod), (int)rayCastPos.y % (chunkSize / chunks[id].lod), (int)rayCastPos.z % (chunkSize / chunks[id].lod)) != 0) {
+								hitDeadEnd = true;
+								break;
+							}
 						}
+
 					}
-
-					shaders.display.UpdateSSBO(3, &world.handle, sizeof(world.handle), 0);
-
-					chunkCount = 0;
+					else break;
+				}
+				if (!hitDeadEnd) {
+					rayCastPos = { pos.x + forward.x * 25,pos.y + forward.y * 25,pos.z + forward.z * 25 };
 				}
 
+				if (window.GetMouseButtonPressed(0) && !menuOpen && selectedColorIndex >= 0) {
+
+					Vector3 ppp = rayCastPos;
+
+					bool doneChanges = false;
+					bool allocatedThisRun = false;
+					for (int dx = 0; dx < editSize; dx++) {
+						for (int dy = 0; dy < editSize; dy++) {
+							for (int dz = 0; dz < editSize; dz++) {
+
+								Vector3 pp = ppp;
+								pp.x += dx;
+								pp.y += dy;
+								pp.z += dz;
+
+								int x = pp.x / chunkSize;
+								int y = pp.y / chunkSize;
+								int z = pp.z / chunkSize;
+
+								int id = y * (wx * wz) + z * wx + x;
+
+								if (id >= wx * wy * wz || id < 0) continue;
+								if (chunks[id].lod == 0 || chunks[id].voxelCount == 0 || world.chunkData[id].skipped) {
+									world.chunkData[id].skipped = false;
+									chunks[id].gx = dx;
+									chunks[id].gy = dy;
+									chunks[id].gz = dz;
+									chunks[id].lod = 1;
+									chunks[id].size = chunkSize / chunks[id].lod;
+									world.chunkData[id].lod = 1;
+									world.chunkData[id].terrain = (uint16_t*)MemAlloc(chunkSize * chunkSize * chunkSize * sizeof(uint16_t));
+									int kx = int(fabs(pp.x)) % chunkSize;
+									int ky = int(fabs(pp.y)) % chunkSize;
+									int kz = int(fabs(pp.z)) % chunkSize;
+									int blockid = kx + ky * chunkSize + kz * chunkSize * chunkSize;
+									world.chunkData[id].terrain[blockid] = 3;
+									int size = chunkSize / chunks[id].lod;
+									chunks[id].GenerateBitMap(&world.chunkData[id]);
+									chunks[id].Compress(&world.chunkData[id]);
+
+									if (chunks[id].shortenedData) {
+										world.chunkData[id].fluidByteMap.Clear({ size,size,size });
+										world.chunkData[id].fluidByteMap.Upload(world.chunkData[id].compressedTerrain);
+										world.chunkData[id].fluidByteMap.GetBindlessHandle();
+										world.handle.handle[id].handle = world.chunkData[id].fluidByteMap.handle;
+									}
+									else {
+										world.chunkData[id].fluidShortMap.Clear({ size,size,size });
+										uint16_t* tt = chunks[id].DecompressChunk(&world.chunkData[id]);
+										world.chunkData[id].fluidShortMap.Upload(tt);
+										free(tt);
+										world.chunkData[id].fluidShortMap.GetBindlessHandle();
+										world.handle.handle[id].handle = world.chunkData[id].fluidShortMap.handle;
+
+									}
+									allocatedThisRun = true;
+									world.handle.handle[id].lod = world.chunkData[id].lod;
+									for (int dx = -1; dx <= 1; dx++) {
+										for (int dy = -1; dy <= 1; dy++) {
+											for (int dz = -1; dz <= 1; dz++) {
+
+												bool inGen = false;
+
+												for (int d = 0; d < chunkCount; d++) {
+													if (chunksUpdatedThisFrame[d].x == x + dx && chunksUpdatedThisFrame[d].y == y + dy && chunksUpdatedThisFrame[d].z == z + dz) {
+														inGen = true;
+													}
+												}
+												if (!inGen) {
+													chunksUpdatedThisFrame[chunkCount] = { x + dx,y + dy,z + dz };
+													chunkCount++;
+												}
+											}
+										}
+									}
+								}
+								if (chunks[id].lod == 1 && world.chunkData[id].lod == 1) {
+									if (chunks[id].ReadVoxel(&world.chunkData[id], int(fabs(pp.x)) % chunkSize, int(fabs(pp.y)) % chunkSize, int(fabs(pp.z)) % chunkSize) == 0) {
+										chunks[id].SetTerrain(&world.chunkData[id], int(fabs(pp.x)) % chunkSize, int(fabs(pp.y)) % chunkSize, int(fabs(pp.z)) % chunkSize, 3);
+										doneChanges = true;
+									}
+									for (int dx = -1; dx <= 1; dx++) {
+										for (int dy = -1; dy <= 1; dy++) {
+											for (int dz = -1; dz <= 1; dz++) {
+												bool inGen = false;
+												for (int d = 0; d < chunkCount; d++) {
+													if (chunksUpdatedThisFrame[d].x == x + dx && chunksUpdatedThisFrame[d].y == y + dy && chunksUpdatedThisFrame[d].z == z + dz) {
+														inGen = true;
+													}
+												}
+												if (!inGen) {
+													chunksUpdatedThisFrame[chunkCount] = { x + dx,y + dy,z + dz };
+													chunkCount++;
+												}
+											}
+										}
+									}
+								}
+
+							}
+						}
+					}
+					if (doneChanges) {
+						decals.push_back(rayCastPos);
+						decalTypes.push_back(5);
+					}
+					releasedMouseButton = true;
+				}
+				if (!window.GetMouseButtonPressed(0) && releasedMouseButton) {
+
+					if (chunkCount > 0) {
+						std::cout << chunkCount << "\n";
+						for (int i = 0; i < chunkCount; i++) {
+							int dx = chunksUpdatedThisFrame[i].x;
+							int dy = chunksUpdatedThisFrame[i].y;
+							int dz = chunksUpdatedThisFrame[i].z;
+							int id = dy * (wx * wz) + dz * wx + dx;
+							if (chunks[id].lod != 0) {
+								ChunkDeleteMeshData(dx, dy, dz);
+								vv[drd] = { dx,dy,dz };
+								drd++;
+
+							}
+						}
+
+						shaders.display.UpdateSSBO(3, &world.handle, sizeof(world.handle), 0);
+						decals.clear();
+						decalTypes.clear();
+						chunkCount = 0;
+					}
+					releasedMouseButton = false;
+
+
+				}
 			}
+			
 			Math::IVector2 generateArrayId[1024];
 			int generateCount = 0;
 			const float halfAngle = tanf((160 * 0.5f) * DEG2RAD);
@@ -1381,7 +1506,7 @@ public:
 				gen.highestChunkY += 2;
 
 				for (int y = 0; y < gen.highestChunkY && y < wy; y++) {
-					chunks[y * (wx * wz) + nz * wx + nx].GenerateDesert(&world.chunkData[y * (wx * wz) + nz * wx + nx], gen, nx, y, nz, lod, grass);
+					chunks[y * (wx * wz) + nz * wx + nx].GenerateMountains(&world.chunkData[y * (wx * wz) + nz * wx + nx], gen, nx, y, nz, lod, grass);
 					RecalculateParticles(nx,y,nz);
 				};
 				for (int y = 0; y < gen.highestChunkY && y < wy; y++) {
@@ -1501,7 +1626,10 @@ public:
 					drd * sizeof(int), end.data());
 
 				glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
-
+				if (totalMeshletCount * 64 > 59259259) {
+					std::cout << "Buffer overflow \n";
+				}
+				
 				totalTriangleCount = totalMeshletCount * 64 + 64;
 
 				for (int i = 0; i < drd; i++) {
@@ -1731,9 +1859,6 @@ public:
 			ImGui_ImplOpenGL3_NewFrame();
 			ImGui_ImplGlfw_NewFrame();
 			ImGui::NewFrame();
-			if (window.GetKeyPressed(KEY_F)) {
-				world.Save();
-			}
 
 			if (window.GetKeyPressed(KEY_K) && releasedMenu) {
 				menuOpen = !menuOpen;

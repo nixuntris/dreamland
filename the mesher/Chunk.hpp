@@ -274,64 +274,6 @@ struct World {
 		//Generate moisture map
 		//Generate elevation map
 	}
-	void Save() {
-		std::cout << "Save\n";
-		FILE* f = fopen("world.bin", "wb");
-		if (!f) { TraceLog(LOG_ERROR, "Save: cannot open world.bin"); return; }
-
-		const int voxelsPerChunk = chunkSize * chunkSize * chunkSize;
-
-		uint32_t magic = 0x574C4431u; // 'WLD1'
-		uint32_t version = 1;
-		int32_t  swx = wx, swy = wy, swz = wz, sChunkSize = chunkSize;
-		uint32_t modelCount = (uint32_t)models.size();
-		uint32_t chunkCount = (uint32_t)chunkData.size();
-
-		fwrite(&magic, sizeof(magic), 1, f);
-		fwrite(&version, sizeof(version), 1, f);
-		fwrite(&swx, sizeof(swx), 1, f);
-		fwrite(&swy, sizeof(swy), 1, f);
-		fwrite(&swz, sizeof(swz), 1, f);
-		fwrite(&sChunkSize, sizeof(sChunkSize), 1, f);
-		fwrite(&modelCount, sizeof(modelCount), 1, f);
-		fwrite(&chunkCount, sizeof(chunkCount), 1, f);
-
-		for (std::map<int, std::vector<VoxelObject>>::iterator it = models.begin();
-			it != models.end(); ++it)
-		{
-			uint32_t modelId = (uint32_t)it->first;
-			uint32_t n = (uint32_t)it->second.size();
-			fwrite(&modelId, sizeof(modelId), 1, f);
-			fwrite(&n, sizeof(n), 1, f);
-			if (n) fwrite(it->second.data(), sizeof(VoxelObject), n, f);
-		}
-		for (int i = 0; i < (int)chunkData.size(); i++) {
-			ChunkData& cd = chunkData[i];
-
-			fwrite(&i, sizeof(i), 1, f);
-			fwrite(&cd.skipped, sizeof(cd.skipped), 1, f);
-			fwrite(&cd.lod, sizeof(cd.lod), 1, f);
-			fwrite(&cd.voxelCount, sizeof(cd.voxelCount), 1, f);
-			fwrite(&cd.paletteSize, sizeof(cd.paletteSize), 1, f);
-			fwrite(&cd.compressed, sizeof(cd.compressed), 1, f);
-			fwrite(&cd.updated, sizeof(cd.updated), 1, f);
-
-			if (cd.skipped || cd.voxelCount == 0) continue;
-
-			if (cd.compressed) {
-				fwrite(cd.palette, sizeof(uint16_t), cd.paletteSize, f);
-				fwrite(cd.compressedTerrain, 1, voxelsPerChunk, f);
-			}
-			else {
-				fwrite(cd.terrain, sizeof(uint16_t), voxelsPerChunk, f);
-			}
-
-			size_t bmBytes = (size_t)voxelsPerChunk / 8;
-		}
-
-		fclose(f);
-		TraceLog(LOG_INFO, "World saved");
-	}
 	void Setup() {
 		chunkData.resize(wx * wz * wy);
 		memset(handle.handle, 0, wx * wy * wz * sizeof(GLuint64));
@@ -478,6 +420,7 @@ public:
 			}
 		}
 	}
+
 	inline void GenerateMountains(ChunkData* chunkData, GenerationData generationData, int gx, int gy, int gz, int lod = 1, bool grass = false) {
 		this->gx = gx;
 		this->gy = gy;
@@ -498,15 +441,36 @@ public:
 				for (int y = chunkSize - 1; y >= 0; y -= 1) {
 					int worldY = gy * chunkSize + y;
 					if (worldY < terrainHeight - 6) {
-						chunkData->terrain[IDX(x, y, z, chunkSize)] = STONE;
+						chunkData->terrain[
+							IDX(x, y, z, chunkSize)
+						] = 2; // stone
+
 					}
 					else if (worldY < terrainHeight) {
-						if (worldY < 200 + grassLineOffset)
-							chunkData->terrain[IDX(x, y, z, chunkSize)] = GRASS;
-						else if (worldY < 400 + grassLineOffset)
-							chunkData->terrain[IDX(x, y, z, chunkSize)] = DIRT;
-						else
-							chunkData->terrain[IDX(x, y, z, chunkSize)] = SNOW;
+						if (worldY < 200 + grassLineOffset) {
+							chunkData->terrain[
+								IDX(x, y, z, chunkSize)
+							] = 5; //dirt
+							if (chunkData->terrain[
+								IDX(x, y + 1, z, chunkSize)
+							] == 0) {
+								if ((x + y + Math::GetRandomValueStreamlined(-1, 1)) % 2 == 0 && grass) grassList.push_back({ (float)x + gx * chunkSize,(float)y + gy * chunkSize,(float)z + gz * chunkSize });
+							}
+						}
+						else if (worldY < 400 + grassLineOffset) {
+
+							chunkData->terrain[
+								IDX(x, y, z, chunkSize)
+							] = 2; //stone
+
+						}
+						else {
+							chunkData->terrain[
+								IDX(x, y, z, chunkSize)
+							] = 6; //snow
+
+
+						}
 					}
 				}
 			}
@@ -597,7 +561,7 @@ public:
 	inline void GenerateLod(ChunkData* chunkData, int gx, int gy, int gz) {
 		voxelCount = 0;
 		for (int i = 0; i < chunkSize * chunkSize * chunkSize; i++) {
-			if (chunkData->compressed) {
+			if (chunkData->compressed || shortenedData) {
 				voxelCount += chunkData->compressedTerrain[i] != 0;
 			}
 			else {

@@ -132,7 +132,7 @@ void main()
                 uint mask = 0u;
 
                 for (int f = 0; f < 6; f++) {
-                    ivec3 neighborPos = p + faceOffsets[f];
+                    ivec3 neighborPos = p + faceOffsets[f] * lod;
                     
                     if (readVoxelData(neighborPos) == 0u)
                         mask |= 1u << f;

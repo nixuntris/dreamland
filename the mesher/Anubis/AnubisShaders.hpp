@@ -147,6 +147,92 @@ namespace Anubis {
             }
         }
     };
+    void UploadByteMaps(GPUONLYByteMap** maps, uint8_t** data, Math::IVector3* sizes, int count) {
+        GLuint* textureIDs = new GLuint[count];
+        glCreateTextures(GL_TEXTURE_3D, count, textureIDs);
+
+        size_t totalSize = 0;
+
+        for (int i = 0; i < count; i++) {
+            maps[i]->size = sizes[i];
+            maps[i]->textureID = textureIDs[i];
+
+            glTextureStorage3D(textureIDs[i], 1, GL_R8UI, sizes[i].x, sizes[i].y, sizes[i].z);
+            totalSize += (size_t)sizes[i].x * sizes[i].y * sizes[i].z;
+        }
+
+        GLuint pbo;
+        glCreateBuffers(1, &pbo);
+        glNamedBufferData(pbo, totalSize, nullptr, GL_STREAM_DRAW);
+
+        uint8_t* mapped = (uint8_t*)glMapNamedBuffer(pbo, GL_WRITE_ONLY);
+
+        size_t offset = 0;
+        for (int i = 0; i < count; i++) {
+            size_t dataSize = (size_t)sizes[i].x * sizes[i].y * sizes[i].z;
+            memcpy(mapped + offset, data[i], dataSize);
+            offset += dataSize;
+        }
+
+        glUnmapNamedBuffer(pbo);
+        glBindBuffer(GL_PIXEL_UNPACK_BUFFER, pbo);
+
+        offset = 0;
+        for (int i = 0; i < count; i++) {
+            glTextureSubImage3D(maps[i]->textureID, 0, 0, 0, 0,
+                sizes[i].x, sizes[i].y, sizes[i].z,
+                GL_RED_INTEGER, GL_UNSIGNED_BYTE, (void*)offset);
+
+            offset += (size_t)sizes[i].x * sizes[i].y * sizes[i].z;
+        }
+
+        glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
+        glDeleteBuffers(1, &pbo);
+        delete[] textureIDs;
+    }
+    void UploadShortMaps(GPUONLYShortMap** maps, uint16_t** data, Math::IVector3* sizes, int count) {
+        GLuint* textureIDs = new GLuint[count];
+        glCreateTextures(GL_TEXTURE_3D, count, textureIDs);
+
+        size_t totalSize = 0;
+
+        for (int i = 0; i < count; i++) {
+            maps[i]->size = sizes[i];
+            maps[i]->textureID = textureIDs[i];
+
+            glTextureStorage3D(textureIDs[i], 1, GL_R16UI, sizes[i].x, sizes[i].y, sizes[i].z);
+            totalSize += (size_t)sizes[i].x * sizes[i].y * sizes[i].z * sizeof(uint16_t);
+        }
+
+        GLuint pbo;
+        glCreateBuffers(1, &pbo);
+        glNamedBufferData(pbo, totalSize, nullptr, GL_STREAM_DRAW);
+
+        uint8_t* mapped = (uint8_t*)glMapNamedBuffer(pbo, GL_WRITE_ONLY);
+
+        size_t offset = 0;
+        for (int i = 0; i < count; i++) {
+            size_t dataSize = (size_t)sizes[i].x * sizes[i].y * sizes[i].z * sizeof(uint16_t);
+            memcpy(mapped + offset, data[i], dataSize);
+            offset += dataSize;
+        }
+
+        glUnmapNamedBuffer(pbo);
+        glBindBuffer(GL_PIXEL_UNPACK_BUFFER, pbo);
+
+        offset = 0;
+        for (int i = 0; i < count; i++) {
+            glTextureSubImage3D(maps[i]->textureID, 0, 0, 0, 0,
+                sizes[i].x, sizes[i].y, sizes[i].z,
+                GL_RED_INTEGER, GL_UNSIGNED_SHORT, (void*)offset);
+
+            offset += (size_t)sizes[i].x * sizes[i].y * sizes[i].z * sizeof(uint16_t);
+        }
+
+        glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
+        glDeleteBuffers(1, &pbo);
+        delete[] textureIDs;
+    }
     class Shader {
     public:
         GLuint programID;
