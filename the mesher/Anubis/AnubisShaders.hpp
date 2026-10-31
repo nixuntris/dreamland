@@ -24,6 +24,21 @@ namespace Anubis {
         void Clear(Math::IVector3 s) {
             size = s;
         }
+        void ChangePixel(int x, int y, int z, uint16_t value) {
+            if (textureID == 0) {
+                return;
+            }
+
+            if (x < 0 || y < 0 || z < 0 ||
+                x >= size.x || y >= size.y || z >= size.z) {
+                return;
+            }
+            glTextureSubImage3D(textureID, 0,
+                x, y, z,
+                1, 1, 1,
+                GL_RED_INTEGER, GL_UNSIGNED_SHORT, &value);
+        }
+
         void Upload(uint16_t* data = nullptr) {
             if (textureID != 0) {
                 if (handle != 0) {
@@ -70,7 +85,6 @@ namespace Anubis {
                 textureID = 0;
             }
         }
-
     };
     class GPUONLYByteMap {
     public:
@@ -92,6 +106,20 @@ namespace Anubis {
                     size.x, size.y, size.z,
                     GL_RED_INTEGER, GL_UNSIGNED_BYTE, data);
             }
+        }
+        void ChangePixel(int x, int y, int z, uint8_t value) {
+            if (textureID == 0) {
+                return;
+            }
+
+            if (x < 0 || y < 0 || z < 0 ||
+                x >= size.x || y >= size.y || z >= size.z) {
+                return;
+            }
+            glTextureSubImage3D(textureID, 0,
+                x, y, z,
+                1, 1, 1,
+                GL_RED_INTEGER, GL_UNSIGNED_BYTE, &value);
         }
         void ReuploadContents(uint8_t* data) {
             if (textureID == 0) { Upload(data); return; }

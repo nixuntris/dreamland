@@ -197,7 +197,6 @@ struct ChunkData {
 	int lod;
 	Anubis::GPUONLYShortMap fluidShortMap;
 	Anubis::GPUONLYByteMap fluidByteMap;
-	uint8_t* bitMap;
 	uint16_t* terrain;
 	uint16_t* palette;
 	int paletteSize;
@@ -206,7 +205,6 @@ struct ChunkData {
 	int voxelCount = 0;
 	bool updated = false;
 };
-#define READ_BITMAP(x,y,z) ((chunkdata->bitMap[(((x) + (y) * size + (z) * size * size))>>3] >> ((((x) + (y) * size + (z) * size * size))&7)) & 1u)
 struct PhysicsAccelerationChunk {
 	int* idReferences;
 	uint16_t objectsInChunk=0;
@@ -222,7 +220,7 @@ struct World {
 	uint8_t setLod[mwx][mwz];
 	struct GlobalHandle {
 		struct Region {
-			GLuint64 handle;
+			GLuint64 handle = 0;
 			int lod;
 			int lightIds[16];
 			Region() {
@@ -329,7 +327,6 @@ struct World {
 			}
 
 			size_t bmBytes = (size_t)voxelsPerChunk / 8;
-			fwrite(cd.bitMap, 1, bmBytes, f);
 		}
 
 		fclose(f);
@@ -674,8 +671,6 @@ public:
 	}
 	inline void GenerateBitMap(ChunkData* chunkData) {
 		const int total = size * size * size;
-		chunkData->bitMap = (uint8_t*)MemAlloc(total / 8 * sizeof(uint8_t));
-		memset(chunkData->bitMap, 0, total / 8);
 		voxelCount = 0;
 		if (chunkData->terrain != nullptr) {
 			for (int x = 0; x < size; x++) {
@@ -683,7 +678,6 @@ public:
 					for (int z = 0; z < size; z++) {
 						int id = x + y * size + z * size * size;
 						if (chunkData->terrain[id] != 0) {
-							chunkData->bitMap[id / 8] |= (1u << (id % 8));
 							voxelCount++;
 						}
 					}
@@ -696,7 +690,6 @@ public:
 					for (int z = 0; z < size; z++) {
 						int id = x + y * size + z * size * size;
 						if (chunkData->compressedTerrain[id] != 0) {
-							chunkData->bitMap[id / 8] |= (1u << (id % 8));
 							voxelCount++;
 						}
 					}
@@ -704,11 +697,7 @@ public:
 			}
 		}
 	}
-	inline bool SetTerrain(ChunkData* chunkdata, int x, int y, int z, uint16_t t) {
-		if (lod != 1) {
-			return false;
-		}
-
+	inline bool SetTerrain(ChunkData* chunkdata, int x, int y, int z, uint16_t t, bool setGPUDATA=true) {
 		int id = x + y * size + z * size * size;
 		bool set = false;
 		if (shortenedData) {
@@ -716,9 +705,12 @@ public:
 				voxelCount++;
 			}
 			chunkdata->compressedTerrain[id] = (uint8_t)t;
+			if (setGPUDATA) chunkdata->fluidByteMap.ChangePixel(x, y, z, t);
+			//edit byte map
 			return true;
 		}
 		if (chunkdata->compressed) {
+			//edit byte map
 			uint8_t compressedValue = 0;
 			for (int i = 0; i < chunkdata->paletteSize; i++) {
 				if (chunkdata->palette[i] == t) {
@@ -744,11 +736,13 @@ public:
 			}
 		}
 		else {
+			//edit short map
 			uint16_t oldValue = chunkdata->terrain[id];
 			set = oldValue != t;
 			if (set) {
 				chunkdata->terrain[id] = t;
 			}
+			if (setGPUDATA) chunkdata->fluidShortMap.ChangePixel(x, y, z, t);
 		}
 
 		if (set) {
@@ -853,22 +847,7 @@ public:
 				chunkData->voxelCount = voxelCount;
 			}
 
-		if (chunkData->bitMap) {
-			MemFree(chunkData->bitMap);
-			chunkData->bitMap = NULL;
-		}
 		GenerateBitMap(chunkData);
-	}
-	inline bool ReadBitMap(ChunkData* chunkdata, int x, int y, int z) {
-		if (chunkdata->skipped) return true;
-		if (chunkdata->voxelCount == 0) return false;
-		int ss = chunkSize / chunkdata->lod;
-		if (ss * ss * ss == chunkdata->voxelCount) return true;
-		if (chunkdata->lod == lod) {
-			int id = x + (y * size) + (z * size * size);
-			return (chunkdata->bitMap[id / 8] >> (id % 8)) & 1u;
-		}
-		return false;
 	}
 	inline uint32_t PackMetaData(uint8_t mask, uint8_t lod, uint16_t type)
 	{
@@ -879,6 +858,7 @@ public:
 	}
 	uint16_t ReadVoxel(ChunkData* chunkData, int x, int y, int z) {
 		int index = x + y * size + z * size * size; 
+		if (index<0 || index>size * size * size) return 0;
 		if (chunkData->voxelCount == 0) return 0;
 		if (chunkData->skipped) return 0;
 		if (shortenedData) {
@@ -912,10 +892,6 @@ public:
 			if (cd->palette && cd->compressed) {
 				MemFree(cd->palette);
 				cd->palette = NULL;
-			}
-			if (cd->bitMap) {
-				MemFree(cd->bitMap);
-				cd->bitMap = NULL;
 			}
 		}
 
