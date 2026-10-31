@@ -124,7 +124,6 @@ inline __m256 perlin2d_avx2(__m256 x, __m256 y) {
     return lerp(v, x1, x2); // result in [-1, 1]
 }
 
-// Helper: generate a row/array of noise values
 inline void perlin2d_array_avx2(const float* xs, const float* ys, float* out, int n) {
     int i = 0;
     for (; i + 8 <= n; i += 8) {
@@ -133,7 +132,6 @@ inline void perlin2d_array_avx2(const float* xs, const float* ys, float* out, in
         __m256 r = perlin2d_avx2(x, y);
         _mm256_storeu_ps(out + i, r);
     }
-    // scalar tail (fallback for n % 8 != 0) - omitted for brevity, or pad input arrays to multiple of 8
 }
 static inline float fade_scalar(float t) {
     return t * t * t * (t * (t * 6.0f - 15.0f) + 10.0f);

@@ -132,7 +132,6 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="AnubisOpengl.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="PerlinAVX2.hpp" />
   </ItemGroup>
@@ -166,7 +165,6 @@
     <None Include="renderAABB.glsl" />
     <None Include="HizBuilder.glsl" />
     <None Include="SecondaryRays.glsl" />
-    <None Include="GenerateTerrain.glsl" />
     <None Include="tree.voxobj" />
     <None Include="ver.vs" />
   </ItemGroup>

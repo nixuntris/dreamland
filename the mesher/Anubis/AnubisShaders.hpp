@@ -125,9 +125,7 @@ namespace Anubis {
     };
     class ComputeShader : public Shader {
     private:
-        unsigned int maxSSBOs;        // Maximum number of SSBOs
-
-        // Load a file's content into a string
+        unsigned int maxSSBOs;      
         std::string LoadFile(const char* filePath) {
             std::ifstream file(filePath, std::ios::in | std::ios::binary);
             std::stringstream buffer;
@@ -135,7 +133,6 @@ namespace Anubis {
             return buffer.str();
         }
 
-        // Check if a shader program linked successfully
         void CheckLinkErrors() {
             GLint success;
             glGetProgramiv(programID, GL_LINK_STATUS, &success);
@@ -145,8 +142,6 @@ namespace Anubis {
                 std::cerr << "Error: Compute shader program link failed\n" << infoLog << "\n";
             }
         }
-
-        // Check if a shader compiled successfully
         void CheckCompileErrors(GLuint shaderID) {
             GLint success;
             glGetShaderiv(shaderID, GL_COMPILE_STATUS, &success);
@@ -161,14 +156,11 @@ namespace Anubis {
     public:
         std::vector<GLuint> ssboIds;  // Stores SSBO IDs
         GLuint programID;
-        // Constructor
         ComputeShader() : programID(0), maxSSBOs(50) {
-            ssboIds.resize(maxSSBOs, 0); // Resize vector to hold SSBO IDs
-            ssboIds.resize(maxSSBOs, 0); // Resize vector to hold SSBO IDs
+            ssboIds.resize(maxSSBOs, 0);
+            ssboIds.resize(maxSSBOs, 0);
         }
 
-        // Destructor - Cleanup all SSBOs
-        
         void SetByteMap(GPUONLYByteMap byteMap, int spot, const char* name) {
             glBindImageTexture(spot, byteMap.textureID, 0, GL_TRUE, 0, GL_READ_WRITE, GL_R8UI);
             
@@ -192,10 +184,9 @@ namespace Anubis {
             glLinkProgram(programID);
             CheckLinkErrors();
 
-            glDeleteShader(computeShader);  // Clean up the shader after linking
+            glDeleteShader(computeShader);
         }
 
-        // Bind an SSBO at a given index and allocate buffer
         GLuint BindSSBO(int bufferIndex, void* ssboData, size_t size) {
             GLuint id = 0;
             std::cout << bufferIndex << " " << maxSSBOs << "\n";
@@ -250,58 +241,14 @@ namespace Anubis {
             glBindBufferBase(GL_SHADER_STORAGE_BUFFER, bufferIndex, ssboIds[bufferIndex]);
         }
 
-        GLuint BindSSBOGPUONLY(int bufferIndex, size_t size) {
-            if (bufferIndex >= maxSSBOs) {
-                std::cerr << "Error: Buffer index out of range\n";
-                return -1;
-            }
-
-            // Create buffer if not already created
-            if (ssboIds[bufferIndex] == 0) {
-                glGenBuffers(1, &ssboIds[bufferIndex]);
-                std::cout << ssboIds[bufferIndex] << " ssbo id \n";
-            }
-
-            glBindBuffer(GL_SHADER_STORAGE_BUFFER, ssboIds[bufferIndex]);
-            glBufferData(GL_SHADER_STORAGE_BUFFER, size, nullptr, GL_DYNAMIC_DRAW);
-            glBindBufferBase(GL_SHADER_STORAGE_BUFFER, bufferIndex, ssboIds[bufferIndex]);
-            return ssboIds[bufferIndex];
-        }
-        // Dispatch the compute shader to run on the GPU
         void Use(int workgroupCountX, int workgroupCountY, int workgroupCountZ) {
             glDispatchCompute(workgroupCountX, workgroupCountY, workgroupCountZ);
             glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT | GL_BUFFER_UPDATE_BARRIER_BIT);
         }
 
-        // Retrieve data from the SSBO (example: read back to CPU)
-        void RetrieveData(int bufferIndex, void* data, size_t size) {
-            if (bufferIndex >= maxSSBOs) {
-                std::cerr << "Error: Buffer index out of range\n";
-                return;
-            }
-
-            glBindBuffer(GL_SHADER_STORAGE_BUFFER, ssboIds[bufferIndex]);
-            void* mappedBuffer = glMapBuffer(GL_SHADER_STORAGE_BUFFER, GL_READ_ONLY);
-            if (mappedBuffer) {
-                std::memcpy(data, mappedBuffer, size);  // Copy data from buffer
-                glUnmapBuffer(GL_SHADER_STORAGE_BUFFER);
-            }
-            else {
-                std::cerr << "Error: Failed to map SSBO\n";
-            }
-        }
         void SetVector2(Math::Vector2 vec, const char* name) {
             GLint vec2Location = glGetUniformLocation(programID, name);
             glUniform2f(vec2Location, vec.x, vec.y);
-        }
-        void SetTextureHandle(uint64_t handle, const std::string& uniformName) {
-            GLint location = glGetUniformLocation(programID, uniformName.c_str());
-            if (location != -1) {
-                glUniformHandleui64ARB(location, handle); // Set the 64-bit texture handle as uniform
-            }
-            else {
-                std::cerr << "Error: Could not find uniform location for " << uniformName << "\n";
-            }
         }
         void SetVector3(Math::Vector3 vec, const char* name) {
             GLint vec3Location = glGetUniformLocation(programID, name);
@@ -339,7 +286,6 @@ namespace Anubis {
         void SetUVec2Handle(GLuint64 handle, const char* name) {
             GLint loc = glGetUniformLocation(programID, name);
             if (loc != -1) {
-                // Use glUniform2ui to split the 64-bit handle into two 32-bit components
                 glUniform2ui(loc,
                     static_cast<GLuint>(handle & 0xFFFFFFFF),
                     static_cast<GLuint>(handle >> 32));
@@ -427,56 +373,6 @@ namespace Anubis {
             delete[] flatArray;
         }
     };
-    void CheckComputeLimits() {
-        GLint maxInvocations = 0;
-        glGetIntegerv(GL_MAX_COMPUTE_WORK_GROUP_INVOCATIONS, &maxInvocations);
-        std::cout << "Max total invocations per work group: " << maxInvocations << std::endl;
-
-        GLint maxGroupSizes[3] = { 0, 0, 0 };
-        glGetIntegeri_v(GL_MAX_COMPUTE_WORK_GROUP_SIZE, 0, &maxGroupSizes[0]);
-        glGetIntegeri_v(GL_MAX_COMPUTE_WORK_GROUP_SIZE, 1, &maxGroupSizes[1]);
-        glGetIntegeri_v(GL_MAX_COMPUTE_WORK_GROUP_SIZE, 2, &maxGroupSizes[2]);
-
-        std::cout << "Max individual group sizes (X, Y, Z): "
-            << maxGroupSizes[0] << ", "
-            << maxGroupSizes[1] << ", "
-            << maxGroupSizes[2] << std::endl;
-    }
-
-    void CheckComputeShaderLimits() {
-        std::cout << "==================================================\n";
-        std::cout << "          OPENGL COMPUTE SHADER LIMITS            \n";
-        std::cout << "==================================================\n";
-
-        // 1. LOCAL WORK GROUP LIMITS (Size inside the shader)
-        GLint maxInvocations = 0;
-        glGetIntegerv(GL_MAX_COMPUTE_WORK_GROUP_INVOCATIONS, &maxInvocations);
-    
-        GLint maxLocalSizes[3] = {0, 0, 0};
-        glGetIntegeri_v(GL_MAX_COMPUTE_WORK_GROUP_SIZE, 0, &maxLocalSizes[0]);
-        glGetIntegeri_v(GL_MAX_COMPUTE_WORK_GROUP_SIZE, 1, &maxLocalSizes[1]);
-        glGetIntegeri_v(GL_MAX_COMPUTE_WORK_GROUP_SIZE, 2, &maxLocalSizes[2]);
-
-        std::cout << "[LOCAL WORK GROUP (layout in shader)]\n";
-        std::cout << "  -> Max Total Invocations (X * Y * Z): " << maxInvocations << "\n";
-        std::cout << "  -> Max Individual Dimensions:\n";
-        std::cout << "     X: " << maxLocalSizes[0] << "\n";
-        std::cout << "     Y: " << maxLocalSizes[1] << "\n";
-        std::cout << "     Z: " << maxLocalSizes[2] << "\n\n";
-
-        // 2. GLOBAL WORK GROUP COUNT LIMITS (Arguments for glDispatchCompute)
-        GLint maxGlobalCounts[3] = {0, 0, 0};
-        glGetIntegeri_v(GL_MAX_COMPUTE_WORK_GROUP_COUNT, 0, &maxGlobalCounts[0]);
-        glGetIntegeri_v(GL_MAX_COMPUTE_WORK_GROUP_COUNT, 1, &maxGlobalCounts[1]);
-        glGetIntegeri_v(GL_MAX_COMPUTE_WORK_GROUP_COUNT, 2, &maxGlobalCounts[2]);
-
-        std::cout << "[GLOBAL WORK GROUP COUNT (glDispatchCompute arguments)]\n";
-        std::cout << "  -> Max Dispatchable Groups:\n";
-        std::cout << "     X: " << maxGlobalCounts[0] << "\n";
-        std::cout << "     Y: " << maxGlobalCounts[1] << "\n";
-        std::cout << "     Z: " << maxGlobalCounts[2] << "\n";
-        std::cout << "==================================================\n";
-    }
     class DisplayShader : Shader {
     public:
         std::vector<GLuint> ssboIds;
@@ -498,8 +394,6 @@ namespace Anubis {
             glShaderSource(vertexShader, 1, &vertex, nullptr);  // Correct shader source
 
             glCompileShader(vertexShader);
-
-            // Check for vertex shader compilation errors
             int success;
             glGetShaderiv(vertexShader, GL_COMPILE_STATUS, &success);
             if (!success) {
@@ -568,9 +462,6 @@ namespace Anubis {
             Setup(vertex, fragment);
         };
 
-        void LoadBase() {
-            Setup("Anubis/BaseShaders/quad_display_shader.vs", "Anubis/BaseShaders/quad_display_shader.fs");
-        }
         void CreateSSBO(int bufferIndex, size_t size)
         {
             GLint maxBindings = 0;
@@ -670,11 +561,6 @@ namespace Anubis {
             inUsessbo[bufferIndex] = true;
             glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
         }
-
-        void* GetSSBOPointer(int bufferIndex)
-        {
-            return ssboPointers[bufferIndex];
-        }
         void DeleteSSBO(int bufferIndex)
         {
             if (bufferIndex < 0 || bufferIndex >= ssboIds.size() || bufferIndex >= inUsessbo.size())
@@ -690,57 +576,6 @@ namespace Anubis {
                 ssboIds[bufferIndex] = 0;   // Clear stored ID
                 inUsessbo[bufferIndex] = false; // Mark as unused
             }
-        }
-        void ResizeSSBO(int bufferIndex, size_t newSize)
-        {
-            if (bufferIndex < 0 || bufferIndex >= ssboIds.size() || bufferIndex >= inUsessbo.size())
-            {
-                std::cerr << "SSBO ERROR: bufferIndex out of bounds\n";
-                return;
-            }
-
-            GLuint id = ssboIds[bufferIndex];
-            if (id == 0)
-            {
-                std::cerr << "SSBO ERROR: buffer not created yet\n";
-                return;
-            }
-
-            // Query max block size
-            GLint maxBlockSize = 0;
-            glGetIntegerv(GL_MAX_SHADER_STORAGE_BLOCK_SIZE, &maxBlockSize);
-
-            if (newSize <= 0 || newSize > (size_t)maxBlockSize)
-            {
-                std::cerr << "SSBO ERROR: newSize " << newSize
-                    << " exceeds max block size (" << maxBlockSize << ")\n";
-                return;
-            }
-
-            glBindBuffer(GL_SHADER_STORAGE_BUFFER, id);
-
-            // Reallocate buffer with new size (old contents are lost)
-            glBufferData(GL_SHADER_STORAGE_BUFFER, newSize, nullptr, GL_DYNAMIC_DRAW);
-
-            GLenum err = glGetError();
-            if (err != GL_NO_ERROR)
-            {
-                std::cerr << "SSBO ERROR: glBufferData (resize) failed (error " << err << ")\n";
-                return;
-            }
-
-            // Re-bind to slot
-            glBindBufferBase(GL_SHADER_STORAGE_BUFFER, bufferIndex, id);
-
-            err = glGetError();
-            if (err != GL_NO_ERROR)
-            {
-                std::cerr << "SSBO ERROR: glBindBufferBase (resize) failed (error " << err << ")\n";
-                return;
-            }
-
-            // Optional: unbind
-            glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
         }
         void UpdateSSBO(int bufferIndex, const void* data, size_t size, size_t startPoint=0)
         {
@@ -846,13 +681,6 @@ namespace Anubis {
             const char* vertexShaderSource = vertexShaderCode.c_str();
             const char* fragmentShaderSource = fragmentShaderCode.c_str();
             Setup(vertexShaderSource, fragmentShaderSource);
-        }
-        void LoadPartialFragment(const char* fragmentSource, const char* vertexPath) {
-            std::string vertexShaderCode = LoadFile(vertexPath);
-
-            const char* vertexShaderSource = vertexShaderCode.c_str();
-            Setup(vertexShaderSource, fragmentSource);
-
         }
         void SetIntArray(const int* integers, int count, const char* name) {
             GLint intLocation = glGetUniformLocation(shaderId, name);

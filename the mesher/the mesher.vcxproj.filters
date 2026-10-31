@@ -43,9 +43,6 @@
     <Filter Include="Source Files\Abstraction Layer">
       <UniqueIdentifier>{ed7593ff-b3a1-4120-8781-aad4846f76d2}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Source Files\Abstraction Layer\Anubis Opengl">
-      <UniqueIdentifier>{1d5c526d-a532-4732-8ba4-14916c168025}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Source Files\Shaders\Rasterizer\Physics">
       <UniqueIdentifier>{c4c2dfdc-6f34-4745-9bfe-aaf4905bd93f}</UniqueIdentifier>
     </Filter>
@@ -57,9 +54,6 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="AnubisOpengl.cpp">
-      <Filter>Source Files\Abstraction Layer\Anubis Opengl</Filter>
-    </ClCompile>
     <ClCompile Include="PerlinAVX2.hpp">
       <Filter>Source Files\Abstraction Layer</Filter>
     </ClCompile>
@@ -119,9 +113,6 @@
       <Filter>Source Files\Shaders\Rasterizer\Software\Illumination</Filter>
     </None>
     <None Include="RenderFluids.glsl">
-      <Filter>Source Files\Shaders\Rasterizer\Physics</Filter>
-    </None>
-    <None Include="GenerateTerrain.glsl">
       <Filter>Source Files\Shaders\Rasterizer\Physics</Filter>
     </None>
     <None Include="hwMesh.vs">

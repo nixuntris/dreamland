@@ -116,15 +116,6 @@ class App {
 	bool firstGen = true;
 	int totalTriangleCount;
 	int renderDistance = 500;
-	struct ChunkOffset {
-		int vertice;
-		int color;
-		int meshlet;
-		uint16_t x;
-		uint16_t y;
-		uint16_t z;
-	};
-	ChunkOffset* off;
 	int wWidth = 3840;
 	int wHeight = 2160;
 	int currentResolutionWindow = 3;
@@ -158,7 +149,6 @@ public:
 		shaders.display.CreateSSBO(0, sizeof(uint32_t) * 3840 * 2160 *6);
 		int maxSSBOCount = 0;
 		glGetIntegerv(GL_MAX_SHADER_STORAGE_BUFFER_BINDINGS, &maxSSBOCount);
-		//std::cout << maxSSBOCount << "\n";
 		if (gpuMeshing) {
 			shaders.display.CreatePersistentSSBO(9, sizeof(int) * 2+1024*1024*2*sizeof(int));
 			shaders.display.CreateSSBO(10, maxGPUBatch * sizeof(Math::IVector3));
@@ -174,9 +164,6 @@ public:
 			std::cout << "gpu meshing on\n";
 			totalTriangleCount = 59259259;
 			totalMeshletCount = totalTriangleCount/64;
-			if ((totalMeshletCount + 1) * sizeof(int) * 8 <= 0 || totalTriangleCount * sizeof(uint32_t) * 8 <= 0 || totalTriangleCount * sizeof(uint32_t) * 8 <= 0 || totalMeshletCount * 6 * sizeof(float) * 8 <= 0) {
-				"Pre allocation for gpu meshing is failing";
-			}
 			shaders.display.CreatePersistentSSBO(5, (totalMeshletCount + 1) * sizeof(int) * 8);
 			shaders.display.CreatePersistentSSBO(2, totalTriangleCount * sizeof(uint32_t) * 8);
 			shaders.display.CreatePersistentSSBO(6, totalTriangleCount * sizeof(uint32_t) * 8);
@@ -193,7 +180,6 @@ public:
 		glFrontFace(GL_CCW);
 	}
 	inline void GenerateTerrain() {
-		off = (ChunkOffset*)MemAlloc(wx * wy * wz * sizeof(ChunkOffset));
 		chunks = (Chunk*)MemAlloc(wx * wz * wy * sizeof(Chunk));
 	}
 	inline void uploadChunkSSBO(uint32_t neighbourId) {
@@ -411,9 +397,6 @@ public:
 				}
 			}
 		}
-		free(off);
-		free(chunks);
-		off = (ChunkOffset*)MemAlloc(wx * wy * wz * sizeof(ChunkOffset));
 		chunks = (Chunk*)MemAlloc(wx * wz * wy * sizeof(Chunk));
 		Anubis::SwitchShaderStage(shaders.display.shaderId);
 		memset(shaders.display.ssboPointers[9], 0, (1024 * 1024 * 2 + 1) * sizeof(int));

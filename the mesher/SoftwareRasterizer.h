@@ -11,8 +11,6 @@
 #include <bitset>
 #include <bit> // Required for std::bit_cast (C++20)
 #include <chrono>
-const int screenW = 1920;
-const int screenH = 1080;
 
 using Clock = std::chrono::high_resolution_clock;
 #define START_TIMER(name) auto name##_start = Clock::now();
@@ -21,60 +19,6 @@ using Clock = std::chrono::high_resolution_clock;
     std::cout << #name << ": " \
     << std::chrono::duration<double, std::milli>(name##_end - name##_start).count() \
     << " ms\n";
-const float halfW = (float(screenW) / 2.0);
-const float halfH = (float(screenH) / 2.0);
-const float reprocOfhalfW = 1.0 / halfW;
-const float reprocOfhalfH = 1.0 / halfH;
-int lesserTriangles = 0;
-int lesserVoxels = 0;
-int voxelizedTriangles = 0;
-
-const int renderW = 1920;
-const int renderH = 1080;
-const float reproX = float(renderW) / float(screenW);
-const float reproY = float(renderH) / float(screenH);
-struct Vector3LowPrecision {
-	uint8_t x;
-	uint8_t y;
-	uint8_t z;
-};
-const Vector3LowPrecision v000 = { 0, 0, 0 }; //0
-const Vector3LowPrecision v001 = { 0, 0, 1 }; //1
-const Vector3LowPrecision v010 = { 0,1, 0 }; //2
-const Vector3LowPrecision v011 = { 0, 1, 1 }; //3 
-const Vector3LowPrecision v100 = { 1, 0, 0 }; //3
-const Vector3LowPrecision v101 = { 1, 0, 1 }; //4
-const Vector3LowPrecision v110 = { 1, 1, 0 }; //5
-const Vector3LowPrecision v111 = { 1, 1, 1 }; //6
-const Vector3LowPrecision vertices[8] =
-{
-	{0,0,0}, // 0
-	{0,0,1}, // 1
-	{0,1,0}, // 2
-	{0,1,1}, // 3
-	{1,0,0}, // 4
-	{1,0,1}, // 5
-	{1,1,0}, // 6
-	{1,1,1}  // 7
-};
-const uint8_t tris[6][6] =
-{
-	{ 2, 6, 4, 2, 4, 0 },
-	{ 7, 3, 1, 7, 1, 5 },
-	{ 3, 2, 1, 1, 2, 0 },
-	{ 6, 7, 5, 6, 5, 4 },
-	{ 3, 7, 6, 3, 6, 2 },
-	{ 4, 5, 1, 4, 1, 0 }
-};
-const uint8_t quads[6][4] =
-{
-	{ 2, 6, 4, 0 }, // -X face
-	{ 7, 3, 1, 5 }, // +X face
-	{ 3, 2, 0, 1 }, // -Y face
-	{ 6, 7, 5, 4 }, // +Y face
-	{ 3, 7, 6, 2 }, // +Z face
-	{ 4, 5, 1, 0 }  // -Z face
-};
 const Matrix matProj = MatrixPerspective(90 * DEG2RAD, ((double)1920 / (double)1080), 0.1, 100000.0);
 const float f_pixels = matProj.m0 * 1280.0f*0.5f;
 struct Frame {
@@ -92,38 +36,6 @@ inline uint32_t PackRGBA8(Color color)
 		(uint32_t(color.g) << 8) |
 		(uint32_t(color.b) << 16) |
 		(uint32_t(color.a) << 24);
-}
-struct ScreenData {
-	Frame image;
-
-	float depth[1920 * 1080];
-	float depthLowRes[960*540];
-	int frame;
-	void ClearBuffer() {
-		for (int dy = 0; dy < screenH / 2; dy++) {
-			int y = dy * 2 + (frame) % 2;
-			for (int i = 0; i < screenW; i++) {
-				image.pixels[y * screenW + i] = PackRGBA8(SKYBLUE);
-				depth[y * screenW + i] = 100000;
-
-			}
-
-		}
-	}
-};
-static const Vector3 faceNormals[6] =
-{
-	{ -1.0f,  0.0f,  0.0f }, // Face 0: x = 0  (left)
-	{  1.0f,  0.0f,  0.0f }, // Face 1: x = 1  (right)
-	{  0.0f,  0.0f, -1.0f }, // Face 2: z = 0  (back)
-	{  0.0f,  0.0f,  1.0f }, // Face 3: z = 1  (front)
-	{  0.0f,  1.0f,  0.0f }, // Face 4: y = 1  (top)
-	{  0.0f, -1.0f,  0.0f }, // Face 5: y = 0  (bottom)
-};
-inline static void SwapVector2(Vector2* a, Vector2* b) {
-	Vector2 tmp = *a;
-	*a = *b;
-	*b = tmp;
 }
 struct Plane {
 	Vector3 normal;
