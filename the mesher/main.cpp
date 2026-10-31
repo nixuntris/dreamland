@@ -811,6 +811,9 @@ public:
 		shaders.display.UpdateSSBO(9, 0, sizeof(int), 0);
 		Math::IVector2 oldChunkPos = { camera.position.x / chunkSize,camera.position.z / chunkSize };
 		PreGenerateFullDebug();
+		bool releasedMouseButton = false;
+		Math::IVector3 chunksUpdatedThisFrame[20];
+		int chunkCount = 0;
 		while (window.IsOpen()) {
 			double frameStart = glfwGetTime();
 			Anubis::DisplayShader* shader = &shaders.display;
@@ -1183,8 +1186,6 @@ public:
 
 				bool doneChanges = false;
 				bool allocatedThisRun = false;
-				Math::IVector3 chunksUpdatedThisFrame[20];
-				int chunkCount = 0;
 				for (int dx = 0; dx < editSize; dx++) {
 					for (int dy = 0; dy < editSize; dy++) {
 						for (int dz = 0; dz < editSize; dz++) {
@@ -1267,7 +1268,12 @@ public:
 						}
 					}
 				}
-				if (doneChanges) {
+				releasedMouseButton = true;
+			}
+			if (!window.GetMouseButtonPressed(0) && releasedMouseButton) {
+				releasedMouseButton = false;
+				if (chunkCount > 0) {
+
 					for (int i = 0; i < chunkCount; i++) {
 						int dx = chunksUpdatedThisFrame[i].x;
 						int dy = chunksUpdatedThisFrame[i].y;
@@ -1280,10 +1286,12 @@ public:
 
 						}
 					}
-					std::cout << chunkCount << "\n";
+
 					shaders.display.UpdateSSBO(3, &world.handle, sizeof(world.handle), 0);
 
+					chunkCount = 0;
 				}
+
 			}
 			Math::IVector2 generateArrayId[1024];
 			int generateCount = 0;
