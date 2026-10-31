@@ -98,7 +98,13 @@ void main()
 
     int chunkIndex = chunk.y * (wx * wz) + chunk.z * wx + chunk.x;
     int lod = handles[chunkIndex].lod;
-
+    if (lod==3000) {
+        if (tid == 0u) {
+            chunkBeginning[batchId] = 0;
+            chunkEnd[batchId] = 0;
+        }
+        return;
+    }
     if (lod == 0) {
         if (tid == 0u) {
             chunkBeginning[batchId] = 0;
@@ -134,7 +140,7 @@ void main()
 
                 for (int f = 0; f < 6; f++) {
                     ivec3 neighborPos = p + faceOffsets[f] * lod;
-
+                    
                     if (readVoxelData(neighborPos) == 0u)
                         mask |= 1u << f;
                 }

@@ -217,8 +217,8 @@ const vec3 faceN[6] = vec3[6](
 void main()
 {
 
-        vec2 SCREEN_MIN = vec2(0.0, 0.0);
-        vec2 SCREEN_MAX = vec2(float(renderWidth), float(renderHeight));
+    vec2 SCREEN_MIN = vec2(0.0, 0.0);
+    vec2 SCREEN_MAX = vec2(float(renderWidth), float(renderHeight));
     
     float m15reproc = 1.0 / matView[3][3];
 
@@ -226,7 +226,7 @@ void main()
     if (triangleActive[triangleId/64]==-1 || triangleId/64>=triangleAtomic) return;
     int meshletId = triangleActive[triangleId/64];
     triangleId = meshletId *64+int(gl_LocalInvocationID.x);
-    int base = triangleId ;
+    int base = triangleId;
     vec3 meshletPosition = vec3(AABBCorners[meshletId*6],AABBCorners[meshletId*6+1],AABBCorners[meshletId*6+2]);
     VoxelMeta meta = UnpackMetaData(colors[triangleId]);
     vec3 baseP = vec3(unpack_vertex(vertices[base]))  +meshletPosition;

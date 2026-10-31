@@ -4,6 +4,7 @@
 #include "Anubis/AnubisShaders.hpp"
 #include "Anubis/AnubisMath.hpp"
 #include <sys/stat.h> 
+
 struct ShaderManager {
 	Anubis::DisplayShader display;
 	Anubis::DisplayShader displayNoFXAA;

@@ -15,361 +15,17 @@ namespace Anubis {
         uint8_t b;
         uint8_t a;
     };
-    struct FrameBuffer {
-        unsigned int id;
-        Math::Vector2 size;
-        void Generate(Math::Vector2 size) {
-            glGenTextures(1, &id);
-            glBindTexture(GL_TEXTURE_2D, id);
-
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-
-            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, size.x, size.y, 0, GL_RGBA, GL_FLOAT, nullptr);
-            this->size = size;
-        }
-        void Clear() {
-            GLfloat clearColor[4] = { 0.0f, 0.0f, 0.0f, 0.0f };
-            glClearTexImage(id, 0, GL_RGBA, GL_FLOAT, clearColor);
-        }
-        std::vector<float> Read() {
-            std::vector<float> colors(size.x * size.y * 4);
-            glBindTexture(GL_TEXTURE_2D, id);
-            glGetTexImage(GL_TEXTURE_2D, 0, GL_RGBA, GL_FLOAT, colors.data());
-        }
-        void BindToSpot(unsigned int spot) {
-            glBindImageTexture(spot, id, 0, GL_FALSE, 0, GL_READ_WRITE, GL_RGBA32F);
-        }
-    };
-    class Texture2DFloat {
-    private:
-        Math::IVector2 size;
-    public:
-        unsigned int textureID;
-        unsigned int framebufferID;
-        std::vector<float> pixels;
-        void Clear(Math::IVector2 size) {
-            pixels.resize(size.x * size.y, 1.0f);
-            this->size.x = size.x;
-            this->size.y = size.y;
-        }
-        void Upload() {
-
-            glGenTextures(1, &textureID);
-            glBindTexture(GL_TEXTURE_2D, textureID);
-            glTexImage2D(GL_TEXTURE_2D, 0, GL_R32F, this->size.x, this->size.y, 0, GL_RED, GL_FLOAT, pixels.data());
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-
-            glGenFramebuffers(1, &framebufferID);
-            glBindFramebuffer(GL_FRAMEBUFFER, framebufferID);
-
-            glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, textureID, 0);
-
-            if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
-                std::cerr << "Framebuffer is not complete! \n";
-            }
-            else {
-                std::cout << "Framebuffer is fine! This is a debug message!\n";
-            }
-            glBindFramebuffer(GL_FRAMEBUFFER, 0);
-        }
-        void BindForWriting() {
-            glBindFramebuffer(GL_FRAMEBUFFER, framebufferID);
-        }
-
-        void Unbind() {
-            glBindFramebuffer(GL_FRAMEBUFFER, 0);
-        }
-        void BindForImageAccess(unsigned int unit) {
-            glBindImageTexture(unit, textureID, 0, GL_FALSE, 0, GL_READ_WRITE, GL_R32F);
-        }
-    };
-    class Texture2D {
-    private:
-        std::vector<uint8_t> pixels;
-        Math::IVector2 size;
-    public:
-        unsigned int textureID;
-        unsigned int framebufferID;
-        void Clear(Math::IVector2 size) {
-            pixels.resize(size.x * size.y * 4, 255);
-            this->size.x = size.x;
-            this->size.y = size.y;
-        }
-        void Upload() {
-
-            glGenTextures(1, &textureID);
-            glBindTexture(GL_TEXTURE_2D, textureID);
-            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, this->size.x, this->size.y, 0, GL_RGBA, GL_UNSIGNED_BYTE, pixels.data());
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-
-            glGenFramebuffers(1, &framebufferID);
-            glBindFramebuffer(GL_FRAMEBUFFER, framebufferID);
-
-            glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, textureID, 0);
-
-            if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
-                std::cerr << "Framebuffer is not complete! \n";
-            }
-            else {
-                std::cout << "Framebuffer is fine! This is a debug message!\n";
-            }
-            glBindFramebuffer(GL_FRAMEBUFFER, 0);
-        }
-        void BindForWriting() {
-            glBindFramebuffer(GL_FRAMEBUFFER, framebufferID);
-        }
-
-        void Unbind() {
-            glBindFramebuffer(GL_FRAMEBUFFER, 0);
-        }
-        void BindForImageAccess(unsigned int unit) {
-            glBindImageTexture(unit, textureID, 0, GL_FALSE, 0, GL_READ_WRITE, GL_RGBA8); // You can use a different format if needed
-        }
-    };
-    class Texture3D {
-    public:
-        std::vector<uint8_t> pixels;
-        Math::IVector3 size = { -1,-1,-1 };
-        unsigned int textureID;
-        bool resize;
-        void Clear(Math::IVector3 size, bool resize = true) {
-            // if (resize) pixels.resize(size.x * size.y * size.z, 0); // Initialize with white pixels
-            this->size = size;
-            this->resize = resize;
-
-        }
-        void SetChannel(Math::IVector3 position, uint8_t value) {
-            int index = (position.z * size.y * size.x + position.y * size.x + position.x);
-            if (index < pixels.size()) pixels[index] = value;
-        }
-
-
-        void Upload(uint8_t *data=nullptr) {
-            glGenTextures(1, &textureID);
-            glBindTexture(GL_TEXTURE_3D, textureID);
-            glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-            glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-            glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_R, GL_REPEAT);
-            glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-            glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-
-            glTexImage3D(
-                GL_TEXTURE_3D,           // target
-                0,                       // mip level
-                GL_R8UI,                 // internal format (what GPU stores)
-                size.x, size.y, size.z,  // dimensions
-                0,                       // border, must be 0
-                GL_RED_INTEGER,          // format of incoming data (even if null)
-                GL_UNSIGNED_BYTE,        // type of incoming data (even if null)
-                data                  // no data, just allocate
-            );
-
-
-            glBindTexture(GL_TEXTURE_3D, 0);
-        }
-        void Delete() {
-            glDeleteTextures(1, &textureID);
-        }
-    };
-    class ProbeBuffer {
-    public:
-        Math::IVector3 size = { -1,-1,-1 };
-        unsigned int textureID;
-        bool resize;
-        void Clear(Math::IVector3 size, bool resize = true) {
-            this->size = size;
-            this->resize = resize;
-        }
-        GLint64 Upload(bool genHandle = false, bool type = true, bool hex = false) {
-
-            if (genHandle || textureID == 0) {
-                if (textureID != 0) {
-                    glDeleteTextures(1, &textureID);
-                }
-                glGenTextures(1, &textureID);
-            }
-            glBindTexture(GL_TEXTURE_3D, textureID);
-            glTexImage3D(GL_TEXTURE_3D, 0, GL_RG32F, size.x, size.y, size.z, 0, GL_RG, GL_FLOAT, nullptr);
-            
-
-            glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-            glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-            glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_R, GL_REPEAT);
-            glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-            glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-
-            // optional: generate mipmaps if needed
-            // glGenerateMipmap(GL_TEXTURE_3D);
-
-            glBindTexture(GL_TEXTURE_3D, 0);
-
-            return textureID;
-        }
-        void Delete() {
-            glDeleteTextures(1, &textureID);
-        }
-    };
-    class ImageTexture {
-    public:
-        Math::IVector2 size = { -1,-1};
-        unsigned int textureID;
-        bool resize;
-        void Clear(Math::IVector2 size, bool resize = true) {
-            this->size = size;
-            this->resize = resize;
-
-        }
-
-        void Upload() {
-            glGenTextures(1, &textureID);
-            glBindTexture(GL_TEXTURE_2D, textureID);
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_R, GL_REPEAT);
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-
-            glTexImage2D(
-                GL_TEXTURE_2D,           // target
-                0,                       // mip level
-                GL_RGBA32F,                 // internal format (what GPU stores)
-                size.x, size.y,  // dimensions
-                0,                       // border, must be 0
-                GL_RGBA,          // format of incoming data (even if null)
-                GL_FLOAT,        // type of incoming data (even if null)
-                nullptr                  // no data, just allocate
-            );
-
-
-            glBindTexture(GL_TEXTURE_3D, 0);
-        }
-        void Delete() {
-            glDeleteTextures(1, &textureID);
-        }
-    };
-
     class GPUONLYShortMap {
     public:
         Math::IVector3 size{};
         GLuint textureID = 0;
         GLuint64 handle = 0;
-        GLuint pboID = 0;
 
-        void CreatePBO() {
-            if (pboID != 0) {
-                glDeleteBuffers(1, &pboID);
-                pboID = 0;
-            }
-
-            glCreateBuffers(1, &pboID);
-
-            GLsizeiptr dataSize = static_cast<GLsizeiptr>(size.x) * size.y * size.z * sizeof(uint16_t);
-            glNamedBufferStorage(pboID, dataSize, nullptr, GL_MAP_READ_BIT | GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT);
-        }
-
-        bool DownloadContentsAsync(uint16_t* targetData) {
-            if (textureID == 0 || targetData == nullptr) {
-                return false;
-            }
-            auto startTime = std::chrono::high_resolution_clock::now();
-            if (pboID == 0) {
-                CreatePBO();
-            }
-
-            // Calculate total bytes to copy
-            GLsizeiptr byteSize = static_cast<GLsizeiptr>(size.x) * size.y * size.z * sizeof(uint16_t);
-
-            // Bind PBO to tell OpenGL to download data into the buffer instead of CPU memory
-            glBindBuffer(GL_PIXEL_PACK_BUFFER, pboID);
-
-            // Copy texture data into the PBO
-            glGetTextureSubImage(textureID, 0, 0, 0, 0,
-                size.x, size.y, size.z,
-                GL_RED_INTEGER, GL_UNSIGNED_SHORT,
-                byteSize, nullptr);
-
-            // Modern DSA mapping (Direct State Access) using the PBO ID directly
-            void* ptr = glMapNamedBufferRange(pboID, 0, byteSize, GL_MAP_READ_BIT);
-
-            bool success = false;
-            if (ptr) {
-                memcpy(targetData, ptr, byteSize);
-                glUnmapNamedBuffer(pboID);
-                success = true;
-            }
-
-            // Reset pixel pack buffer binding
-            glBindBuffer(GL_PIXEL_PACK_BUFFER, 0);
-            auto endTime = std::chrono::high_resolution_clock::now();
-            std::chrono::duration<double, std::milli> duration = endTime - startTime;
-
-            // Log the result
-            std::cout << "Texture download took: " << duration.count() << " ms (Success: " << (success ? "True" : "False") << ")\n";
-            return success;
-        }
         void Clear(Math::IVector3 s) {
             size = s;
         }
 
-        void EditGPURegion(Math::IVector3 pos, Math::IVector3 regionSize, uint16_t value)
-        {
-            if (textureID == 0)
-                Upload();
-
-            // 1. Basic sanity check: is the region valid?
-            if (regionSize.x <= 0 || regionSize.y <= 0 || regionSize.z <= 0)
-                return;
-
-            // 2. Query OpenGL to check if storage actually exists
-            GLint texWidth = 0, texHeight = 0, texDepth = 0;
-            glGetTextureLevelParameteriv(textureID, 0, GL_TEXTURE_WIDTH, &texWidth);
-            glGetTextureLevelParameteriv(textureID, 0, GL_TEXTURE_HEIGHT, &texHeight);
-            glGetTextureLevelParameteriv(textureID, 0, GL_TEXTURE_DEPTH, &texDepth);
-
-            // If width/height/depth are 0, storage was never allocated.
-            // This catches your specific GL_INVALID_OPERATION error.
-            if (texWidth == 0 || texHeight == 0 || texDepth == 0)
-            {
-                // TODO: Log a warning here. 
-                // Ensure your Upload() method calls glTextureStorage3D()!
-                return;
-            }
-
-            // 3. Bounds checking to prevent out-of-bounds access
-            if (pos.x < 0 || pos.y < 0 || pos.z < 0 ||
-                pos.x + regionSize.x > texWidth ||
-                pos.y + regionSize.y > texHeight ||
-                pos.z + regionSize.z > texDepth)
-            {
-                // TODO: Log an out-of-bounds warning here.
-                return;
-            }
-
-            // simplest CPU->GPU fallback (still GPU-side texture, but CPU-driven edit)
-            std::vector<uint16_t> buffer(regionSize.x * regionSize.y * regionSize.z, value);
-
-            glTextureSubImage3D(
-                textureID,
-                0,
-                pos.x, pos.y, pos.z,
-                regionSize.x, regionSize.y, regionSize.z,
-                GL_RED_INTEGER,
-                GL_UNSIGNED_SHORT,
-                buffer.data()
-            );
-        }
-        // --- Create / Upload texture ---
         void Upload(uint16_t* data = nullptr) {
-            // Cleanup old
             if (textureID != 0) {
                 if (handle != 0) {
                     glMakeImageHandleNonResidentARB(handle);
@@ -378,20 +34,12 @@ namespace Anubis {
                 glDeleteTextures(1, &textureID);
                 textureID = 0;
             }
-
-            // Create texture
             glCreateTextures(GL_TEXTURE_3D, 1, &textureID);
 
             glTextureStorage3D(textureID, 1, GL_R16UI, size.x, size.y, size.z);
 
             if (data) {
-                glTextureSubImage3D(textureID,
-                    0,
-                    0, 0, 0,
-                    size.x, size.y, size.z,
-                    GL_RED_INTEGER,
-                    GL_UNSIGNED_SHORT,
-                    data);
+                glTextureSubImage3D(textureID,0,0, 0, 0,size.x, size.y, size.z,GL_RED_INTEGER,GL_UNSIGNED_SHORT,data);
             }
         }
 
@@ -400,30 +48,15 @@ namespace Anubis {
                 Upload(data);
                 return;
             }
-
-            glTextureSubImage3D(textureID,
-                0,
-                0, 0, 0,
-                size.x, size.y, size.z,
-                GL_RED_INTEGER,
-                GL_UNSIGNED_SHORT,
-                data);
+            glTextureSubImage3D(textureID,0,0, 0, 0,size.x, size.y, size.z,GL_RED_INTEGER,GL_UNSIGNED_SHORT,data);
         }
 
         GLuint64 GetBindlessHandle(GLenum access = GL_READ_WRITE) {
             if (textureID == 0) {
                 Upload();
             }
-
             if (handle == 0) {
-                handle = glGetImageHandleARB(
-                    textureID,
-                    0,          // mip level
-                    GL_TRUE,    // layered (3D texture)
-                    0,          // layer (ignored if layered)
-                    GL_R16UI     // format MUST match
-                );
-
+                handle = glGetImageHandleARB(textureID,0, GL_TRUE, 0, GL_R16UI );
                 glMakeImageHandleResidentARB(handle, access);
             }
 
@@ -452,62 +85,9 @@ namespace Anubis {
         void Clear(Math::IVector3 s) {
             size = s;
         }
-        void CreatePBO() {
-            if (pboID != 0) {
-                glDeleteBuffers(1, &pboID);
-                pboID = 0;
-            }
-            glCreateBuffers(1, &pboID);
-
-            // FIX: 1 byte per pixel (GL_R8UI / uint8_t)
-            GLsizeiptr dataSize = static_cast<GLsizeiptr>(size.x) * size.y * size.z * sizeof(uint8_t);
-
-            glNamedBufferStorage(pboID, dataSize, nullptr, GL_MAP_READ_BIT | GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT);
-        }
-
-        bool DownloadContentsAsync(uint8_t* targetData) {
-            if (textureID == 0 || targetData == nullptr) return false;
-
-            if (pboID == 0) CreatePBO();
-
-            GLsizeiptr byteSize = static_cast<GLsizeiptr>(size.x) * size.y * size.z * sizeof(uint8_t);
-
-            glBindBuffer(GL_PIXEL_PACK_BUFFER, pboID);
-
-            glGetTextureSubImage(textureID, 0, 0, 0, 0,
-                size.x, size.y, size.z,
-                GL_RED_INTEGER, GL_UNSIGNED_BYTE, // Changed to UNSIGNED_BYTE
-                byteSize, nullptr);
-
-            void* ptr = glMapNamedBufferRange(pboID, 0, byteSize, GL_MAP_READ_BIT);
-            bool success = false;
-            if (ptr) {
-                memcpy(targetData, ptr, byteSize);
-                glUnmapNamedBuffer(pboID);
-                success = true;
-            }
-            glBindBuffer(GL_PIXEL_PACK_BUFFER, 0);
-            return success;
-        }
-
-        void EditGPURegion(Math::IVector3 pos, Math::IVector3 regionSize, uint8_t value) {
-            if (textureID == 0) Upload();
-
-            // Bounds checking logic remains same, just ensure buffer uses uint8_t
-            std::vector<uint8_t> buffer(regionSize.x * regionSize.y * regionSize.z, value);
-
-            glTextureSubImage3D(textureID, 0,
-                pos.x, pos.y, pos.z,
-                regionSize.x, regionSize.y, regionSize.z,
-                GL_RED_INTEGER, GL_UNSIGNED_BYTE, // Changed to UNSIGNED_BYTE
-                buffer.data());
-        }
-
         void Upload(uint8_t* data = nullptr) {
-            if (textureID != 0) { /* ... cleanup logic same as original ... */ }
 
             glCreateTextures(GL_TEXTURE_3D, 1, &textureID);
-            // Changed to GL_R8UI
             glTextureStorage3D(textureID, 1, GL_R8UI, size.x, size.y, size.z);
 
             if (data) {
@@ -516,18 +96,16 @@ namespace Anubis {
                     GL_RED_INTEGER, GL_UNSIGNED_BYTE, data);
             }
         }
-
-        void UpdateContents(uint8_t* data) {
+        void ReuploadContents(uint8_t* data) {
             if (textureID == 0) { Upload(data); return; }
             glTextureSubImage3D(textureID, 0, 0, 0, 0,
                 size.x, size.y, size.z,
                 GL_RED_INTEGER, GL_UNSIGNED_BYTE, data);
         }
-
         GLuint64 GetBindlessHandle(GLenum access = GL_READ_WRITE) {
             if (textureID == 0) Upload();
             if (handle == 0) {
-                handle = glGetImageHandleARB(textureID, 0, GL_TRUE, 0, GL_R8UI); // Changed to GL_R8UI
+                handle = glGetImageHandleARB(textureID, 0, GL_TRUE, 0, GL_R8UI);
                 glMakeImageHandleResidentARB(handle, access);
             }
             return handle;
@@ -543,8 +121,6 @@ namespace Anubis {
                 textureID = 0;
             }
         }
-
-        // Delete() method remains same
     };
     void CreateByteMaps(
         GPUONLYByteMap** maps,
@@ -612,169 +188,6 @@ namespace Anubis {
             maps[i]->GetBindlessHandle();
         }
     }
-    class GPUONLYInt32Map {
-    public:
-        Math::IVector3 size{};
-        GLuint textureID = 0;
-        GLuint64 handle = 0;
-        GLuint pboID = 0;
-
-        // Helper to calculate total buffer size in bytes
-        size_t GetTotalBytes() const {
-            return (size_t)size.x * size.y * size.z * sizeof(int32_t);
-        }
-
-        void CreatePBO() {
-            if (pboID != 0) glDeleteBuffers(1, &pboID);
-            glCreateBuffers(1, &pboID);
-            glNamedBufferStorage(pboID, GetTotalBytes(), nullptr, GL_MAP_READ_BIT | GL_MAP_PERSISTENT_BIT);
-        }
-
-        bool DownloadContentsAsync(int32_t* targetData) {
-            if (textureID == 0) return false;
-            if (pboID == 0) CreatePBO();
-
-            glBindBuffer(GL_PIXEL_PACK_BUFFER, pboID);
-            // Note: Use GL_RED_INTEGER and GL_INT for 32-bit signed
-            glGetTextureSubImage(textureID, 0, 0, 0, 0,
-                size.x, size.y, size.z,
-                GL_RED_INTEGER, GL_INT,
-                GetTotalBytes(), nullptr);
-
-            void* ptr = glMapBufferRange(GL_PIXEL_PACK_BUFFER, 0, GetTotalBytes(), GL_MAP_READ_BIT);
-            if (ptr) {
-                memcpy(targetData, ptr, GetTotalBytes());
-                glUnmapBuffer(GL_PIXEL_PACK_BUFFER);
-                glBindBuffer(GL_PIXEL_PACK_BUFFER, 0);
-                return true;
-            }
-            glBindBuffer(GL_PIXEL_PACK_BUFFER, 0);
-            return false;
-        }
-
-        void EditGPURegion(Math::IVector3 pos, Math::IVector3 regionSize, int32_t value) {
-            if (textureID == 0) Upload();
-
-            // Bounds checking remains the same logic, but ensure buffer size matches int32
-            std::vector<int32_t> buffer(regionSize.x * regionSize.y * regionSize.z, value);
-
-            glTextureSubImage3D(
-                textureID, 0,
-                pos.x, pos.y, pos.z,
-                regionSize.x, regionSize.y, regionSize.z,
-                GL_RED_INTEGER, GL_INT, // Changed from GL_UNSIGNED_BYTE
-                buffer.data()
-            );
-        }
-
-        void Upload(int32_t* data = nullptr) {
-            // ... (Cleanup code same as original) ...
-            glCreateTextures(GL_TEXTURE_3D, 1, &textureID);
-
-            // Changed to GL_R32I for 32-bit signed integers
-            glTextureStorage3D(textureID, 1, GL_R32I, size.x, size.y, size.z);
-
-            if (data) {
-                glTextureSubImage3D(textureID, 0, 0, 0, 0,
-                    size.x, size.y, size.z,
-                    GL_RED_INTEGER, GL_INT, data);
-            }
-        }
-
-        GLuint64 GetBindlessHandle(GLenum access = GL_READ_WRITE) {
-            if (textureID == 0) Upload();
-
-            if (handle == 0) {
-                handle = glGetImageHandleARB(textureID, 0, GL_TRUE, 0, GL_R32I);
-                glMakeImageHandleResidentARB(handle, access);
-            }
-            return handle;
-        }
-        void Clear(Math::IVector3 s) {
-            size = s;
-        }
-        // ... Delete() remains the same ...
-    };
-    class AsyncGPUReadbacker {
-        GLuint pbo = 0;
-        GLsync sync = nullptr;
-        size_t bufferSize = 0;
-        void* mappedPtr = nullptr; // Keep the persistent pointer
-
-    public:
-        void Init(size_t size) {
-            bufferSize = size;
-            glCreateBuffers(1, &pbo);
-            // Use PERSISTENT and COHERENT for the most efficient path
-            GLbitfield flags = GL_MAP_READ_BIT | GL_MAP_PERSISTENT_BIT | GL_MAP_COHERENT_BIT;
-            glNamedBufferStorage(pbo, bufferSize, nullptr, flags);
-
-            // Map once and keep the pointer
-            mappedPtr = glMapNamedBufferRange(pbo, 0, bufferSize, flags);
-        }
-
-        void RequestReadback(GLuint textureID, Math::IVector3 size) {
-            // ... (Same logic for glGetTextureSubImage)
-            glBindBuffer(GL_PIXEL_PACK_BUFFER, pbo);
-            // Ensure you are using the correct format for your texture
-            glGetTextureSubImage(textureID, 0, 0, 0, 0, size.x, size.y, size.z,
-                GL_RED_INTEGER, GL_UNSIGNED_BYTE, (GLsizei)bufferSize, 0);
-            glBindBuffer(GL_PIXEL_PACK_BUFFER, 0);
-
-            if (sync) glDeleteSync(sync);
-            sync = glFenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE, 0);
-            glFlush(); // Force the command to start
-        }
-
-        const uint8_t* GetMappedData() {
-            if (!sync) return nullptr;
-
-            // Check if GPU is finished
-            GLenum wait = glClientWaitSync(sync, GL_SYNC_FLUSH_COMMANDS_BIT, 0);
-            if (wait == GL_ALREADY_SIGNALED || wait == GL_CONDITION_SATISFIED) {
-                return (const uint8_t*)mappedPtr;
-            }
-            return nullptr;
-        }
-
-        // No need to Unmap every frame now
-    };
-    class ByteMap3Channel {
-    public:
-        std::vector<uint8_t> pixels;
-        Math::IVector3 size;
-        unsigned int textureID;
-        void Clear(Math::IVector3 size) {
-            this->size.x = size.x;
-            this->size.y = size.y;
-            this->size.z = size.z;
-        }
-        void SetChannel(Math::IVector3 position, int value, int channel) {
-            int index = (position.z * size.y * size.x + position.y * size.x + position.x) * 3 + channel;
-            if (index < pixels.size()) pixels[index] = value;
-        }
-
-
-        void ChangePixel(Math::IVector3 position, uint8_t r) {
-            glTexSubImage3D(GL_TEXTURE_3D, 0, position.x, position.y, position.z, 1, 1, 1, GL_RGB, GL_UNSIGNED_BYTE, &r);
-        }
-
-        void Upload() {
-
-            glGenTextures(1, &textureID);
-            glBindTexture(GL_TEXTURE_3D, textureID);
-            glTexImage3D(GL_TEXTURE_3D, 0, GL_RGB8, size.x, size.y, size.z, 0, GL_RGB, GL_UNSIGNED_BYTE, nullptr);
-
-            // Set texture parameters
-            glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-            glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-            glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_R, GL_REPEAT);
-            glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-            glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-            glBindTexture(GL_TEXTURE_3D, 0); // Ensure no conflicts
-            //glBindTexture(GL_TEXTURE_3D, 0);
-        }
-    };
     class Shader {
     public:
         GLuint programID;
@@ -828,11 +241,6 @@ namespace Anubis {
         void SetByteMap(GPUONLYByteMap byteMap, int spot, const char* name) {
             glBindImageTexture(spot, byteMap.textureID, 0, GL_TRUE, 0, GL_READ_WRITE, GL_R8UI);
             
-            glActiveTexture(GL_TEXTURE0 + spot);  // This is not necessary for image binding, but needed for regular texture sampling.
-        }
-        void SetImage(ImageTexture byteMap, int spot, const char* name) {
-            glBindImageTexture(spot, byteMap.textureID, 0, GL_TRUE, 0, GL_READ_WRITE, GL_RGBA32F);
-
             glActiveTexture(GL_TEXTURE0 + spot);  // This is not necessary for image binding, but needed for regular texture sampling.
         }
         void UnsetByteMap(int spot) {
@@ -1050,11 +458,6 @@ namespace Anubis {
                 );
             }
         }
-        void SetProbe(ProbeBuffer probe, int spot, const char* name) {
-            glActiveTexture(GL_TEXTURE0 + spot);
-            glBindTexture(GL_TEXTURE_3D, probe.textureID);
-            glUniform1i(glGetUniformLocation(programID, name), probe.textureID);
-        }
         void SetFloatArray(const float* integers, int count, const char* name) {
             GLint intLocation = glGetUniformLocation(programID, name);
             glUniform1fv(intLocation, count, integers);
@@ -1108,30 +511,16 @@ namespace Anubis {
 
             delete[] flatArray;
         }
-        void SetTexture3D(Texture3D texture3D, int spot, const char* name) {
-            glActiveTexture(GL_TEXTURE0 + spot);
-            glBindImageTexture(spot, texture3D.textureID, 0, GL_TRUE, 0, GL_READ_WRITE, GL_R32I);
-        }
-        void SetByteMap3Channel(ByteMap3Channel texture, int textureSpot, const char* name) {
-
-            GLuint textureLocation = glGetUniformLocation(programID, name);
-            std::cout << textureLocation << " texture spot :3 \n";
-            glActiveTexture(GL_TEXTURE0 + textureSpot);
-            glBindTexture(GL_TEXTURE_2D, texture.textureID);
-            glUniform1i(textureLocation, textureSpot);
-        }
     };
     void CheckComputeLimits() {
-        // 1. Get the absolute maximum product total (Max Invocations)
         GLint maxInvocations = 0;
         glGetIntegerv(GL_MAX_COMPUTE_WORK_GROUP_INVOCATIONS, &maxInvocations);
         std::cout << "Max total invocations per work group: " << maxInvocations << std::endl;
 
-        // 2. Get the maximum size allowed for individual dimensions [X, Y, Z]
         GLint maxGroupSizes[3] = { 0, 0, 0 };
-        glGetIntegeri_v(GL_MAX_COMPUTE_WORK_GROUP_SIZE, 0, &maxGroupSizes[0]); // X axis
-        glGetIntegeri_v(GL_MAX_COMPUTE_WORK_GROUP_SIZE, 1, &maxGroupSizes[1]); // Y axis
-        glGetIntegeri_v(GL_MAX_COMPUTE_WORK_GROUP_SIZE, 2, &maxGroupSizes[2]); // Z axis
+        glGetIntegeri_v(GL_MAX_COMPUTE_WORK_GROUP_SIZE, 0, &maxGroupSizes[0]);
+        glGetIntegeri_v(GL_MAX_COMPUTE_WORK_GROUP_SIZE, 1, &maxGroupSizes[1]);
+        glGetIntegeri_v(GL_MAX_COMPUTE_WORK_GROUP_SIZE, 2, &maxGroupSizes[2]);
 
         std::cout << "Max individual group sizes (X, Y, Z): "
             << maxGroupSizes[0] << ", "
@@ -1549,32 +938,6 @@ namespace Anubis {
             const char* vertexShaderSource = vertexShaderCode.c_str();
             Setup(vertexShaderSource, fragmentSource);
 
-        }
-        void SetTexture3D(Texture3D texture3D, int spot, const char* name) {
-            glActiveTexture(GL_TEXTURE0 + spot);
-            glBindTexture(GL_TEXTURE_3D, texture3D.textureID);
-            glUniform1i(glGetUniformLocation(shaderId, name), texture3D.textureID);
-        }
-        void SetProbe(ProbeBuffer probe, int spot, const char* name) {
-            glActiveTexture(GL_TEXTURE0 + spot);
-            glBindTexture(GL_TEXTURE_3D, probe.textureID);
-            glUniform1i(glGetUniformLocation(shaderId, name), probe.textureID);
-        }
-        void SetTexture2D(Texture2D texture, int textureSpot, const char* name) {
-
-            GLuint textureLocation = glGetUniformLocation(shaderId, name);
-            std::cout << textureLocation << " texture spot :3 \n";
-            glActiveTexture(GL_TEXTURE0 + textureSpot);
-            glBindTexture(GL_TEXTURE_2D, texture.textureID);
-            glUniform1i(textureLocation, textureSpot);
-        }
-        void SetByteMap3Channel(ByteMap3Channel texture, int textureSpot, const char* name) {
-
-            GLuint textureLocation = glGetUniformLocation(shaderId, name);
-            std::cout << textureLocation << " texture spot :3 \n";
-            glActiveTexture(GL_TEXTURE0 + textureSpot);
-            glBindTexture(GL_TEXTURE_2D, texture.textureID);
-            glUniform1i(textureLocation, textureSpot);
         }
         void SetIntArray(const int* integers, int count, const char* name) {
             GLint intLocation = glGetUniformLocation(shaderId, name);

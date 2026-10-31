@@ -20,6 +20,18 @@
 #define FACE_BOTTOM (1 << 5)
 const int FACES[6] = { FACE_FRONT,FACE_BACK,FACE_LEFT,FACE_RIGHT,FACE_TOP,FACE_BOTTOM };
 
+enum VOXEL_ENUM_NAMES {
+	GRASS = 0,
+	STONE = 1,
+	DIRT = 2,
+	WOOD = 3,
+	LEAF = 4,
+	SNOW = 5,
+	WATER = 6,
+	SAND = 8,
+	OLIVE = 9
+
+};
 struct PhysicsObject {
 	Math::Vector3 position;
 	Math::Vector3 velocity;
@@ -793,7 +805,7 @@ public:
 		}
 	}
 	inline bool SetTerrain(ChunkData* chunkdata, int x, int y, int z, uint16_t t) {
-		if (voxelCount == 0 || lod != 1) {
+		if (lod != 1) {
 			return false;
 		}
 
