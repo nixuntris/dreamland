@@ -479,15 +479,6 @@ namespace Anubis {
             this->target = Math::AddVector3(position, targeted);
 
         }
-        inline bool UpdateRPG(Math::Vector2 mousePos, Math::Vector2 oldMouse, Window window) {
-
-            if (window.GetKeyPressed(KEY::W)) position.x += 5;
-            if (window.GetKeyPressed(KEY::S)) position.x -= 5;
-            if (window.GetKeyPressed(KEY::D)) position.z += 5;
-            if (window.GetKeyPressed(KEY::A)) position.z -= 5;
-
-
-        }
         inline bool UpdateFREE(Math::Vector2 mousePos, Math::Vector2 oldMouse, Window window) {
             Math::Vector2 mouseDelta;
             mouseDelta.x = mousePos.x - oldMouse.x;

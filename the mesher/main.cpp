@@ -817,7 +817,7 @@ public:
 			Vector3 tag = { (float)camera.target.x ,(float)camera.target.y,(float)camera.target.z };
 			Vector3 pos = { (float)camera.position.x ,(float)camera.position.y,(float)camera.position.z };
 
-			Vector3 forward = Vector3NormalizeInline(Vector3Subtract(tag, pos));
+			Vector3 forward = Vector3Normalize(Vector3Subtract(tag, pos));
 			window.Clear();
 			oldMouse = window.GetMousePos();
 			Plane planes[6];

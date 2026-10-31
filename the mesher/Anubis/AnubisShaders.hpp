@@ -24,7 +24,6 @@ namespace Anubis {
         void Clear(Math::IVector3 s) {
             size = s;
         }
-
         void Upload(uint16_t* data = nullptr) {
             if (textureID != 0) {
                 if (handle != 0) {
@@ -42,7 +41,6 @@ namespace Anubis {
                 glTextureSubImage3D(textureID,0,0, 0, 0,size.x, size.y, size.z,GL_RED_INTEGER,GL_UNSIGNED_SHORT,data);
             }
         }
-
         void UpdateContents(uint16_t* data) {
             if (textureID == 0) {
                 Upload(data);
@@ -50,7 +48,6 @@ namespace Anubis {
             }
             glTextureSubImage3D(textureID,0,0, 0, 0,size.x, size.y, size.z,GL_RED_INTEGER,GL_UNSIGNED_SHORT,data);
         }
-
         GLuint64 GetBindlessHandle(GLenum access = GL_READ_WRITE) {
             if (textureID == 0) {
                 Upload();
@@ -122,72 +119,6 @@ namespace Anubis {
             }
         }
     };
-    void CreateByteMaps(
-        GPUONLYByteMap** maps,
-        uint8_t** data,
-        Math::IVector3* sizes,
-        int count
-    ) {
-        if (count <= 0) return;
-
-        std::vector<GLuint> textureIDs(count);
-        glCreateTextures(GL_TEXTURE_3D, count, textureIDs.data());
-
-        for (int i = 0; i < count; i++) {
-            maps[i]->size = sizes[i];
-            maps[i]->textureID = textureIDs[i];
-
-            glTextureStorage3D(
-                textureIDs[i], 1, GL_R8UI,
-                sizes[i].x, sizes[i].y, sizes[i].z
-            );
-        }
-
-        for (int i = 0; i < count; i++) {
-            glTextureSubImage3D(
-                textureIDs[i], 0,
-                0, 0, 0,
-                sizes[i].x, sizes[i].y, sizes[i].z,
-                GL_RED_INTEGER, GL_UNSIGNED_BYTE,
-                data[i]
-            );
-
-            maps[i]->GetBindlessHandle();
-        }
-    }
-    void CreateShortMaps(
-        GPUONLYShortMap** maps,
-        uint16_t** data,
-        Math::IVector3* sizes,
-        int count
-    ) {
-        if (count <= 0) return;
-
-        std::vector<GLuint> textureIDs(count);
-        glCreateTextures(GL_TEXTURE_3D, count, textureIDs.data());
-
-        for (int i = 0; i < count; i++) {
-            maps[i]->size = sizes[i];
-            maps[i]->textureID = textureIDs[i];
-
-            glTextureStorage3D(
-                textureIDs[i], 1, GL_R16UI,
-                sizes[i].x, sizes[i].y, sizes[i].z
-            );
-        }
-
-        for (int i = 0; i < count; i++) {
-            glTextureSubImage3D(
-                textureIDs[i], 0,
-                0, 0, 0,
-                sizes[i].x, sizes[i].y, sizes[i].z,
-                GL_RED_INTEGER, GL_UNSIGNED_SHORT,
-                data[i]
-            );
-
-            maps[i]->GetBindlessHandle();
-        }
-    }
     class Shader {
     public:
         GLuint programID;
@@ -246,22 +177,6 @@ namespace Anubis {
         void UnsetByteMap(int spot) {
             glBindTexture(GL_TEXTURE_3D, 0);
             glBindImageTexture(spot, 0, 0, GL_FALSE, 0, GL_READ_WRITE, GL_R8);
-        }
-        void SetByteMapSamplerArray(GPUONLYByteMap byteMap, int spot, GLuint shaderProgram, const char* name) {
-            glActiveTexture(GL_TEXTURE0 + spot);
-            glBindTexture(GL_TEXTURE_3D, byteMap.textureID);
-
-            // Construct the uniform name for the array element
-            std::string uniformName = std::string(name) + "[" + std::to_string(spot) + "]";
-
-            // Set the uniform value in the shader to the texture unit index
-            GLint textureUniformLocation = glGetUniformLocation(shaderProgram, uniformName.c_str());
-            if (textureUniformLocation != -1) {
-                glUniform1i(textureUniformLocation, spot);
-            }
-            else {
-                // Handle uniform not found error
-            }
         }
         void Setup(const std::string& path) {
             std::string sourceCode = LoadFile(path.c_str());
