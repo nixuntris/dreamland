@@ -21,16 +21,15 @@
 const int FACES[6] = { FACE_FRONT,FACE_BACK,FACE_LEFT,FACE_RIGHT,FACE_TOP,FACE_BOTTOM };
 
 enum VOXEL_ENUM_NAMES {
-	GRASS = 0,
-	STONE = 1,
-	DIRT = 2,
-	WOOD = 3,
-	LEAF = 4,
-	SNOW = 5,
-	WATER = 6,
-	SAND = 8,
-	OLIVE = 9
-
+	GRASS = 1,   // palette[0]
+	STONE = 2,   // palette[1]
+	DIRT = 3,   // palette[2]
+	WOOD = 4,   // palette[3]
+	LEAF = 5,   // palette[4]
+	SNOW = 6,   // palette[5]
+	WATER = 7,   // palette[6]
+	SAND = 9,   // palette[8]
+	OLIVE = 10   // palette[9]
 };
 struct PhysicsObject {
 	Math::Vector3 position;
@@ -378,7 +377,7 @@ public:
 	std::vector<Vector3> grassList;
 	bool hwOrSoftwareRaster = false;
 	bool shortenedData = false;
-	inline void GenerateSavanna(ChunkData* chunkData, GenerationData generationData, int gx, int gy, int gz, int lod = 1, bool grass = false) {
+	inline void GenerateDesert(ChunkData* chunkData, GenerationData generationData, int gx, int gy, int gz, int lod = 1, bool grass = false) {
 		this->gx = gx;
 		this->gy = gy;
 		this->gz = gz;
@@ -451,7 +450,7 @@ public:
 			
 		
 	}
-	inline void GenerateDesert(ChunkData* chunkData, GenerationData generationData, int gx, int gy, int gz, int lod = 1, bool grass = false) {
+	inline void GenerateSavanna(ChunkData* chunkData, GenerationData generationData, int gx, int gy, int gz, int lod = 1, bool grass = false) {
 		this->gx = gx;
 		this->gy = gy;
 		this->gz = gz;
@@ -502,36 +501,15 @@ public:
 				for (int y = chunkSize - 1; y >= 0; y -= 1) {
 					int worldY = gy * chunkSize + y;
 					if (worldY < terrainHeight - 6) {
-						chunkData->terrain[
-							IDX(x, y, z, chunkSize)
-						] = 2; // stone
-
+						chunkData->terrain[IDX(x, y, z, chunkSize)] = STONE;
 					}
 					else if (worldY < terrainHeight) {
-						if (worldY < 200 + grassLineOffset) {
-							chunkData->terrain[
-								IDX(x, y, z, chunkSize)
-							] = 5; //dirt
-							if (chunkData->terrain[
-								IDX(x, y + 1, z, chunkSize)
-							] == 0) {
-							//	if ((x + y + Math::GetRandomValueStreamlined(-1, 1)) % 2 == 0 && grass) grassList.push_back({ (float)x + gx * chunkSize,(float)y + gy * chunkSize,(float)z + gz * chunkSize });
-							}
-						}
-						else if (worldY < 400 + grassLineOffset) {
-
-							chunkData->terrain[
-								IDX(x, y, z, chunkSize)
-							] = 2; //stone
-
-						}
-						else {
-							chunkData->terrain[
-								IDX(x, y, z, chunkSize)
-							] = 6; //snow
-
-
-						}
+						if (worldY < 200 + grassLineOffset)
+							chunkData->terrain[IDX(x, y, z, chunkSize)] = GRASS;
+						else if (worldY < 400 + grassLineOffset)
+							chunkData->terrain[IDX(x, y, z, chunkSize)] = DIRT;
+						else
+							chunkData->terrain[IDX(x, y, z, chunkSize)] = SNOW;
 					}
 				}
 			}
@@ -698,7 +676,7 @@ public:
 		const int total = size * size * size;
 		chunkData->bitMap = (uint8_t*)MemAlloc(total / 8 * sizeof(uint8_t));
 		memset(chunkData->bitMap, 0, total / 8);
-
+		voxelCount = 0;
 		if (chunkData->terrain != nullptr) {
 			for (int x = 0; x < size; x++) {
 				for (int y = 0; y < size; y++) {
@@ -706,6 +684,7 @@ public:
 						int id = x + y * size + z * size * size;
 						if (chunkData->terrain[id] != 0) {
 							chunkData->bitMap[id / 8] |= (1u << (id % 8));
+							voxelCount++;
 						}
 					}
 				}
@@ -718,6 +697,7 @@ public:
 						int id = x + y * size + z * size * size;
 						if (chunkData->compressedTerrain[id] != 0) {
 							chunkData->bitMap[id / 8] |= (1u << (id % 8));
+							voxelCount++;
 						}
 					}
 				}

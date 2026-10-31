@@ -130,6 +130,9 @@ class App {
 	bool mainMenu = false;
 	int alreadySpawnedGrass = 0;
 	ParticleRender particleRenderer;
+	Plane planes[6];
+	Math::Vector3 planeNormals[6];
+	float planeDs[6];
 public:
 	App() {
 		//IMPLEMENT THE HARDWARE PIPELINE
@@ -219,7 +222,7 @@ public:
 		gen.GenerateMountains(x, z);
 #pragma omp parallel for num_threads(4)
 		for (int y = 0; y < gen.highestChunkY; y++) {
-			chunks[y * (wx * wz) + z * wx + x].GenerateMountains(&world.chunkData[y * (wx * wz) + z * wx + x], gen, x, y, z, lod, grass);
+			chunks[y * (wx * wz) + z * wx + x].GenerateDesert(&world.chunkData[y * (wx * wz) + z * wx + x], gen, x, y, z, lod, grass);
 			chunks[y * (wx * wz) + z * wx + x].GenerateLod(
 				&world.chunkData[y * (wx * wz) + z * wx + x], x, y, z);
 			chunks[y * (wx * wz) + z * wx + x].Compress(
@@ -673,7 +676,7 @@ public:
 				gen.highestChunkY += 2;
 
 				for (int y = 0; y < gen.highestChunkY && y < wy; y++) {
-					chunks[y * (wx * wz) + nz * wx + nx].GenerateMountains(&world.chunkData[y * (wx * wz) + nz * wx + nx], gen, nx, y, nz, lod, grass);
+					chunks[y * (wx * wz) + nz * wx + nx].GenerateDesert(&world.chunkData[y * (wx * wz) + nz * wx + nx], gen, nx, y, nz, lod, grass);
 					
 				};
 				for (int y = 0; y < gen.highestChunkY && y < wy; y++) {
@@ -693,10 +696,9 @@ public:
 					int neighbourId = ny * (wx * wz) + nz * wx + nx;
 					if (chunks[neighbourId].lod == 0) continue;
 					int size = chunkSize / chunks[neighbourId].lod;
-					if (world.chunkData[neighbourId].skipped || world.chunkData[neighbourId].voxelCount>=size*size*size) {
+					if (world.chunkData[neighbourId].skipped || world.chunkData[neighbourId].voxelCount >= chunkSize * chunkSize * chunkSize) {
 						world.handle.handle[neighbourId].lod = 3000;
 					}
-					world.handle.handle[neighbourId].lod = 0;
 					chunks[neighbourId].hasFluid = true;
 					if (world.chunkData[neighbourId].voxelCount != 0 && !world.chunkData[neighbourId].skipped)
 					{
@@ -726,6 +728,27 @@ public:
 		
 		shaders.display.UpdateSSBO(3, &world.handle, sizeof(world.handle), 0);
 		RecalculateParticlesFullDebug();
+	}
+	void FrustumCull(Matrix matView, Vector3 pos, Vector3 forward) {
+
+		ExtractFrustumPlanes(matView, planes);
+
+		for (int i = 0; i < 6; i++) {
+			planeNormals[i].x = planes[i].normal.x;
+			planeNormals[i].y = planes[i].normal.y;
+			planeNormals[i].z = planes[i].normal.z;
+			planeDs[i] = planes[i].d;
+		}
+		Anubis::SwitchShaderStage(shaders.frustumCull.programID);
+		shaders.frustumCull.SetMatrix({ matView.m0,matView.m1,matView.m2,matView.m3,matView.m4,matView.m5,matView.m6,matView.m7,matView.m8,matView.m9,matView.m10,matView.m11,matView.m12,matView.m13,matView.m14,matView.m15 }, "matView");
+		shaders.frustumCull.SetMatrix({ matProj.m0,matProj.m1,matProj.m2,matProj.m3,matProj.m4,matProj.m5,matProj.m6,matProj.m7,matProj.m8,matProj.m9,matProj.m10,matProj.m11,matProj.m12,matProj.m13,matProj.m14,matProj.m15 }, "matProj");
+		shaders.frustumCull.SetVector3Array(planeNormals, 6, "planeNormals");
+		shaders.frustumCull.SetFloatArray(planeDs, 6, "planeDs");
+		shaders.frustumCull.SetVector3({ pos.x,pos.y,pos.z }, "camPos");
+		shaders.frustumCull.SetVector3({ forward.x,forward.y,forward.z }, "camForward");
+
+
+		shaders.frustumCull.Use(totalMeshletCount / 32, 1, 1);
 	}
 	void Run() {
 		const std::vector<Color> palette = {
@@ -803,18 +826,7 @@ public:
 			Vector3 forward = Vector3Normalize(Vector3Subtract(tag, pos));
 			window.Clear();
 			oldMouse = window.GetMousePos();
-			Plane planes[6];
 			Matrix matView = MatrixLookAt(pos, tag, { 0,1,0 });
-			ExtractFrustumPlanes(matView, planes);
-			Math::Vector3 planeNormals[6];
-
-			float planeDs[6];
-			for (int i = 0; i < 6; i++) {
-				planeNormals[i].x = planes[i].normal.x;
-				planeNormals[i].y = planes[i].normal.y;
-				planeNormals[i].z = planes[i].normal.z;
-				planeDs[i] = planes[i].d;
-			}
 
 			int renderedChunks = 0;
 			Anubis::GpuTimer frustum;
@@ -822,19 +834,9 @@ public:
 			Anubis::GpuTimer secondaryRays;
 			timerFrustum.Start();
 
+			frustum.Start();
 			if (totalMeshletCount > 0) {
-
-				Anubis::SwitchShaderStage(shaders.frustumCull.programID);
-				shaders.frustumCull.SetMatrix({ matView.m0,matView.m1,matView.m2,matView.m3,matView.m4,matView.m5,matView.m6,matView.m7,matView.m8,matView.m9,matView.m10,matView.m11,matView.m12,matView.m13,matView.m14,matView.m15 }, "matView");
-				shaders.frustumCull.SetMatrix({ matProj.m0,matProj.m1,matProj.m2,matProj.m3,matProj.m4,matProj.m5,matProj.m6,matProj.m7,matProj.m8,matProj.m9,matProj.m10,matProj.m11,matProj.m12,matProj.m13,matProj.m14,matProj.m15 }, "matProj");
-				shaders.frustumCull.SetVector3Array(planeNormals, 6, "planeNormals");
-				shaders.frustumCull.SetFloatArray(planeDs, 6, "planeDs");
-				shaders.frustumCull.SetVector3({ pos.x,pos.y,pos.z }, "camPos");
-				shaders.frustumCull.SetVector3({ forward.x,forward.y,forward.z }, "camForward");
-
-				frustum.Start();
-
-				shaders.frustumCull.Use(totalMeshletCount / 32, 1, 1);
+				FrustumCull(matView, pos, forward);
 			}
 
 			glMemoryBarrier(GL_BUFFER_UPDATE_BARRIER_BIT | GL_CLIENT_MAPPED_BUFFER_BARRIER_BIT);
@@ -1234,7 +1236,7 @@ public:
 				gen.highestChunkY += 2;
 
 				for (int y = 0; y < gen.highestChunkY && y < wy; y++) {
-					chunks[y * (wx * wz) + nz * wx + nx].GenerateMountains(&world.chunkData[y * (wx * wz) + nz * wx + nx], gen, nx, y, nz, lod, grass);
+					chunks[y * (wx * wz) + nz * wx + nx].GenerateDesert(&world.chunkData[y * (wx * wz) + nz * wx + nx], gen, nx, y, nz, lod, grass);
 					RecalculateParticles(nx,y,nz);
 				};
 				for (int y = 0; y < gen.highestChunkY && y < wy; y++) {
@@ -1261,10 +1263,10 @@ public:
 					}
 					chunks[neighbourId].hasFluid = true;
 					int size = chunkSize / chunks[neighbourId].lod;
-					if (world.chunkData[neighbourId].skipped || chunks[neighbourId].voxelCount == chunks[neighbourId].size * chunks[neighbourId].size * chunks[neighbourId].size) {
-						world.handle.handle[neighbourId].lod = 3000;
-						uploadChunkSSBO(neighbourId);
-					}
+//					if (world.chunkData[neighbourId].skipped || chunks[neighbourId].voxelCount == chunks[neighbourId].size * chunks[neighbourId].size * chunks[neighbourId].size) {
+	//					world.handle.handle[neighbourId].lod = 3000;
+		//				uploadChunkSSBO(neighbourId);
+			//		}
 					if (world.chunkData[neighbourId].voxelCount != 0 && !world.chunkData[neighbourId].skipped)
 					{
 
