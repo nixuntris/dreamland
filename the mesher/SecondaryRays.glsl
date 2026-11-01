@@ -195,6 +195,28 @@ bool outOfBounds(ivec3 p) {
     return any(lessThan(p, ivec3(0))) ||
            any(greaterThanEqual(p, ivec3(wx, wy, wz) * chunkSize));
 }
+bool sunRayOccluded(vec3 ro, vec3 rd, int maxSteps)
+{
+    vec3 invD   = 1.0 / (rd + vec3(equal(rd, vec3(0.0))) * 1e-8);
+    ivec3 cell  = ivec3(floor(ro));
+    ivec3 stepV = ivec3(sign(rd));
+    vec3 tDelta = abs(invD);
+
+    vec3 nextB  = vec3(cell) + vec3(greaterThan(rd, vec3(0.0)));
+    vec3 tMax   = (nextB - ro) * invD;
+
+    for (int i = 0; i < maxSteps; i++)
+    {
+        if (tMax.x < tMax.y && tMax.x < tMax.z) { cell.x += stepV.x; tMax.x += tDelta.x; }
+        else if (tMax.y < tMax.z)               { cell.y += stepV.y; tMax.y += tDelta.y; }
+        else                                    { cell.z += stepV.z; tMax.z += tDelta.z; }
+
+        if (outOfBounds(cell)) return false;
+
+        if (readVoxelData(cell) != 0u) return true;
+    }
+    return false;
+}
 void main()
 {
     ivec2 gid = ivec2(gl_GlobalInvocationID.xy);

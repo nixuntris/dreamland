@@ -19,10 +19,39 @@ const bool gpuMeshing = true;
 struct Particle {
 	Math::Vector3 position;
 	uint32_t color;
+	Math::Vector3 targetPosition;
 	void (*update)(Particle&);
 };
+Math::Vector3 Vector3MoveTowards(Math::Vector3 v, Math::Vector3 target, float maxDistance)
+{
+	Math::Vector3 result = { 0 };
+	float dx = target.x - v.x;
+	float dy = target.y - v.y;
+	float dz = target.z - v.z;
+	float sqrDist = dx * dx + dy * dy + dz * dz;
+	if ((maxDistance < 0.0f) || (sqrDist > (maxDistance * maxDistance)))
+	{
+		float dist = sqrtf(sqrDist);
+		float inv = maxDistance / dist;
+
+		result.x = v.x + dx * inv;
+		result.y = v.y + dy * inv;
+		result.z = v.z + dz * inv;
+	}
+	else
+	{
+		result = target;
+	}
+
+	return result;
+}
 void ExampleUpdate(Particle& p) {
-//	p.position.y -= 0.16f;
+	p.position = Vector3MoveTowards(p.position, p.targetPosition, 3);
+	if (Vector3Distance({ (float)p.position.x, (float)p.position.y,(float)p.position.z }, { (float)p.targetPosition.x,(float)p.targetPosition.y,(float)p.targetPosition.z }) < 1) {
+		p.targetPosition.x = GetRandomValue(0, wx * 32);
+		p.targetPosition.y = GetRandomValue(150, 250);
+		p.targetPosition.z = GetRandomValue(0, wz * 32);
+	}
 }
 const int MAX_PARTICLES = 1000000;
 const bool DEBUG_FEATURES_ON = false;
@@ -597,7 +626,11 @@ public:
 
 				particleRenderer.Create();
 				for (int i = 0; i < 10000; i++) {
-					particleRenderer.PushRenderParticle({ (float)GetRandomValue(wx * 32 + 32, wx * 32 - 32),100,(float)GetRandomValue(wx * 32 + 32, wx * 32 - 32) }, { 255,255,255,255 }, ExampleUpdate);
+					particleRenderer.PushRenderParticle({ (float)GetRandomValue(wx * 16 + 32, wx * 16-  32),300,(float)GetRandomValue(wx * 16 + 32, wx * 16- 32) }, { 255,255,255,255 }, ExampleUpdate);
+					particleRenderer.particles[i].targetPosition.x = wx * 16;
+					particleRenderer.particles[i].targetPosition.z = wz * 16;
+					particleRenderer.particles[i].targetPosition.y = 300;
+
 				}
 
 				currentResolutionWindow = menuResolutionIndex;
@@ -1306,9 +1339,9 @@ world.array[nx][nz] = true;
 								if (id >= wx * wy * wz || id < 0) continue;
 								if (chunks[id].lod == 0 || chunks[id].voxelCount == 0 || world.chunkData[id].skipped) {
 									world.chunkData[id].skipped = false;
-									chunks[id].gx = dx;
-									chunks[id].gy = dy;
-									chunks[id].gz = dz;
+									chunks[id].gx = x;
+									chunks[id].gy = y;
+									chunks[id].gz = z;
 									chunks[id].lod = 1;
 									chunks[id].size = chunkSize / chunks[id].lod;
 									world.chunkData[id].lod = 1;
@@ -1403,11 +1436,11 @@ world.array[nx][nz] = true;
 								ChunkDeleteMeshData(dx, dy, dz);
 								vv[drd] = { dx,dy,dz };
 								drd++;
+								uploadChunkSSBO(id);
 
 							}
 						}
 
-						shaders.display.UpdateSSBO(3, &world.handle, sizeof(world.handle), 0);
 						decals.clear();
 						decalTypes.clear();
 						chunkCount = 0;
@@ -1977,7 +2010,7 @@ world.array[nx][nz] = true;
 			else {
 				window.DisableCursor();
 			}
-			//std::cout << window.getFPS() << "\n";
+			std::cout << window.getFPS() << "\n";
 			ImGui::Render();
 			ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 			window.UpdateBuffer();
