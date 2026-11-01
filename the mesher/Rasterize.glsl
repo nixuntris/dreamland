@@ -232,7 +232,6 @@ void main()
     vec3 baseP = vec3(unpack_vertex(vertices[base]))  +meshletPosition;
     int distance = int(dot(baseP-camPos, camForward));
 
-    if (meta.type==0) return;
     uint hash = hashVec3(baseP);
     uint color = packedColors[meta.type];
     if (hash%2==0) {

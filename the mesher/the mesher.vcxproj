@@ -158,7 +158,6 @@
     <None Include="hwMesh.fs" />
     <None Include="hwMesh.vs" />
     <None Include="PhysicsObject.glsl" />
-    <None Include="quad_display_no_fxaa.glsl" />
     <None Include="quad_display_shader.fs" />
     <None Include="RenderFluids.glsl" />
     <None Include="grassParticle.glsl" />

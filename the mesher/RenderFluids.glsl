@@ -134,12 +134,10 @@ void main()
                 for (int f = 0; f < 6; f++) {
                     ivec3 neighborPos = p + faceOffsets[f] * lod;
                     
-                    if (readVoxelData(neighborPos) == 0u)
-                        mask |= 1u << f;
+                    if (readVoxelData(neighborPos) == 0u) mask |= 1u << f;
                 }
 
-                if (mask == 0u)
-                    continue;
+                if (mask == 0u) continue;
 
                 cachePos[myCount] =
                     uint(lp.x) |
@@ -216,24 +214,12 @@ void main()
 
     if (tid < meshletCount) {
         int aabbBase = (beginningId + int(tid)) * 6;
-
-        AABBCorners[aabbBase] =
-            float(sMin[tid * 3u] + chunkOrigin.x);
-
-        AABBCorners[aabbBase + 1] =
-            float(sMin[tid * 3u + 1u] + chunkOrigin.y);
-
-        AABBCorners[aabbBase + 2] =
-            float(sMin[tid * 3u + 2u] + chunkOrigin.z);
-
-        AABBCorners[aabbBase + 3] =
-            float(sMax[tid * 3u] + chunkOrigin.x + lod);
-
-        AABBCorners[aabbBase + 4] =
-            float(sMax[tid * 3u + 1u] + chunkOrigin.y + lod);
-
-        AABBCorners[aabbBase + 5] =
-            float(sMax[tid * 3u + 2u] + chunkOrigin.z + lod);
+        AABBCorners[aabbBase] = float(sMin[tid * 3u] + chunkOrigin.x); //should be min
+        AABBCorners[aabbBase + 1] = float(sMin[tid * 3u + 1u] + chunkOrigin.y);
+        AABBCorners[aabbBase + 2] = float(sMin[tid * 3u + 2u] + chunkOrigin.z);
+        AABBCorners[aabbBase + 3] = float(sMax[tid * 3u] + chunkOrigin.x + lod); //should be max
+        AABBCorners[aabbBase + 4] = float(sMax[tid * 3u + 1u] + chunkOrigin.y + lod);
+        AABBCorners[aabbBase + 5] = float(sMax[tid * 3u + 2u] + chunkOrigin.z + lod);
     }
 
     uint outBase = uint(beginningId) * 64u;
@@ -241,26 +227,18 @@ void main()
     for (uint i = 0u; i < myCount; i++) {
         uint packed = cachePos[i];
 
-        ivec3 lp = ivec3(
-            int(packed & 31u),
-            int((packed >> 5) & 31u),
-            int((packed >> 10) & 31u)
-        );
+        ivec3 lp = ivec3(int(packed & 31u),int((packed >> 5) & 31u),int((packed >> 10) & 31u));
 
         uint mask = (packed >> 15) & 0x3Fu;
         uint idx = exclusive + i;
         uint m = idx >> 6;
 
-        ivec3 minXYZ = ivec3(
-            sMin[m * 3u],
-            sMin[m * 3u + 1u],
-            sMin[m * 3u + 2u]
-        );
+        ivec3 minXYZ = ivec3(sMin[m * 3u],sMin[m * 3u + 1u],sMin[m * 3u + 2u]);
 
         ivec3 local = lp - minXYZ;
 
         uint packedVertex =
-            (uint(local.x) & 0x3FFu) |
+           (uint(local.x) & 0x3FFu) |
             ((uint(local.y) & 0x3FFu) << 10) |
             ((uint(local.z) & 0x3FFu) << 20);
 

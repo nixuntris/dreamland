@@ -135,9 +135,175 @@ public:
 };
 const int maxGPUBatch = 1024 * 1024;
 const int maxGrassCount = 1449303 * 2;
+struct ViewPort {
+	ShaderManager* shaders;
+
+	Plane planes[6];
+	Math::Vector3 planeNormals[6];
+	Anubis::Camera camera;
+	float planeDs[6];
+	void FrustumCull(Matrix matView, Vector3 pos, Vector3 forward, int totalMeshletCount) {
+
+		ExtractFrustumPlanes(matView, planes);
+
+		for (int i = 0; i < 6; i++) {
+			planeNormals[i].x = planes[i].normal.x;
+			planeNormals[i].y = planes[i].normal.y;
+			planeNormals[i].z = planes[i].normal.z;
+			planeDs[i] = planes[i].d;
+		}
+		Anubis::SwitchShaderStage(shaders->frustumCull.programID);
+		shaders->frustumCull.SetMatrix({ matView.m0,matView.m1,matView.m2,matView.m3,matView.m4,matView.m5,matView.m6,matView.m7,matView.m8,matView.m9,matView.m10,matView.m11,matView.m12,matView.m13,matView.m14,matView.m15 }, "matView");
+		shaders->frustumCull.SetMatrix({ matProj.m0,matProj.m1,matProj.m2,matProj.m3,matProj.m4,matProj.m5,matProj.m6,matProj.m7,matProj.m8,matProj.m9,matProj.m10,matProj.m11,matProj.m12,matProj.m13,matProj.m14,matProj.m15 }, "matProj");
+		shaders->frustumCull.SetVector3Array(planeNormals, 6, "planeNormals");
+		shaders->frustumCull.SetFloatArray(planeDs, 6, "planeDs");
+		shaders->frustumCull.SetVector3({ pos.x,pos.y,pos.z }, "camPos");
+		shaders->frustumCull.SetVector3({ forward.x,forward.y,forward.z }, "camForward");
+
+
+		shaders->frustumCull.Use(totalMeshletCount / 32, 1, 1);
+	}
+	void RenderClouds(Matrix matView, int frame, Vector3 pos, Vector3 forward, int wWidth, int wHeight, float timeSpeed) {
+		Anubis::SwitchShaderStage(shaders->clouds.programID);
+		shaders->clouds.SetVector3({ pos.x,pos.y,pos.z }, "camPos");
+		shaders->clouds.SetVector3({ forward.x,forward.y,forward.z }, "camForward");
+		shaders->clouds.SetMatrix({ matView.m0,matView.m1,matView.m2,matView.m3,matView.m4,matView.m5,matView.m6,matView.m7,matView.m8,matView.m9,matView.m10,matView.m11,matView.m12,matView.m13,matView.m14,matView.m15 }, "matView");
+		shaders->clouds.SetMatrix({ matProj.m0,matProj.m1,matProj.m2,matProj.m3,matProj.m4,matProj.m5,matProj.m6,matProj.m7,matProj.m8,matProj.m9,matProj.m10,matProj.m11,matProj.m12,matProj.m13,matProj.m14,matProj.m15 }, "matProj");
+		shaders->clouds.SetInt(wx, "wx");
+		shaders->clouds.SetInt(wy, "wy");
+		shaders->clouds.SetInt(wz, "wz");
+		shaders->clouds.SetFloat(timeSpeed, "timeSpeed");
+		shaders->clouds.SetInt(wWidth, "renderWidth");
+		shaders->clouds.SetInt(wHeight, "renderHeight");
+		shaders->clouds.SetInt(frame, "frameIndex");
+		shaders->clouds.Use(wWidth / 32, wHeight / 32, 1);
+	}
+	void SecondaryRays(Matrix matView, Vector3 pos, Vector3 forward, const std::vector<uint32_t> palette, int frame, float timeSpeed, int wWidth, int wHeight, World *world) {
+
+		Anubis::SwitchShaderStage(shaders->secondaryRaysRender.programID);
+		shaders->secondaryRaysRender.SetVector3({ pos.x,pos.y,pos.z }, "camPos");
+		shaders->secondaryRaysRender.SetVector3({ forward.x,forward.y,forward.z }, "camForward");
+		shaders->secondaryRaysRender.SetMatrix({ matView.m0,matView.m1,matView.m2,matView.m3,matView.m4,matView.m5,matView.m6,matView.m7,matView.m8,matView.m9,matView.m10,matView.m11,matView.m12,matView.m13,matView.m14,matView.m15 }, "matView");
+		shaders->secondaryRaysRender.SetMatrix({ matProj.m0,matProj.m1,matProj.m2,matProj.m3,matProj.m4,matProj.m5,matProj.m6,matProj.m7,matProj.m8,matProj.m9,matProj.m10,matProj.m11,matProj.m12,matProj.m13,matProj.m14,matProj.m15 }, "matProj");
+		shaders->secondaryRaysRender.SetInt(wx, "wx");
+		shaders->secondaryRaysRender.SetInt(wy, "wy");
+		shaders->secondaryRaysRender.SetInt(wz, "wz");
+		shaders->secondaryRaysRender.SetInt(world->lightCount, "lightCount");
+		shaders->secondaryRaysRender.SetVector3Array(world->lightPositions, 16, "lightPositions");
+		shaders->secondaryRaysRender.SetVector3Array(world->lightValues, 16, "lightValues");
+		shaders->secondaryRaysRender.SetIntArray(world->lightRadiusList, 16, "lightRadiusList");
+
+		shaders->secondaryRaysRender.SetFloat(timeSpeed, "timeSpeed");
+		shaders->secondaryRaysRender.SetInt(wWidth, "renderWidth");
+		shaders->secondaryRaysRender.SetInt(wHeight, "renderHeight");
+		shaders->secondaryRaysRender.SetInt(frame, "frameIndex");
+		shaders->secondaryRaysRender.Use(wWidth / 32, wHeight / 32, 1);
+		shaders->secondaryRaysRender.SetUIntArray(palette.data(), palette.size(), "packedColors");
+	}
+	void RenderPhysicsObject(ShaderManager* shaders, Anubis::Camera camera, Matrix matView, Anubis::HWVIrGeomMesh& renderSphere, Vector3 vv, int frame, int voxelType, int size, uint32_t* pack, int packCount, GLuint handle, Vector3 rotation, int wHeight) {
+		Anubis::SwitchShaderStage(shaders->hwRenderForObjects.shaderId);
+
+		Matrix m = GetStaticMVPMatrix(vv, matView);
+		shaders->hwRenderForObjects.SetVector3(camera.position, "camPos");
+		Math::Vector3 camFwd = Math::NormalizeVector3(
+			Math::SubtractVector3(camera.target, camera.position)
+		);
+		shaders->hwRenderForObjects.SetVector3({ rotation.x,rotation.y,rotation.z }, "objectRotation");
+		shaders->hwRenderForObjects.SetVector3({ vv.x,vv.y,vv.z }, "objectPos");
+		shaders->hwRenderForObjects.SetVector3(camFwd, "camForward");
+		shaders->hwRenderForObjects.SetUIntArray(pack, packCount, "packedColors");
+		shaders->hwRenderForObjects.SetFloat(size, "size");
+		shaders->hwRenderForObjects.SetInt(frame, "frame");
+		shaders->hwRenderForObjects.SetInt(wHeight, "vHeight");
+		shaders->hwRenderForObjects.SetInt(voxelType, "voxelType");
+		shaders->hwRenderForObjects.SetUVec2(handle, "handle");
+
+		shaders->hwRenderForObjects.SetVector3({ 1,0,1 }, "colorr");
+		shaders->hwRenderForObjects.SetMatrix({ m.m0 ,m.m1,m.m2,m.m3,m.m4,m.m5,m.m6,m.m7,m.m8,m.m9,m.m10,m.m11,m.m12,m.m13,m.m14,m.m15 }, "MVP");
+
+		shaders->hwRenderForObjects.Use();
+
+		renderSphere.Draw();
+	};
+	void RasterizeMeshes(Matrix matView, Vector3 pos, Vector3 forward, const std::vector<uint32_t> palette, int frame, int triangleCount, int wWidth, int wHeight) {
+
+		Anubis::SwitchShaderStage(shaders->rasterizer.programID);
+		shaders->rasterizer.SetVector3({ pos.x,pos.y,pos.z }, "camPos");
+		shaders->rasterizer.SetVector3({ forward.x,forward.y,forward.z }, "camForward");
+		shaders->rasterizer.SetMatrix({ matView.m0,matView.m1,matView.m2,matView.m3,matView.m4,matView.m5,matView.m6,matView.m7,matView.m8,matView.m9,matView.m10,matView.m11,matView.m12,matView.m13,matView.m14,matView.m15 }, "matView");
+		shaders->rasterizer.SetMatrix({ matProj.m0,matProj.m1,matProj.m2,matProj.m3,matProj.m4,matProj.m5,matProj.m6,matProj.m7,matProj.m8,matProj.m9,matProj.m10,matProj.m11,matProj.m12,matProj.m13,matProj.m14,matProj.m15 }, "matProj");
+		shaders->rasterizer.SetInt(wx, "wx");
+		shaders->rasterizer.SetInt(wy, "wy");
+		shaders->rasterizer.SetInt(wz, "wz");
+		shaders->rasterizer.SetUIntArray(palette.data(), palette.size(), "packedColors");
+		shaders->rasterizer.SetInt(wWidth, "renderWidth");
+		shaders->rasterizer.SetInt(wHeight, "renderHeight");
+		shaders->rasterizer.SetInt(frame, "frameIndex");
+		shaders->rasterizer.SetInt(0, "offset");
+
+		shaders->rasterizer.Use(floor(triangleCount), 1, 1);
+	}
+	void RenderGrass(Matrix matView, Vector3 pos, Vector3 forward, int frame, int wWidth, int wHeight, int grass) {
+
+		Anubis::SwitchShaderStage(shaders->grassRenderer.programID);
+		shaders->grassRenderer.SetVector3({ pos.x,pos.y,pos.z }, "camPos");
+		shaders->grassRenderer.SetVector3({ forward.x,forward.y,forward.z }, "camForward");
+		shaders->grassRenderer.SetInt(wWidth, "renderWidth");
+		shaders->grassRenderer.SetInt(wHeight, "renderHeight");
+		shaders->grassRenderer.SetMatrix({ matView.m0,matView.m1,matView.m2,matView.m3,matView.m4,matView.m5,matView.m6,matView.m7,matView.m8,matView.m9,matView.m10,matView.m11,matView.m12,matView.m13,matView.m14,matView.m15 }, "matView");
+		shaders->grassRenderer.SetMatrix({ matProj.m0,matProj.m1,matProj.m2,matProj.m3,matProj.m4,matProj.m5,matProj.m6,matProj.m7,matProj.m8,matProj.m9,matProj.m10,matProj.m11,matProj.m12,matProj.m13,matProj.m14,matProj.m15 }, "matProj");
+		shaders->grassRenderer.SetInt(wx, "wx");
+		shaders->grassRenderer.SetInt(wy, "wy");
+		shaders->grassRenderer.SetInt(wz, "wz");
+		shaders->grassRenderer.SetVector3Array(planeNormals, 6, "planeNormals");
+		shaders->grassRenderer.SetFloatArray(planeDs, 6, "planeDs");
+		shaders->grassRenderer.SetInt(frame, "frameIndex");
+		shaders->grassRenderer.Use(grass / 64, 1, 1);
+	}
+	/*
+	void RenderPhysicalObjects(Matrix matView, Vector3 pos, Vector3 forward, std::vector<uint32_t> palette, int frame, std::vector<std::unique_ptr<PhysicsObject>> physicalObjects, int wWidth, int wHeight) {
+
+		for (auto& k : physicalObjects) {
+			bool downardsCollision = false;
+			bool rightLeftCollision = false;
+			bool frontBackCollision = false;
+
+
+			if (Vector3Distance({ (float)k->position.x,(float)k->position.y,(float)k->position.z }, { (float)camera.position.x,(float)camera.position.y,(float)camera.position.z }) < 20) {
+				RenderPhysicsObject(shaders, camera, matView, k->mesh, { (float)k->position.x,(float)k->position.y,(float)k->position.z }, frame, 1, 1, palette.data(), palette.size(), k->byte.handle, { (float)k->rotation.x,(float)k->rotation.y,(float)k->rotation.z },wHeight);
+
+				Anubis::SwitchShaderStage(shaders->fillOut.programID);
+				shaders->fillOut.SetVector3(k->position, "objectPos");
+				shaders->fillOut.SetUVec2(k->byte.handle, "handle");
+				shaders->fillOut.SetInt(wx, "wx");
+				shaders->fillOut.SetInt(wy, "wy");
+				shaders->fillOut.SetInt(wz, "wz");
+				shaders->fillOut.Use(4, 4, 4);
+			}
+			else {
+				Anubis::SwitchShaderStage(shaders->renderPhysicalObjects.programID);
+				shaders->renderPhysicalObjects.SetVector3({ pos.x,pos.y,pos.z }, "camPos");
+				shaders->renderPhysicalObjects.SetVector3(k->rotation, "objectRotation");
+				shaders->renderPhysicalObjects.SetVector3(k->position, "objectPos");
+				shaders->renderPhysicalObjects.SetVector3({ forward.x,forward.y,forward.z }, "camForward");
+				shaders->renderPhysicalObjects.SetMatrix({ matView.m0,matView.m1,matView.m2,matView.m3,matView.m4,matView.m5,matView.m6,matView.m7,matView.m8,matView.m9,matView.m10,matView.m11,matView.m12,matView.m13,matView.m14,matView.m15 }, "matView");
+				shaders->renderPhysicalObjects.SetMatrix({ matProj.m0,matProj.m1,matProj.m2,matProj.m3,matProj.m4,matProj.m5,matProj.m6,matProj.m7,matProj.m8,matProj.m9,matProj.m10,matProj.m11,matProj.m12,matProj.m13,matProj.m14,matProj.m15 }, "matProj");
+				shaders->renderPhysicalObjects.SetUIntArray(palette.data(), palette.size(), "packedColors");
+				shaders->renderPhysicalObjects.SetInt(wWidth, "renderWidth");
+				shaders->renderPhysicalObjects.SetInt(wHeight, "renderHeight");
+				shaders->renderPhysicalObjects.SetInt(frame, "frameIndex");
+				shaders->renderPhysicalObjects.SetInt(0, "offset");
+				shaders->renderPhysicalObjects.SetInt(wx, "wx");
+				shaders->renderPhysicalObjects.SetInt(wy, "wy");
+				shaders->renderPhysicalObjects.SetInt(wz, "wz");
+				shaders->renderPhysicalObjects.SetUVec2(k->byte.handle, "handle");
+				shaders->renderPhysicalObjects.Use(4, 4, 4);
+			}
+		}
+	}*/
+};
 class App {
 	Anubis::Window window;
-	Anubis::Camera camera;
 	Chunk* chunks;
 	ShaderManager shaders;
 	World world;
@@ -158,10 +324,8 @@ class App {
 	float timeSpeed = 0.0004;
 	bool mainMenu = false;
 	int alreadySpawnedGrass = 0;
+	ViewPort viewPort;
 	ParticleRender particleRenderer;
-	Plane planes[6];
-	Math::Vector3 planeNormals[6];
-	float planeDs[6];
 public:
 	App() {
 		//IMPLEMENT THE HARDWARE PIPELINE
@@ -175,7 +339,7 @@ public:
 		window.Resize(600, 800);
 		
 		omp_set_num_threads(32);
-		camera.target = { 0,1,0 };
+		viewPort.camera.target = { 0,1,0 };
 		SetRandomSeed(100);
 		shaders.Load();
 		shaders.display.CreateSSBO(0, sizeof(uint32_t) * 3840 * 2160 *6);
@@ -205,11 +369,7 @@ public:
 		shaders.display.CreateSSBO(20, maxGrassCount * 3 * sizeof(float));
 		ImGui_ImplGlfw_InitForOpenGL(window.GetWindowHandle(), true);
 		ImGui_ImplOpenGL3_Init("#version 460");
-		glEnable(GL_DEBUG_OUTPUT);
-		glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS);
-		glEnable(GL_CULL_FACE);
-		glCullFace(GL_BACK);
-		glFrontFace(GL_CCW);
+		viewPort.shaders = &shaders;
 	}
 	inline void GenerateTerrain() {
 		chunks = (Chunk*)MemAlloc(wx * wz * wy * sizeof(Chunk));
@@ -244,7 +404,7 @@ public:
 
 		float dist = Vector2Distance(
 			{ (float)x * chunkSize + chunkSize / 2, (float)z * chunkSize + chunkSize / 2 },
-			{ float(camera.position.x), float(camera.position.z) });
+			{ float(viewPort.camera.position.x), float(viewPort.camera.position.z) });
 		bool grass = false;
 		if (dist < 1920) grass = true;
 		GenerationData gen;
@@ -346,7 +506,7 @@ public:
 		
 
 		int lod = 1;
-		float dist = Vector2Distance({ (float)nx * chunkSize + chunkSize / 2,(float)nz * chunkSize + chunkSize / 2 }, { float(camera.position.x),float(camera.position.z) });
+		float dist = Vector2Distance({ (float)nx * chunkSize + chunkSize / 2,(float)nz * chunkSize + chunkSize / 2 }, { float(viewPort.camera.position.x),float(viewPort.camera.position.z) });
 		bool grass = false;
 
 		if (dist < 1920) grass = true;
@@ -646,7 +806,7 @@ public:
 				wHeight = graphicsSettings.resolutions[currentResolutionWindow].height;
 				window.Resize(wWidth,wHeight);
 				world.Setup();
-				camera.position = { (double)wx * chunkSize/2,200,(double)wz * chunkSize / 2 };
+				viewPort.camera.position = { (double)wx * chunkSize/2,200,(double)wz * chunkSize / 2 };
 				if (pregenerate) {
 					Run(true);
 				}
@@ -669,7 +829,6 @@ public:
 			window.UpdateBuffer();
 		}
 	}
-
 	void RecalculateParticlesFullDebug() {
 
 		grass = 0;
@@ -723,7 +882,7 @@ public:
 			for (int nx = 0; nx < wx; nx++) {
 				for (int nz = 0; nz < wz; nz++) {
 world.array[nx][nz] = true;
-					float dist = Vector2Distance({ (float)nx * chunkSize + chunkSize / 2,(float)nz * chunkSize + chunkSize / 2 }, { float(camera.position.x),float(camera.position.z) });
+					float dist = Vector2Distance({ (float)nx * chunkSize + chunkSize / 2,(float)nz * chunkSize + chunkSize / 2 }, { float(viewPort.camera.position.x),float(viewPort.camera.position.z) });
 					bool grass = false;
 
 					if (dist < 1920) grass = true;
@@ -875,27 +1034,7 @@ world.array[nx][nz] = true;
 		shaders.display.UpdateSSBO(3, &world.handle, sizeof(world.handle), 0);
 		RecalculateParticlesFullDebug();
 	}
-	void FrustumCull(Matrix matView, Vector3 pos, Vector3 forward) {
-
-		ExtractFrustumPlanes(matView, planes);
-
-		for (int i = 0; i < 6; i++) {
-			planeNormals[i].x = planes[i].normal.x;
-			planeNormals[i].y = planes[i].normal.y;
-			planeNormals[i].z = planes[i].normal.z;
-			planeDs[i] = planes[i].d;
-		}
-		Anubis::SwitchShaderStage(shaders.frustumCull.programID);
-		shaders.frustumCull.SetMatrix({ matView.m0,matView.m1,matView.m2,matView.m3,matView.m4,matView.m5,matView.m6,matView.m7,matView.m8,matView.m9,matView.m10,matView.m11,matView.m12,matView.m13,matView.m14,matView.m15 }, "matView");
-		shaders.frustumCull.SetMatrix({ matProj.m0,matProj.m1,matProj.m2,matProj.m3,matProj.m4,matProj.m5,matProj.m6,matProj.m7,matProj.m8,matProj.m9,matProj.m10,matProj.m11,matProj.m12,matProj.m13,matProj.m14,matProj.m15 }, "matProj");
-		shaders.frustumCull.SetVector3Array(planeNormals, 6, "planeNormals");
-		shaders.frustumCull.SetFloatArray(planeDs, 6, "planeDs");
-		shaders.frustumCull.SetVector3({ pos.x,pos.y,pos.z }, "camPos");
-		shaders.frustumCull.SetVector3({ forward.x,forward.y,forward.z }, "camForward");
-
-
-		shaders.frustumCull.Use(totalMeshletCount / 32, 1, 1);
-	}
+	
 	void Run(bool pregenerate=false) {
 		const std::vector<Color> palette = {
 					{0, 255, 0, 255},       // 0: GREEN GRASS
@@ -940,37 +1079,26 @@ world.array[nx][nz] = true;
 		bool menuOpen = false;
 		bool releasedMenu = false;
 		int frame = 0;
-		std::vector<int> chunksToUpdate;
-		std::vector<Vector3> chunksToUpdateIds;
-		std::vector<Vector3> decals;
-		std::vector<int> decalTypes;
-		Anubis::HWVIrGeomMesh mesh;
-		size_t floatCount = sizeof(Anubis::cubeVertices) / sizeof(float);
-		mesh.Create(Anubis::cubeVertices, floatCount);
 		bool preallocated = false;
 		bool generatedMesh = false;
 		Anubis::SwitchShaderStage(shaders.display.shaderId);
 		shaders.display.CreateSSBO(3, sizeof(world.handle));
 		shaders.display.UpdateSSBO(9, 0, sizeof(int), 0);
-		Math::IVector2 oldChunkPos = { camera.position.x / chunkSize,camera.position.z / chunkSize };
+		Math::IVector2 oldChunkPos = { viewPort.camera.position.x / chunkSize,viewPort.camera.position.z / chunkSize };
 		if (pregenerate) PreGenerateFullDebug();
 		bool releasedMouseButton = false;
 		Math::IVector3 chunksUpdatedThisFrame[100];
 		int chunkCount = 0;
 		while (window.IsOpen()) {
 			double frameStart = glfwGetTime();
-			Anubis::DisplayShader* shader = &shaders.display;
-			if (graphicsSettings.FXAA) {
-				shader = &shaders.displayNoFXAA;
-			}
 			int zero = 0;
 			int* p_triangleCounter = (int*)shaders.display.ssboPointers[5];
 			*p_triangleCounter = 0;
 			if (!menuOpen) {
-				camera.UpdateFREE(window.GetMousePos(), oldMouse, window);
+				viewPort.camera.UpdateFREE(window.GetMousePos(), oldMouse, window);
 			}
-			Vector3 tag = { (float)camera.target.x ,(float)camera.target.y,(float)camera.target.z };
-			Vector3 pos = { (float)camera.position.x ,(float)camera.position.y,(float)camera.position.z };
+			Vector3 tag = { (float)viewPort.camera.target.x ,(float)viewPort.camera.target.y,(float)viewPort.camera.target.z };
+			Vector3 pos = { (float)viewPort.camera.position.x ,(float)viewPort.camera.position.y,(float)viewPort.camera.position.z };
 
 			Vector3 forward = Vector3Normalize(Vector3Subtract(tag, pos));
 			window.Clear();
@@ -985,7 +1113,7 @@ world.array[nx][nz] = true;
 
 			frustum.Start();
 			if (totalMeshletCount > 0) {
-				FrustumCull(matView, pos, forward);
+				viewPort.FrustumCull(matView, pos, forward, totalMeshletCount);
 			}
 
 			glMemoryBarrier(GL_BUFFER_UPDATE_BARRIER_BIT | GL_CLIENT_MAPPED_BUFFER_BARRIER_BIT);
@@ -996,12 +1124,6 @@ world.array[nx][nz] = true;
 			glDeleteSync(fence);
 			int triangleCount = *p_triangleCounter;
 
-			int r = 0;
-			for (auto t : decals) {
-
-				Render(&shaders, camera, matView, mesh, t, frame, decalTypes[r], editSize, ColorPallete.data(), ColorPallete.size(), wHeight);
-				r++;
-			}
 			const float radius = 0.5f;
 
 			for (size_t i = 0; i < physicalObjects.size(); i++) {
@@ -1148,91 +1270,15 @@ world.array[nx][nz] = true;
 					MemFree(world.physicsAccelerationChunks[id].idReferences);
 					world.physicsAccelerationChunks[id].allocated = false;
 				}
-
 			}
-			auto RenderPhysicsObject = [&](ShaderManager* shaders, Anubis::Camera camera, Matrix matView, Anubis::HWVIrGeomMesh& renderSphere, Vector3 vv, int frame, int voxelType, int size, uint32_t* pack, int packCount, GLuint handle, Vector3 rotation) {
-				Anubis::SwitchShaderStage(shaders->hwRenderForObjects.shaderId);
-
-				Matrix m = GetStaticMVPMatrix(vv, matView);
-				shaders->hwRenderForObjects.SetVector3(camera.position, "camPos");
-				Math::Vector3 camFwd = Math::NormalizeVector3(
-					Math::SubtractVector3(camera.target, camera.position)
-				);
-				shaders->hwRenderForObjects.SetVector3({ rotation.x,rotation.y,rotation.z }, "objectRotation");
-				shaders->hwRenderForObjects.SetVector3({ vv.x,vv.y,vv.z }, "objectPos");
-				shaders->hwRenderForObjects.SetVector3(camFwd, "camForward");
-				shaders->hwRenderForObjects.SetUIntArray(pack, packCount, "packedColors");
-				shaders->hwRenderForObjects.SetFloat(size, "size");
-				shaders->hwRenderForObjects.SetInt(frame, "frame");
-				shaders->hwRenderForObjects.SetInt(wHeight, "vHeight");
-				shaders->hwRenderForObjects.SetInt(voxelType, "voxelType");
-				shaders->hwRenderForObjects.SetUVec2(handle, "handle");
-
-				shaders->hwRenderForObjects.SetVector3({ 1,0,1 }, "colorr");
-				shaders->hwRenderForObjects.SetMatrix({ m.m0 ,m.m1,m.m2,m.m3,m.m4,m.m5,m.m6,m.m7,m.m8,m.m9,m.m10,m.m11,m.m12,m.m13,m.m14,m.m15 }, "MVP");
-
-				shaders->hwRenderForObjects.Use();
-
-				renderSphere.Draw();
-			};
-			for (auto& k : physicalObjects) {
-				bool downardsCollision = false;
-				bool rightLeftCollision = false;
-				bool frontBackCollision = false;
-
-
-				if (Vector3Distance({ (float)k->position.x,(float)k->position.y,(float)k->position.z }, { (float)camera.position.x,(float)camera.position.y,(float)camera.position.z }) < 20) {
-					RenderPhysicsObject(&shaders, camera, matView, k->mesh, { (float)k->position.x,(float)k->position.y,(float)k->position.z }, frame, 1, 1, ColorPallete.data(), ColorPallete.size(), k->byte.handle, { (float)k->rotation.x,(float)k->rotation.y,(float)k->rotation.z });
-
-					Anubis::SwitchShaderStage(shaders.fillOut.programID);
-					shaders.fillOut.SetVector3(k->position, "objectPos");
-					shaders.fillOut.SetUVec2(k->byte.handle, "handle");
-					shaders.fillOut.SetInt(wx, "wx");
-					shaders.fillOut.SetInt(wy, "wy");
-					shaders.fillOut.SetInt(wz, "wz");
-					shaders.fillOut.Use(4, 4, 4);
-				}
-				else {
-					Anubis::SwitchShaderStage(shaders.renderPhysicalObjects.programID);
-					shaders.renderPhysicalObjects.SetVector3({ pos.x,pos.y,pos.z }, "camPos");
-					shaders.renderPhysicalObjects.SetVector3(k->rotation, "objectRotation");
-					shaders.renderPhysicalObjects.SetVector3(k->position, "objectPos");
-					shaders.renderPhysicalObjects.SetVector3({ forward.x,forward.y,forward.z }, "camForward");
-					shaders.renderPhysicalObjects.SetMatrix({ matView.m0,matView.m1,matView.m2,matView.m3,matView.m4,matView.m5,matView.m6,matView.m7,matView.m8,matView.m9,matView.m10,matView.m11,matView.m12,matView.m13,matView.m14,matView.m15 }, "matView");
-					shaders.renderPhysicalObjects.SetMatrix({ matProj.m0,matProj.m1,matProj.m2,matProj.m3,matProj.m4,matProj.m5,matProj.m6,matProj.m7,matProj.m8,matProj.m9,matProj.m10,matProj.m11,matProj.m12,matProj.m13,matProj.m14,matProj.m15 }, "matProj");
-					shaders.renderPhysicalObjects.SetUIntArray(ColorPallete.data(), ColorPallete.size(), "packedColors");
-					shaders.renderPhysicalObjects.SetInt(wWidth, "renderWidth");
-					shaders.renderPhysicalObjects.SetInt(wHeight, "renderHeight");
-					shaders.renderPhysicalObjects.SetInt(frame, "frameIndex");
-					shaders.renderPhysicalObjects.SetInt(0, "offset");
-					shaders.renderPhysicalObjects.SetInt(wx, "wx");
-					shaders.renderPhysicalObjects.SetInt(wy, "wy");
-					shaders.renderPhysicalObjects.SetInt(wz, "wz");
-					shaders.renderPhysicalObjects.SetUVec2(k->byte.handle, "handle");
-					shaders.renderPhysicalObjects.Use(4, 4, 4);
-				}
-			}
-			Math::Vector3 pp[2] = { camera.target,{wx * 32,150,wy * 32} };
+			//viewPort.RenderPhysicalObjects(matView, pos, forward, ColorPallete, frame, physicalObjects, wWidth, wHeight);
+			Math::Vector3 pp[2] = { viewPort.camera.target,{wx * 32,150,wy * 32} };
 			double rasterTimeMs;
 			int trianglesRendered = 0;
 			Anubis::GpuTimer raster;
 			raster.Start();
 			if (graphicsSettings.hardwareSoftwareRendering && triangleCount > 0) {
-				Anubis::SwitchShaderStage(shaders.rasterizer.programID);
-				shaders.rasterizer.SetVector3({ pos.x,pos.y,pos.z }, "camPos");
-				shaders.rasterizer.SetVector3({ forward.x,forward.y,forward.z }, "camForward");
-				shaders.rasterizer.SetMatrix({ matView.m0,matView.m1,matView.m2,matView.m3,matView.m4,matView.m5,matView.m6,matView.m7,matView.m8,matView.m9,matView.m10,matView.m11,matView.m12,matView.m13,matView.m14,matView.m15 }, "matView");
-				shaders.rasterizer.SetMatrix({ matProj.m0,matProj.m1,matProj.m2,matProj.m3,matProj.m4,matProj.m5,matProj.m6,matProj.m7,matProj.m8,matProj.m9,matProj.m10,matProj.m11,matProj.m12,matProj.m13,matProj.m14,matProj.m15 }, "matProj");
-				shaders.rasterizer.SetInt(wx, "wx");
-				shaders.rasterizer.SetInt(wy, "wy");
-				shaders.rasterizer.SetInt(wz, "wz");
-				shaders.rasterizer.SetUIntArray(ColorPallete.data(), ColorPallete.size(), "packedColors");
-				shaders.rasterizer.SetInt(wWidth, "renderWidth");
-				shaders.rasterizer.SetInt(wHeight, "renderHeight");
-				shaders.rasterizer.SetInt(frame, "frameIndex");
-				shaders.rasterizer.SetInt(0, "offset");
-
-				shaders.rasterizer.Use(floor(triangleCount), 1, 1);
+				viewPort.RasterizeMeshes(matView, pos, forward, ColorPallete, frame, triangleCount, wWidth, wHeight);
 				trianglesRendered = triangleCount;
 			}
 			rasterTimeMs = raster.Stop();
@@ -1240,23 +1286,7 @@ world.array[nx][nz] = true;
 			Anubis::GpuTimer grassT;
 			grassT.Start();
 			if (graphicsSettings.grassRender && grass > 0) {
-
-				Anubis::SwitchShaderStage(shaders.grassRenderer.programID);
-				shaders.grassRenderer.SetVector3({ pos.x,pos.y,pos.z }, "camPos");
-				shaders.grassRenderer.SetVector3({ forward.x,forward.y,forward.z }, "camForward");
-				shaders.grassRenderer.SetInt(wWidth, "renderWidth");
-				shaders.grassRenderer.SetInt(wHeight, "renderHeight");
-				shaders.grassRenderer.SetMatrix({ matView.m0,matView.m1,matView.m2,matView.m3,matView.m4,matView.m5,matView.m6,matView.m7,matView.m8,matView.m9,matView.m10,matView.m11,matView.m12,matView.m13,matView.m14,matView.m15 }, "matView");
-				shaders.grassRenderer.SetMatrix({ matProj.m0,matProj.m1,matProj.m2,matProj.m3,matProj.m4,matProj.m5,matProj.m6,matProj.m7,matProj.m8,matProj.m9,matProj.m10,matProj.m11,matProj.m12,matProj.m13,matProj.m14,matProj.m15 }, "matProj");
-				shaders.grassRenderer.SetInt(wx, "wx");
-				shaders.grassRenderer.SetInt(wy, "wy");
-				shaders.grassRenderer.SetInt(wz, "wz");
-
-				shaders.grassRenderer.SetVector3Array(planeNormals, 6, "planeNormals");
-				shaders.grassRenderer.SetFloatArray(planeDs, 6, "planeDs");
-				shaders.grassRenderer.SetInt(frame, "frameIndex");
-				shaders.grassRenderer.Use(grass / 64, 1, 1);
-
+				viewPort.RenderGrass(matView, pos, forward, frame, wWidth, wHeight, grass);
 			}
 
 			auto grassTimeMs = grassT.Stop();
@@ -1264,7 +1294,7 @@ world.array[nx][nz] = true;
 			
 			START_TIMER(chunkAllocator)
 			
-			Math::IVector2 currentChunkPos= { int(camera.position.x / chunkSize),int(camera.position.z / chunkSize )};
+			Math::IVector2 currentChunkPos= { int(viewPort.camera.position.x / chunkSize),int(viewPort.camera.position.z / chunkSize )};
 			if (oldChunkPos.x != currentChunkPos.x || oldChunkPos.y != currentChunkPos.y) {
 				int lodchanged = 0;
 				
@@ -1272,7 +1302,7 @@ world.array[nx][nz] = true;
 					for (int z = 0; z < wz; z++) {
 
 						int lod = 1;
-						float dist = Vector2Distance({ (float)x * chunkSize + chunkSize / 2,(float)z * chunkSize + chunkSize / 2 }, { float(camera.position.x),float(camera.position.z) });
+						float dist = Vector2Distance({ (float)x * chunkSize + chunkSize / 2,(float)z * chunkSize + chunkSize / 2 }, { float(viewPort.camera.position.x),float(viewPort.camera.position.z) });
 
 						if (dist > 960) lod = 2;
 						if (dist > 960 * 2) lod = 4;
@@ -1425,10 +1455,6 @@ world.array[nx][nz] = true;
 							}
 						}
 					}
-					if (doneChanges) {
-						decals.push_back(rayCastPos);
-						decalTypes.push_back(5);
-					}
 					releasedMouseButton = true;
 				}
 				if (!window.GetMouseButtonPressed(0) && releasedMouseButton) {
@@ -1448,9 +1474,6 @@ world.array[nx][nz] = true;
 
 							}
 						}
-
-						decals.clear();
-						decalTypes.clear();
 						chunkCount = 0;
 					}
 					releasedMouseButton = false;
@@ -1464,9 +1487,9 @@ world.array[nx][nz] = true;
 			const float halfAngle = tanf((160 * 0.5f) * DEG2RAD);
 			float cosHalf = cosf(halfAngle);
 			float sinHalf = sinf(halfAngle);
-			Vector2 camPos2D = { camera.position.x, camera.position.z };
-			Vector2 camTarget2D = { camera.target.x,   camera.target.z };
-			Vector2 baseForward2D = { camera.GetForward().x, camera.GetForward().z };
+			Vector2 camPos2D = { viewPort.camera.position.x, viewPort.camera.position.z };
+			Vector2 camTarget2D = { viewPort.camera.target.x,   viewPort.camera.target.z };
+			Vector2 baseForward2D = { viewPort.camera.GetForward().x, viewPort.camera.GetForward().z };
 			Vector2 right = { -baseForward2D.y, baseForward2D.x };
 			float fLen = sqrtf(camTarget2D.x * camTarget2D.x + camTarget2D.y * camTarget2D.y);
 			baseForward2D.x /= fLen;
@@ -1489,7 +1512,7 @@ world.array[nx][nz] = true;
 							bool inFrustum = false;
 							if (!alwaysInFrustum) {
 
-								Vector2 toPoint = { point.x - camera.position.x, point.y - camera.position.z };
+								Vector2 toPoint = { point.x - viewPort.camera.position.x, point.y - viewPort.camera.position.z };
 
 								float alongForward = toPoint.x * forward.x + toPoint.y * forward.y;
 								float alongRight = toPoint.x * right.x + toPoint.y * right.y;
@@ -1532,7 +1555,7 @@ world.array[nx][nz] = true;
 				int nz = generateArrayId[i].y;
 
 				int lod = 1;
-				float dist = Vector2Distance({ (float)nx * chunkSize + chunkSize / 2,(float)nz * chunkSize+chunkSize/2 }, { float(camera.position.x),float(camera.position.z) });
+				float dist = Vector2Distance({ (float)nx * chunkSize + chunkSize / 2,(float)nz * chunkSize+chunkSize/2 }, { float(viewPort.camera.position.x),float(viewPort.camera.position.z) });
 				bool grass = false;
 
 				if (dist < 1920) grass = true;
@@ -1574,10 +1597,6 @@ world.array[nx][nz] = true;
 					}
 					chunks[neighbourId].hasFluid = true;
 					int size = chunkSize / chunks[neighbourId].lod;
-//					if (world.chunkData[neighbourId].skipped || chunks[neighbourId].voxelCount == chunks[neighbourId].size * chunks[neighbourId].size * chunks[neighbourId].size) {
-	//					world.handle.handle[neighbourId].lod = 3000;
-		//				uploadChunkSSBO(neighbourId);
-			//		}
 					if (world.chunkData[neighbourId].voxelCount != 0 && !world.chunkData[neighbourId].skipped)
 					{
 
@@ -1595,7 +1614,6 @@ world.array[nx][nz] = true;
 							free(tt);
 							world.chunkData[neighbourId].fluidShortMap.GetBindlessHandle();
 							world.handle.handle[neighbourId].handle = world.chunkData[neighbourId].fluidShortMap.handle;
-
 						}
 						world.handle.handle[neighbourId].lod = world.chunkData[neighbourId].lod;
 						uploadChunkSSBO(neighbourId);
@@ -1603,7 +1621,6 @@ world.array[nx][nz] = true;
 				}
 			}
 			for (int i = 0; i < 2; i++) {
-
 				for (int x = 0; x < wx; x++) {
 					for (int z = 0; z < wz; z++) {
 						if (world.array[x][z]) {
@@ -1653,7 +1670,7 @@ world.array[nx][nz] = true;
 				shaders.fluidRender.Use(drd, 1, 1);
 				glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT | GL_BUFFER_UPDATE_BARRIER_BIT);
 
-				constexpr GLintptr N = 1024 * 1024;                       // array length in the shader
+				constexpr GLintptr N = 1024 * 1024;
 				const GLintptr endOffset = sizeof(int) + N * sizeof(int);
 
 				glBindBuffer(GL_SHADER_STORAGE_BUFFER, shaders.display.ssboIds[9]);
@@ -1684,14 +1701,14 @@ world.array[nx][nz] = true;
 			offfr++;
 			if (window.GetMouseButtonPressed(1) && offfr>5) {
 				offfr = 0;
-				Math::Vector3 angularVelocity = Math::NormalizeVector3(Math::SubtractVector3(camera.target, camera.position));
+				Math::Vector3 angularVelocity = Math::NormalizeVector3(Math::SubtractVector3(viewPort.camera.target, viewPort.camera.position));
 				angularVelocity.x *= 4;
 				angularVelocity.y *= 4;
 				angularVelocity.z *= 4;
 				auto pp = std::make_unique<PhysicsObject>();
 				pp->values = (uint16_t*)MemAlloc(16 * 16 * 16 * sizeof(uint16_t));
 				pp->visibility = (bool*)MemAlloc(16 * 16 * 16 * sizeof(bool));
-				pp->position = camera.target;
+				pp->position = viewPort.camera.target;
 				pp->velocity = angularVelocity;
 				pp->angularVelocity = { 0,0,0 };
 				pp->rotation = { 0,0,0 };
@@ -1727,42 +1744,11 @@ world.array[nx][nz] = true;
 			if (graphicsSettings.secondaryRays) {
 
 				secondaryRays.Start();
-				Anubis::SwitchShaderStage(shaders.secondaryRaysRender.programID);
-				shaders.secondaryRaysRender.SetVector3({ pos.x,pos.y,pos.z }, "camPos");
-				shaders.secondaryRaysRender.SetVector3({ forward.x,forward.y,forward.z }, "camForward");
-				shaders.secondaryRaysRender.SetMatrix({ matView.m0,matView.m1,matView.m2,matView.m3,matView.m4,matView.m5,matView.m6,matView.m7,matView.m8,matView.m9,matView.m10,matView.m11,matView.m12,matView.m13,matView.m14,matView.m15 }, "matView");
-				shaders.secondaryRaysRender.SetMatrix({ matProj.m0,matProj.m1,matProj.m2,matProj.m3,matProj.m4,matProj.m5,matProj.m6,matProj.m7,matProj.m8,matProj.m9,matProj.m10,matProj.m11,matProj.m12,matProj.m13,matProj.m14,matProj.m15 }, "matProj");
-				shaders.secondaryRaysRender.SetInt(wx, "wx");
-				shaders.secondaryRaysRender.SetInt(wy, "wy");
-				shaders.secondaryRaysRender.SetInt(wz, "wz");
-				shaders.secondaryRaysRender.SetInt(world.lightCount, "lightCount");
-				shaders.secondaryRaysRender.SetVector3Array(world.lightPositions, 16, "lightPositions");
-				shaders.secondaryRaysRender.SetVector3Array(world.lightValues, 16, "lightValues");
-				shaders.secondaryRaysRender.SetIntArray(world.lightRadiusList, 16, "lightRadiusList");
-
-				shaders.secondaryRaysRender.SetFloat(timeSpeed, "timeSpeed");
-				shaders.secondaryRaysRender.SetInt(wWidth, "renderWidth");
-				shaders.secondaryRaysRender.SetInt(wHeight, "renderHeight");
-				shaders.secondaryRaysRender.SetInt(frame, "frameIndex");
-				shaders.secondaryRaysRender.Use(wWidth / 32, wHeight / 32, 1);
-				shaders.secondaryRaysRender.SetUIntArray(ColorPallete.data(), ColorPallete.size(), "packedColors");
-
+				viewPort.SecondaryRays(matView, pos, forward, ColorPallete, frame, timeSpeed,wWidth,wHeight, &world);
 			}
+			auto secondaryRaysMs = secondaryRays.Stop();
 			if (graphicsSettings.renderClouds) {
-
-				Anubis::SwitchShaderStage(shaders.clouds.programID);
-				shaders.clouds.SetVector3({ pos.x,pos.y,pos.z }, "camPos");
-				shaders.clouds.SetVector3({ forward.x,forward.y,forward.z }, "camForward");
-				shaders.clouds.SetMatrix({ matView.m0,matView.m1,matView.m2,matView.m3,matView.m4,matView.m5,matView.m6,matView.m7,matView.m8,matView.m9,matView.m10,matView.m11,matView.m12,matView.m13,matView.m14,matView.m15 }, "matView");
-				shaders.clouds.SetMatrix({ matProj.m0,matProj.m1,matProj.m2,matProj.m3,matProj.m4,matProj.m5,matProj.m6,matProj.m7,matProj.m8,matProj.m9,matProj.m10,matProj.m11,matProj.m12,matProj.m13,matProj.m14,matProj.m15 }, "matProj");
-				shaders.clouds.SetInt(wx, "wx");
-				shaders.clouds.SetInt(wy, "wy");
-				shaders.clouds.SetInt(wz, "wz");
-				shaders.clouds.SetFloat(timeSpeed, "timeSpeed");
-				shaders.clouds.SetInt(wWidth, "renderWidth");
-				shaders.clouds.SetInt(wHeight, "renderHeight");
-				shaders.clouds.SetInt(frame, "frameIndex");
-				shaders.clouds.Use(wWidth / 32, wHeight / 32, 1);
+				viewPort.RenderClouds(matView, frame, pos, forward, wWidth,wHeight,timeSpeed);
 			}
 			for (auto& k : physicalObjects) {
 				bool downardsCollision = false;
@@ -1877,21 +1863,20 @@ world.array[nx][nz] = true;
 				k->position.z += k->velocity.z;
 
 			}
-			auto secondaryRaysMs = secondaryRays.Stop();
+			
+			shaders.display.Use();
+			shaders.display.SetInt(frame, "frameIndex");
 
-			shader->Use();
-			shader->SetInt(frame, "frameIndex");
-
-			shader->SetVector3({ pos.x,pos.y,pos.z }, "camPos");
-			shader->SetVector3({ forward.x,forward.y,forward.z }, "camForward");
-			shader->SetMatrix({ matView.m0,matView.m1,matView.m2,matView.m3,matView.m4,matView.m5,matView.m6,matView.m7,matView.m8,matView.m9,matView.m10,matView.m11,matView.m12,matView.m13,matView.m14,matView.m15 }, "matView");
-			shader->SetMatrix({ matProj.m0,matProj.m1,matProj.m2,matProj.m3,matProj.m4,matProj.m5,matProj.m6,matProj.m7,matProj.m8,matProj.m9,matProj.m10,matProj.m11,matProj.m12,matProj.m13,matProj.m14,matProj.m15 }, "matProj");
-			shader->SetInt(wx, "wx");
-			shader->SetInt(wy, "wy");
-			shader->SetInt(wz, "wz");
-			shader->SetUIntArray(ColorPallete.data(), ColorPallete.size(), "packedColors");
-			shader->SetInt(wHeight, "resY");
-			shader->SetVector4({ 1.0f, 1.0f, 1.0f, 1.0f }, "color");
+			shaders.display.SetVector3({ pos.x,pos.y,pos.z }, "camPos");
+			shaders.display.SetVector3({ forward.x,forward.y,forward.z }, "camForward");
+			shaders.display.SetMatrix({ matView.m0,matView.m1,matView.m2,matView.m3,matView.m4,matView.m5,matView.m6,matView.m7,matView.m8,matView.m9,matView.m10,matView.m11,matView.m12,matView.m13,matView.m14,matView.m15 }, "matView");
+			shaders.display.SetMatrix({ matProj.m0,matProj.m1,matProj.m2,matProj.m3,matProj.m4,matProj.m5,matProj.m6,matProj.m7,matProj.m8,matProj.m9,matProj.m10,matProj.m11,matProj.m12,matProj.m13,matProj.m14,matProj.m15 }, "matProj");
+			shaders.display.SetInt(wx, "wx");
+			shaders.display.SetInt(wy, "wy");
+			shaders.display.SetInt(wz, "wz");
+			shaders.display.SetUIntArray(ColorPallete.data(), ColorPallete.size(), "packedColors");
+			shaders.display.SetInt(wHeight, "resY");
+			shaders.display.SetVector4({ 1.0f, 1.0f, 1.0f, 1.0f }, "color");
 			Anubis::Quad quad;
 			quad.Create();
 			window.DrawQuad(quad);

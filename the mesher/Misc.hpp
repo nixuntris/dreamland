@@ -7,7 +7,6 @@
 
 struct ShaderManager {
 	Anubis::DisplayShader display;
-	Anubis::DisplayShader displayNoFXAA;
 	Anubis::DisplayShader hwRender;
 	Anubis::DisplayShader hwRenderForObjects;
 	Anubis::ComputeShader rasterizer;
@@ -37,10 +36,6 @@ struct ShaderManager {
 
 		display.LoadFromFile(
 			path("quad_display_shader.fs").c_str(),
-			"Anubis/BaseShaders/quad_display_shader.vs"
-		);
-		displayNoFXAA.LoadFromFile(
-			path("quad_display_no_fxaa.glsl").c_str(),
 			"Anubis/BaseShaders/quad_display_shader.vs"
 		);
 		rasterizer.Setup(path("Rasterize.glsl").c_str());
