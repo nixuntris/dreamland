@@ -142,6 +142,7 @@ struct ViewPort {
 	Math::Vector3 planeNormals[6];
 	Anubis::Camera camera;
 	float planeDs[6];
+	bool raytracePrimaryRays = false;
 	void FrustumCull(Matrix matView, Vector3 pos, Vector3 forward, int totalMeshletCount) {
 
 		ExtractFrustumPlanes(matView, planes);
@@ -226,22 +227,41 @@ struct ViewPort {
 		renderSphere.Draw();
 	};
 	void RasterizeMeshes(Matrix matView, Vector3 pos, Vector3 forward, const std::vector<uint32_t> palette, int frame, int triangleCount, int wWidth, int wHeight) {
+		if (raytracePrimaryRays) {
+			Anubis::SwitchShaderStage(shaders->primaryRays.programID);
+			shaders->primaryRays.SetVector3({ pos.x,pos.y,pos.z }, "camPos");
+			shaders->primaryRays.SetVector3({ forward.x,forward.y,forward.z }, "camForward");
+			shaders->primaryRays.SetMatrix({ matView.m0,matView.m1,matView.m2,matView.m3,matView.m4,matView.m5,matView.m6,matView.m7,matView.m8,matView.m9,matView.m10,matView.m11,matView.m12,matView.m13,matView.m14,matView.m15 }, "matView");
+			shaders->primaryRays.SetMatrix({ matProj.m0,matProj.m1,matProj.m2,matProj.m3,matProj.m4,matProj.m5,matProj.m6,matProj.m7,matProj.m8,matProj.m9,matProj.m10,matProj.m11,matProj.m12,matProj.m13,matProj.m14,matProj.m15 }, "matProj");
+			shaders->primaryRays.SetInt(wx, "wx");
+			shaders->primaryRays.SetInt(wy, "wy");
+			shaders->primaryRays.SetInt(wz, "wz");
+			shaders->primaryRays.SetUIntArray(palette.data(), palette.size(), "packedColors");
+			shaders->primaryRays.SetInt(wWidth, "renderWidth");
+			shaders->primaryRays.SetInt(wHeight, "renderHeight");
+			shaders->primaryRays.SetInt(frame, "frameIndex");
+			shaders->primaryRays.SetInt(0, "offset");
 
-		Anubis::SwitchShaderStage(shaders->rasterizer.programID);
-		shaders->rasterizer.SetVector3({ pos.x,pos.y,pos.z }, "camPos");
-		shaders->rasterizer.SetVector3({ forward.x,forward.y,forward.z }, "camForward");
-		shaders->rasterizer.SetMatrix({ matView.m0,matView.m1,matView.m2,matView.m3,matView.m4,matView.m5,matView.m6,matView.m7,matView.m8,matView.m9,matView.m10,matView.m11,matView.m12,matView.m13,matView.m14,matView.m15 }, "matView");
-		shaders->rasterizer.SetMatrix({ matProj.m0,matProj.m1,matProj.m2,matProj.m3,matProj.m4,matProj.m5,matProj.m6,matProj.m7,matProj.m8,matProj.m9,matProj.m10,matProj.m11,matProj.m12,matProj.m13,matProj.m14,matProj.m15 }, "matProj");
-		shaders->rasterizer.SetInt(wx, "wx");
-		shaders->rasterizer.SetInt(wy, "wy");
-		shaders->rasterizer.SetInt(wz, "wz");
-		shaders->rasterizer.SetUIntArray(palette.data(), palette.size(), "packedColors");
-		shaders->rasterizer.SetInt(wWidth, "renderWidth");
-		shaders->rasterizer.SetInt(wHeight, "renderHeight");
-		shaders->rasterizer.SetInt(frame, "frameIndex");
-		shaders->rasterizer.SetInt(0, "offset");
+			shaders->primaryRays.Use(wWidth/8, wHeight/8, 1);
 
-		shaders->rasterizer.Use(floor(triangleCount), 1, 1);
+		}
+		else {
+			Anubis::SwitchShaderStage(shaders->rasterizer.programID);
+			shaders->rasterizer.SetVector3({ pos.x,pos.y,pos.z }, "camPos");
+			shaders->rasterizer.SetVector3({ forward.x,forward.y,forward.z }, "camForward");
+			shaders->rasterizer.SetMatrix({ matView.m0,matView.m1,matView.m2,matView.m3,matView.m4,matView.m5,matView.m6,matView.m7,matView.m8,matView.m9,matView.m10,matView.m11,matView.m12,matView.m13,matView.m14,matView.m15 }, "matView");
+			shaders->rasterizer.SetMatrix({ matProj.m0,matProj.m1,matProj.m2,matProj.m3,matProj.m4,matProj.m5,matProj.m6,matProj.m7,matProj.m8,matProj.m9,matProj.m10,matProj.m11,matProj.m12,matProj.m13,matProj.m14,matProj.m15 }, "matProj");
+			shaders->rasterizer.SetInt(wx, "wx");
+			shaders->rasterizer.SetInt(wy, "wy");
+			shaders->rasterizer.SetInt(wz, "wz");
+			shaders->rasterizer.SetUIntArray(palette.data(), palette.size(), "packedColors");
+			shaders->rasterizer.SetInt(wWidth, "renderWidth");
+			shaders->rasterizer.SetInt(wHeight, "renderHeight");
+			shaders->rasterizer.SetInt(frame, "frameIndex");
+			shaders->rasterizer.SetInt(0, "offset");
+
+			shaders->rasterizer.Use(floor(triangleCount), 1, 1);
+		}
 	}
 	void RenderGrass(Matrix matView, Vector3 pos, Vector3 forward, int frame, int wWidth, int wHeight, int grass) {
 
@@ -1947,6 +1967,7 @@ world.array[nx][nz] = true;
 				CustomToggle("Simulate Physics", &graphicsSettings.simulatePhysics);
 				CustomToggle("Render Fluids", &graphicsSettings.renderFluids);
 				CustomToggle("Render Clouds", &graphicsSettings.renderClouds);
+				CustomToggle("Raytrace/Rasterize", &viewPort.raytracePrimaryRays);
 
 				if (ImGui::Button("Reset entities")) {
 				}

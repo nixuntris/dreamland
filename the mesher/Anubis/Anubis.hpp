@@ -5,13 +5,6 @@
 #include "AnubisMath.hpp"
 #include <cinttypes>
 #include <vector>
-namespace MEMORY_READING {
-    typedef enum {
-        VBO_FREE_MEMORY_ATI = 0x87FB,
-        TEXTURE_FREE_MEMORY_ATI = 0x87FC,
-        RENDERBUFFER_FREE_MEMORY_ATI = 0x87FD
-    } EXTENSION_MEMORY_SPACE;
-}
 namespace KEY {
     typedef enum {
         KEY_NULL = 0,

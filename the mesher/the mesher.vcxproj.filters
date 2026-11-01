@@ -19,20 +19,8 @@
     <Filter Include="Source Files\Shaders\Rasterizer">
       <UniqueIdentifier>{5c65c98a-6286-46c3-9cac-6e36de3b212a}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Source Files\Shaders\Rasterizer\Software">
-      <UniqueIdentifier>{111a0ba8-f8ea-4e31-8113-d17b06bd4339}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Source Files\Shaders\Rasterizer\Hardware">
       <UniqueIdentifier>{4a1ad81f-1b7f-4ecf-ae47-f4184ffda435}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Source Files\Shaders\Rasterizer\Software\Particles">
-      <UniqueIdentifier>{dfd8ff1c-82c1-4fef-ad2d-fa99cf545eb5}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Source Files\Shaders\Rasterizer\Software\Meshlets">
-      <UniqueIdentifier>{830b3d88-0d64-4f28-953e-cbdd7da0d4db}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Source Files\Shaders\Rasterizer\Software\Illumination">
-      <UniqueIdentifier>{2ee64cd7-62f8-4e5b-908f-f497cd078433}</UniqueIdentifier>
     </Filter>
     <Filter Include="Source Files\terrain">
       <UniqueIdentifier>{19e452bc-7f58-48d7-a188-aa5916f2e229}</UniqueIdentifier>
@@ -49,11 +37,26 @@
     <Filter Include="Source Files\CPU Code">
       <UniqueIdentifier>{4fd25b9d-8f9a-4458-b9e9-43b1aab2cbd1}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Source Files\Shaders\Rasterizer\Software\Illumination\Display Output">
-      <UniqueIdentifier>{6342455b-b947-410c-ba50-de4dfab1ec88}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Source Files\Abstraction Layer\Opengl">
       <UniqueIdentifier>{5f83a762-a377-48c4-9b68-5de14add4ba7}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\Shaders\Rasterizer\Meshlets">
+      <UniqueIdentifier>{830b3d88-0d64-4f28-953e-cbdd7da0d4db}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\Shaders\Rasterizer\Particles">
+      <UniqueIdentifier>{dfd8ff1c-82c1-4fef-ad2d-fa99cf545eb5}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\Shaders\Raytracing">
+      <UniqueIdentifier>{111a0ba8-f8ea-4e31-8113-d17b06bd4339}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\Shaders\Raytracing\Illumination">
+      <UniqueIdentifier>{2ee64cd7-62f8-4e5b-908f-f497cd078433}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\Shaders\Raytracing\Illumination\Display Output">
+      <UniqueIdentifier>{6342455b-b947-410c-ba50-de4dfab1ec88}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\Shaders\Raytracing\Primary Rays">
+      <UniqueIdentifier>{31697c98-c16b-4e9a-8b28-c9bdebb6d378}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
@@ -98,22 +101,22 @@
       <Filter>Source Files\Shaders\Rasterizer\Hardware</Filter>
     </None>
     <None Include="grassParticle.glsl">
-      <Filter>Source Files\Shaders\Rasterizer\Software\Particles</Filter>
+      <Filter>Source Files\Shaders\Rasterizer\Particles</Filter>
     </None>
     <None Include="frustumCull.glsl">
-      <Filter>Source Files\Shaders\Rasterizer\Software\Meshlets</Filter>
+      <Filter>Source Files\Shaders\Rasterizer\Meshlets</Filter>
     </None>
     <None Include="HizBuilder.glsl">
-      <Filter>Source Files\Shaders\Rasterizer\Software\Meshlets</Filter>
+      <Filter>Source Files\Shaders\Rasterizer\Meshlets</Filter>
     </None>
     <None Include="Rasterize.glsl">
-      <Filter>Source Files\Shaders\Rasterizer\Software\Meshlets</Filter>
+      <Filter>Source Files\Shaders\Rasterizer\Meshlets</Filter>
     </None>
     <None Include="renderAABB.glsl">
-      <Filter>Source Files\Shaders\Rasterizer\Software\Meshlets</Filter>
+      <Filter>Source Files\Shaders\Rasterizer\Meshlets</Filter>
     </None>
     <None Include="SecondaryRays.glsl">
-      <Filter>Source Files\Shaders\Rasterizer\Software\Illumination</Filter>
+      <Filter>Source Files\Shaders\Raytracing\Illumination</Filter>
     </None>
     <None Include="RenderFluids.glsl">
       <Filter>Source Files\Shaders\Rasterizer\Physics</Filter>
@@ -125,25 +128,25 @@
       <Filter>Resource Files</Filter>
     </None>
     <None Include="quad_display_shader.fs">
-      <Filter>Source Files\Shaders\Rasterizer\Software\Illumination\Display Output</Filter>
+      <Filter>Source Files\Shaders\Raytracing\Illumination\Display Output</Filter>
     </None>
     <None Include="PhysicsObject.glsl">
-      <Filter>Source Files\Shaders\Rasterizer\Software\Particles</Filter>
+      <Filter>Source Files\Shaders\Rasterizer\Particles</Filter>
     </None>
     <None Include="ClearPhysicalObject.glsl">
-      <Filter>Source Files\Shaders\Rasterizer\Software\Particles</Filter>
+      <Filter>Source Files\Shaders\Rasterizer\Particles</Filter>
     </None>
     <None Include="FillOutPhysicsData.glsl">
-      <Filter>Source Files\Shaders\Rasterizer\Software\Particles</Filter>
+      <Filter>Source Files\Shaders\Rasterizer\Particles</Filter>
     </None>
     <None Include="hwMesh.fs">
       <Filter>Source Files\Shaders\Rasterizer\Hardware</Filter>
     </None>
     <None Include="Clouds.glsl">
-      <Filter>Source Files\Shaders\Rasterizer\Software\Illumination</Filter>
+      <Filter>Source Files\Shaders\Raytracing\Illumination</Filter>
     </None>
     <None Include="bilboard.glsl">
-      <Filter>Source Files\Shaders\Rasterizer\Software\Meshlets</Filter>
+      <Filter>Source Files\Shaders\Rasterizer\Meshlets</Filter>
     </None>
     <None Include="..\readme.md">
       <Filter>Source Files</Filter>
@@ -152,7 +155,10 @@
       <Filter>Source Files\terrain\example terrain</Filter>
     </None>
     <None Include="Anubis\BaseShaders\quad_display_shader.vs">
-      <Filter>Source Files\Shaders\Rasterizer\Software\Illumination\Display Output</Filter>
+      <Filter>Source Files\Shaders\Raytracing\Illumination\Display Output</Filter>
+    </None>
+    <None Include="PrimaryRays.glsl">
+      <Filter>Source Files\Shaders\Raytracing\Primary Rays</Filter>
     </None>
   </ItemGroup>
   <ItemGroup>

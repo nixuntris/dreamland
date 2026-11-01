@@ -21,6 +21,7 @@ struct ShaderManager {
 	Anubis::ComputeShader bilboards;
 	Anubis::ComputeShader renderPhysicalObjects;
 	Anubis::ComputeShader clearPhysicalObjects;
+	Anubis::ComputeShader primaryRays;
 	void Load() {
 
 		std::string shaderDir = "";
@@ -38,6 +39,7 @@ struct ShaderManager {
 			path("quad_display_shader.fs").c_str(),
 			"Anubis/BaseShaders/quad_display_shader.vs"
 		);
+		primaryRays.Setup(path("PrimaryRays.glsl").c_str());
 		rasterizer.Setup(path("Rasterize.glsl").c_str());
 		frustumCull.Setup(path("frustumCull.glsl").c_str());
 		hizBuilder.Setup(path("HizBuilder.glsl").c_str());

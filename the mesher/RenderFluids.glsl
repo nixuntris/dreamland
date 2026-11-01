@@ -1,5 +1,7 @@
 #version 460
 #extension GL_ARB_bindless_texture : require
+#extension GL_ARB_shader_ballot : require
+#extension GL_ARB_shader_group_vote : require
 
 const int groupSize = 8;
 const int chunkSize = 32;
@@ -54,27 +56,36 @@ shared int sMin[threadCount * 3];
 shared int sMax[threadCount * 3];
 shared int sBegin;
 
+
 uint readVoxelData(ivec3 pos) {
     if (any(lessThan(pos, ivec3(0))) ||
         pos.x >= wx * chunkSize ||
         pos.y >= wy * chunkSize ||
         pos.z >= wz * chunkSize)
-        return 1u;
-
+        return 0u;   
     ivec3 chunk = pos / chunkSize;
     int index = chunk.y * (wx * wz) + chunk.z * wx + chunk.x;
     int regionLod = handles[index].lod;
-    if (regionLod==3000) return 1u;
+    if (regionLod == 3000) return 1u;
     uvec2 handle = handles[index].handle;
     if (handle != uvec2(0)) {
         uimage3D fluidMap = uimage3D(handle);
         ivec3 lp = (pos & (chunkSize - 1)) / regionLod;
-        return imageLoad(fluidMap, lp).x;
+        uint r = 0u;
+        bool pending = true;
+        while (anyInvocationARB(pending)) {
+            if (pending) {
+                uvec2 cur = uvec2(readFirstInvocationARB(handle.x), readFirstInvocationARB(handle.y));
+                if (handle == cur) {
+                    r = imageLoad(uimage3D(cur), lp).x;
+                    pending = false;
+                }
+            }
+        }
+        return r;
     }
-
     return 0u;
 }
-
 uint PackMetaData(uint mask, uint lod, uint type)
 {
     return (mask & 0x3Fu)
