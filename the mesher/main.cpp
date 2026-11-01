@@ -242,7 +242,7 @@ struct ViewPort {
 			shaders->primaryRays.SetInt(frame, "frameIndex");
 			shaders->primaryRays.SetInt(0, "offset");
 
-			shaders->primaryRays.Use(wWidth/8, wHeight/8, 1);
+			shaders->primaryRays.Use(wWidth/32, wHeight/16, 1);
 
 		}
 		else {
@@ -1669,7 +1669,7 @@ world.array[nx][nz] = true;
 					}
 				}
 			}
-			if (drd > 0) {
+			if (drd > 0 && !viewPort.raytracePrimaryRays) {
 				shaders.display.UpdateSSBO(10, vv, drd * sizeof(Math::IVector3), 0);
 
 				auto batchUploadEnd = std::chrono::high_resolution_clock::now();

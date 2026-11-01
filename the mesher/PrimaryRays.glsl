@@ -2,7 +2,7 @@
 #extension GL_ARB_bindless_texture : require
 #extension GL_ARB_shader_ballot : require
 #extension GL_ARB_shader_group_vote : require
-layout (local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
+layout (local_size_x = 32, local_size_y = 16, local_size_z = 1) in;
 
 const int chunkSize = 32;
 
@@ -22,7 +22,7 @@ struct Region {
 layout(std430, binding = 3) buffer BitHandles {
     Region handles[];
 };
-
+uniform vec3 camForward;
 uniform int wx;
 uniform int wy;
 uniform int wz;
@@ -31,7 +31,7 @@ uniform int renderHeight;
 uniform vec3 camPos;
 uniform mat4 matView;
 uniform mat4 matProj;
-
+uniform int frameIndex;
 uint readVoxelData(ivec3 pos) {
     if (any(lessThan(pos, ivec3(0))) ||
         pos.x >= wx * chunkSize ||
@@ -62,8 +62,58 @@ uint readVoxelData(ivec3 pos) {
     return 0u;
 }
 
+uniform uint packedColors[1024];
+uint hashVec3(vec3 v) {
+    uint x = uint(v.x);
+    uint y = uint(v.y);
+    uint z = uint(v.z);
+    uint h = x * 374761393u + y * 668265263u + z * 1274126177u;
+    h = (h ^ (h >> 13)) * 1274126177u;
+    return h ^ (h >> 16);
+}
+vec4 unpackRGBA8(uint packedr)
+{
+    return vec4(
+        float( packedr        & 0xFFu),
+        float((packedr >>  8) & 0xFFu),
+        float((packedr >> 16) & 0xFFu),
+        float((packedr >> 24) & 0xFFu)
+    ) * (1.0 / 255.0);
+}
+uint packRGBA8(vec4 color)
+{
+   vec4 c = clamp(color, 0.0, 1.0);
+   uvec4 bytes = uvec4(c * 255.0 + 0.5);
+
+   return
+        ( bytes.r        ) |
+        ( bytes.g <<  8 ) |
+        ( bytes.b << 16 ) |
+        ( bytes.a << 24 );
+}
+
+void skipChunk(inout ivec3 cell, inout vec3 tMax, ivec3 stepDir, vec3 tDelta)
+{
+    ivec3 chunkMin = (cell / chunkSize) * chunkSize;
+    ivec3 chunkMax = chunkMin + chunkSize;
+    ivec3 nI = mix(cell - chunkMin + 1,
+                   chunkMax - cell,
+                   greaterThan(stepDir, ivec3(0)));
+    vec3 n = vec3(nI);
+    vec3 tAxisExit = tMax + (n - 1.0) * tDelta;
+    float tExit = min(tAxisExit.x, min(tAxisExit.y, tAxisExit.z));
+    vec3 k = floor((tExit - tMax) / tDelta) + 1.0;
+    k = clamp(k, vec3(0.0), n);
+    k = mix(k, n, equal(tAxisExit, vec3(tExit)));
+
+    ivec3 ki = ivec3(k);
+    cell += stepDir * ki;
+    tMax += tDelta * vec3(ki);
+}
 void main() {
     ivec2 px = ivec2(gl_GlobalInvocationID.xy);
+    px.y*=2;
+    px.y += (frameIndex+1)%2;
     if (px.x >= renderWidth || px.y >= renderHeight) return;
 
     vec2 ndc = vec2((px.x + 0.5) / renderWidth * 2.0 - 1.0,
@@ -79,18 +129,55 @@ void main() {
 
     uint color = 0xFFF2BF87u; 
     int axis = 0;
-
-    for (int i = 0; i < 1024; i++) {
+    bool hitAnything = false;
+    for (int i = 0; i < 4096; i++) {
         uint v = readVoxelData(cell);
+        
+        if (any(lessThan(cell, ivec3(0))) ||
+            cell.x >= wx * chunkSize ||
+            cell.y >= wy * chunkSize ||
+            cell.z >= wz * chunkSize || 
+            distance(floor(camPos),cell)>4096)
+            break;   
+            
+
+        ivec3 chunk = cell / chunkSize;
+        int index = chunk.y * (wx * wz) + chunk.z * wx + chunk.x;
+
+        if (handles[index].lod == 0) { 
+            skipChunk(cell, tMax, stepDir, tDelta);
+            continue;
+        }
+        
         if (v != 0u) {
-            uint g = uint(clamp(float(v) * 40.0, 0.0, 255.0));
-            color = g | (g << 8) | (g << 16) | (255u << 24);
+            color = packedColors[v-1];
+            hitAnything = true;
             break;
         }
-        if (tMax.x < tMax.y && tMax.x < tMax.z) { cell.x += stepDir.x; tMax.x += tDelta.x; axis = 0; }
-        else if (tMax.y < tMax.z)                { cell.y += stepDir.y; tMax.y += tDelta.y; axis = 1; }
-        else                                     { cell.z += stepDir.z; tMax.z += tDelta.z; axis = 2; }
-    }
+        bvec3 mask = lessThanEqual(tMax.xyz, min(tMax.yzx, tMax.zxy));
 
-    frame[px.y * 3840 + px.x] = color;
+        ivec3 stepMask = ivec3(mask);
+        cell += stepDir * stepMask;
+        tMax += tDelta * vec3(stepMask);
+    }
+    
+    int distance = int(dot(cell-camPos, camForward));
+    if (distance<depth[px.y * 3840 + px.x] && hitAnything) {
+    
+        uint hash = hashVec3(vec3(cell));
+        if (hash%2==0) {
+            vec4 hr = unpackRGBA8(color);
+            hr.rgb *= 0.95;
+            color = packRGBA8(hr);
+        }
+        else if (hash%3==0) {
+            vec4 hr = unpackRGBA8(color);
+            hr.rgb *= 1.05;
+            color = packRGBA8(hr);
+        }
+        frame[px.y * 3840 + px.x] = color;
+        depth[px.y * 3840 + px.x] = distance;
+        pos[px.y * 3840 + px.x] = vec3(cell);
+        voxelId[px.y * 3840 + px.x] = int(readVoxelData(cell));
+    }
 }
