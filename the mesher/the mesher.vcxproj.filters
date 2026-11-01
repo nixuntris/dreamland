@@ -52,6 +52,9 @@
     <Filter Include="Source Files\Shaders\Rasterizer\Software\Illumination\Display Output">
       <UniqueIdentifier>{6342455b-b947-410c-ba50-de4dfab1ec88}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source Files\Abstraction Layer\Opengl">
+      <UniqueIdentifier>{5f83a762-a377-48c4-9b68-5de14add4ba7}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="PerlinAVX2.hpp">
@@ -59,6 +62,9 @@
     </ClCompile>
     <ClCompile Include="main.cpp">
       <Filter>Source Files\terrain</Filter>
+    </ClCompile>
+    <ClCompile Include="AnubisOpengl.cpp">
+      <Filter>Source Files\Abstraction Layer\Opengl</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

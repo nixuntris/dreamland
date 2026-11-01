@@ -19,28 +19,12 @@ using Clock = std::chrono::high_resolution_clock;
     std::cout << #name << ": " \
     << std::chrono::duration<double, std::milli>(name##_end - name##_start).count() \
     << " ms\n";
-const Matrix matProj = MatrixPerspective(90 * DEG2RAD, ((double)1920 / (double)1080), 0.1, 100000.0);
-const float f_pixels = matProj.m0 * 1280.0f*0.5f;
-struct Frame {
-	uint32_t pixels[1920 * 1080];
-};
-struct Vector3HP {
-	float16 x;
-	float16 y;
-	float16 z;
-};
-inline uint32_t PackRGBA8(Color color)
-{
-	return
-		(uint32_t(color.r)) |
-		(uint32_t(color.g) << 8) |
-		(uint32_t(color.b) << 16) |
-		(uint32_t(color.a) << 24);
-}
 struct Plane {
 	Vector3 normal;
 	float d;
 };
+
+const Matrix matProj = MatrixPerspective(90 * DEG2RAD, ((double)1920 / (double)1080), 0.1, 100000.0);
 
 void ExtractFrustumPlanes(Matrix view, Plane *planes)
 {
@@ -60,17 +44,6 @@ void ExtractFrustumPlanes(Matrix view, Plane *planes)
 		planes[i].d /= len;
 	}
 }
-inline bool TriangleInFrustum(Vector3 v1, Vector3 v2, Vector3 v3, Plane planes[6]) {
-	for (int i = 0; i < 6; i++)
-	{
-		if ((planes[i].normal.x * v2.x + planes[i].normal.y * v2.y + planes[i].normal.z * v2.z) + planes[i].d < 0 &&
-			(planes[i].normal.x * v1.x + planes[i].normal.y * v1.y + planes[i].normal.z * v1.z) + planes[i].d < 0 &&
-			(planes[i].normal.x * v3.x + planes[i].normal.y * v3.y + planes[i].normal.z * v3.z) + planes[i].d < 0) {
-			return false;
-		}
-	}
-	return true;
-}
 inline bool BoxInFrustum(Vector3 min, Vector3 max, Plane planes[6]) {
 	for (int i = 0; i < 6; i++) {
 		const Plane& p = planes[i];
@@ -89,6 +62,3 @@ inline bool BoxInFrustum(Vector3 min, Vector3 max, Plane planes[6]) {
 	}
 	return true;
 }
-
-bool bitTheBullet = false;
-

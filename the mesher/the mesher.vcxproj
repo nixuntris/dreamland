@@ -132,6 +132,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="AnubisOpengl.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="PerlinAVX2.hpp" />
   </ItemGroup>

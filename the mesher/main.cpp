@@ -68,7 +68,7 @@ public:
 	void PushRenderParticle(Math::Vector3 position, Color color, void (*update)(Particle&)) {
 		Particle particle;
 		particle.position = position;
-		particle.color = PackRGBA8(color);
+		particle.color = 0;
 		particle.update = update;
 		particles[renderQueue++] = particle;
 	}
@@ -94,7 +94,7 @@ public:
 				shaders->bilboards.SetVector3Array(billboardPoses, renderPassAmount, "billboards");
 				shaders->bilboards.SetInt(frameIndex, "frameIndex");
 				shaders->bilboards.SetFloat(1, "billboardSize");
-				shaders->bilboards.SetInt(PackRGBA8({0,0,0,0}), "billboardColor");
+				shaders->bilboards.SetInt(0, "billboardColor");
 				shaders->bilboards.Use(renderQueue / 64, 1, 1);
 				renderPassAmount = 0;
 				//dispatch
@@ -115,7 +115,7 @@ public:
 			shaders->bilboards.SetInt(wHeight, "renderHeight");
 			shaders->bilboards.SetVector3Array(billboardPoses, renderPassAmount, "billboards");
 			shaders->bilboards.SetInt(frameIndex, "frameIndex");
-			shaders->bilboards.SetInt(PackRGBA8({ 0,0,0,0 }), "billboardColor");
+			shaders->bilboards.SetInt(0, "billboardColor");
 			shaders->bilboards.SetFloat(1, "billboardSize");;
 
 			shaders->bilboards.Use(renderQueue/64, 1, 1);
@@ -510,6 +510,7 @@ public:
 		int worldSize = 0;
 		bool running = true;
 		bool pregenerate = true;
+		bool spawnCritters = false;
 		while (running && window.IsOpen()) {
 			window.EnableCursor();
 			oldMouse = window.GetMousePos();
@@ -593,6 +594,10 @@ public:
 				if (ImGui::IsItemHovered()) {
 					ImGui::SetTooltip("Generate all chunks during loading before the game starts.\n");
 				}
+				ImGui::Checkbox("Spawn Critters", &spawnCritters);
+				if (ImGui::IsItemHovered()) {
+					ImGui::SetTooltip("Currently it's just debug flies.\n");
+				}
 				ImGui::Unindent();
 				ImGui::Spacing();
 			}
@@ -625,11 +630,14 @@ public:
 				}
 
 				particleRenderer.Create();
-				for (int i = 0; i < 10000; i++) {
-					particleRenderer.PushRenderParticle({ (float)GetRandomValue(wx * 16 + 32, wx * 16-  32),300,(float)GetRandomValue(wx * 16 + 32, wx * 16- 32) }, { 255,255,255,255 }, ExampleUpdate);
-					particleRenderer.particles[i].targetPosition.x = wx * 16;
-					particleRenderer.particles[i].targetPosition.z = wz * 16;
-					particleRenderer.particles[i].targetPosition.y = 300;
+				if (spawnCritters) {
+					for (int i = 0; i < 10000; i++) {
+						particleRenderer.PushRenderParticle({ (float)GetRandomValue(wx * 16 + 32, wx * 16 - 32),300,(float)GetRandomValue(wx * 16 + 32, wx * 16 - 32) }, { 255,255,255,255 }, ExampleUpdate);
+						particleRenderer.particles[i].targetPosition.x = wx * 16;
+						particleRenderer.particles[i].targetPosition.z = wz * 16;
+						particleRenderer.particles[i].targetPosition.y = 300;
+
+					}
 
 				}
 
@@ -2010,6 +2018,19 @@ world.array[nx][nz] = true;
 			else {
 				window.DisableCursor();
 			}
+			ImGui::SetNextWindowPos(ImVec2(10, 10), ImGuiCond_Always);
+			ImGui::SetNextWindowBgAlpha(0.35f); 
+			ImGui::Begin("##fps", nullptr,
+				ImGuiWindowFlags_NoDecoration |
+				ImGuiWindowFlags_AlwaysAutoResize |
+				ImGuiWindowFlags_NoSavedSettings |
+				ImGuiWindowFlags_NoFocusOnAppearing |
+				ImGuiWindowFlags_NoNav |
+				ImGuiWindowFlags_NoInputs);     
+			ImGui::Text("FPS: %.1f", ImGui::GetIO().Framerate);
+			ImGui::Text("Frame: %.2f ms", 1000.0f / ImGui::GetIO().Framerate);
+
+			ImGui::End();
 			std::cout << window.getFPS() << "\n";
 			ImGui::Render();
 			ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
@@ -2025,7 +2046,7 @@ world.array[nx][nz] = true;
 			shaders.hizBuilder.Use(wWidth / 32, 1, wHeight / 32);
 
 			double elapsed = glfwGetTime() - frameStart;
-			double remaining = (1.0 / 75.0) - elapsed;
+			double remaining = (1.0 / 150.0) - elapsed;
 			if (remaining > 0.0) {
 				std::this_thread::sleep_for(std::chrono::duration<double>(remaining));
 			}
