@@ -22,12 +22,6 @@
     <Filter Include="Source Files\Shaders\Rasterizer\Hardware">
       <UniqueIdentifier>{4a1ad81f-1b7f-4ecf-ae47-f4184ffda435}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Source Files\terrain">
-      <UniqueIdentifier>{19e452bc-7f58-48d7-a188-aa5916f2e229}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Source Files\terrain\example terrain">
-      <UniqueIdentifier>{84d25c7b-74a7-4e39-b3fb-7896cacd12b3}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Source Files\Abstraction Layer">
       <UniqueIdentifier>{ed7593ff-b3a1-4120-8781-aad4846f76d2}</UniqueIdentifier>
     </Filter>
@@ -58,16 +52,22 @@
     <Filter Include="Source Files\Shaders\Raytracing\Primary Rays">
       <UniqueIdentifier>{31697c98-c16b-4e9a-8b28-c9bdebb6d378}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source Files\terrain">
+      <UniqueIdentifier>{19e452bc-7f58-48d7-a188-aa5916f2e229}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\terrain\example terrain">
+      <UniqueIdentifier>{84d25c7b-74a7-4e39-b3fb-7896cacd12b3}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="PerlinAVX2.hpp">
       <Filter>Source Files\Abstraction Layer</Filter>
     </ClCompile>
-    <ClCompile Include="main.cpp">
-      <Filter>Source Files\terrain</Filter>
-    </ClCompile>
     <ClCompile Include="AnubisOpengl.cpp">
       <Filter>Source Files\Abstraction Layer\Opengl</Filter>
+    </ClCompile>
+    <ClCompile Include="main.cpp">
+      <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

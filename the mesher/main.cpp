@@ -245,7 +245,7 @@ struct ViewPort {
 			shaders->primaryRays.Use(wWidth/32, wHeight/16, 1);
 
 		}
-		else {
+		else if (triangleCount > 0) {
 			Anubis::SwitchShaderStage(shaders->rasterizer.programID);
 			shaders->rasterizer.SetVector3({ pos.x,pos.y,pos.z }, "camPos");
 			shaders->rasterizer.SetVector3({ forward.x,forward.y,forward.z }, "camForward");
@@ -354,6 +354,9 @@ public:
 		//478476 - triangles
 		wWidth = graphicsSettings.resolutions[currentResolutionWindow].width;
 		wHeight = graphicsSettings.resolutions[currentResolutionWindow].height;
+
+		matProj = MatrixPerspective(90 * DEG2RAD, ((double)wWidth / (double)wHeight), 0.1, 100000.0);
+
 		window.Init(wWidth,wHeight,4,6,"software rasterization");
 		window.DisableCursor();
 		window.Resize(600, 800);
@@ -770,6 +773,7 @@ public:
 
 			if (ImGui::CollapsingHeader("Advanced")) {
 				ImGui::Indent();
+
 				ImGui::Checkbox("Pregenerate World", &pregenerate);
 				if (ImGui::IsItemHovered()) {
 					ImGui::SetTooltip("Generate all chunks during loading before the game starts.\n");
@@ -778,6 +782,7 @@ public:
 				if (ImGui::IsItemHovered()) {
 					ImGui::SetTooltip("Currently it's just debug flies.\n");
 				}
+				ImGui::Checkbox("Rasterize/Raytrace", &viewPort.raytracePrimaryRays);
 				ImGui::Unindent();
 				ImGui::Spacing();
 			}
@@ -1297,7 +1302,7 @@ world.array[nx][nz] = true;
 			int trianglesRendered = 0;
 			Anubis::GpuTimer raster;
 			raster.Start();
-			if (graphicsSettings.hardwareSoftwareRendering && triangleCount > 0) {
+			if (graphicsSettings.hardwareSoftwareRendering) {
 				viewPort.RasterizeMeshes(matView, pos, forward, ColorPallete, frame, triangleCount, wWidth, wHeight);
 				trianglesRendered = triangleCount;
 			}
@@ -1939,6 +1944,7 @@ world.array[nx][nz] = true;
 						window.Resize(graphicsSettings.resolutions[currentResolutionWindow].width, graphicsSettings.resolutions[currentResolutionWindow].height);
 						wWidth = graphicsSettings.resolutions[currentResolutionWindow].width;
 						wHeight = graphicsSettings.resolutions[currentResolutionWindow].height;
+						matProj = MatrixPerspective(90 * DEG2RAD, ((double)wWidth / (double)wHeight), 0.1, 100000.0);
 					}
 
 					if (currentResolutionWindow == i) {
@@ -2037,6 +2043,7 @@ world.array[nx][nz] = true;
 			ImGui::Text("Frame: %.2f ms", 1000.0f / ImGui::GetIO().Framerate);
 
 			ImGui::End();
+			std::cout << viewPort.camera.GetForward().x << " " << viewPort.camera.GetForward().y << " " << viewPort.camera.GetForward().z << "\n";
 			std::cout << window.getFPS() << "\n";
 			ImGui::Render();
 			ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());

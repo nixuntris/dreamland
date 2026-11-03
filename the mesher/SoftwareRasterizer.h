@@ -24,7 +24,7 @@ struct Plane {
 	float d;
 };
 
-const Matrix matProj = MatrixPerspective(90 * DEG2RAD, ((double)1920 / (double)1080), 0.1, 100000.0);
+Matrix matProj = MatrixPerspective(90 * DEG2RAD, ((double)1920 / (double)1080), 0.1, 100000.0);
 
 void ExtractFrustumPlanes(Matrix view, Plane *planes)
 {
