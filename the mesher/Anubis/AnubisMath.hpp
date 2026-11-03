@@ -33,57 +33,51 @@ namespace Math {
         double z;
         double w;
     };
-    inline Vector3 IVec3ToVec3(IVector3 vec) {
-        return { float(vec.x), float(vec.y), float(vec.z) };
-    }
-    inline IVector3 Vec3ToIVec3(Vector3 vec) {
-        return { int(vec.x), int(vec.y), int(vec.z) };
-    }
-    inline double dot(Vector3 vec1, Vector3 vec2) {
+    inline static double dot(Vector3 vec1, Vector3 vec2) {
         return vec1.x * vec2.x + vec1.y * vec2.y + vec1.z * vec2.z;
     }
-    inline Vector3 scale(Vector3 vec1, float scale) {
+    inline static Vector3 scale(Vector3 vec1, float scale) {
         return { vec1.x * scale, vec1.y * scale, vec1.z * scale };
     }
-    inline Vector2 DivideVector2(Vector2 vec1, Vector2 vec2) {
+    inline static Vector2 DivideVector2(Vector2 vec1, Vector2 vec2) {
         return Vector2{ vec1.x / vec2.x,vec1.y / vec2.y };
     }
-    inline Vector2 MultiplyVector2(Vector2 vec1, Vector2 vec2) {
+    inline static  Vector2 MultiplyVector2(Vector2 vec1, Vector2 vec2) {
         return Vector2{ vec1.x * vec2.x,vec1.y * vec2.y };
     }
-    inline Vector2 AddVector2(Vector2 vec1, Vector2 vec2) {
+    inline static  Vector2 AddVector2(Vector2 vec1, Vector2 vec2) {
         return Vector2{ vec1.x + vec2.x,vec1.y + vec2.y };
     }
-    inline Vector2 SubtractVector2(Vector2 vec1, Vector2 vec2) {
+    inline static Vector2 SubtractVector2(Vector2 vec1, Vector2 vec2) {
         return Vector2{ vec1.x - vec2.x,vec1.y - vec2.y };
     }
-    inline Vector3 DivideVector3(Vector3 vec1, Vector3 vec2) {
+    inline static  Vector3 DivideVector3(Vector3 vec1, Vector3 vec2) {
         return Vector3{ vec1.x / vec2.x,vec1.y / vec2.y, vec1.z / vec2.z };
     }
-    inline Vector3 MultiplyVector3(Vector3 vec1, Vector3 vec2) {
+    inline static  Vector3 MultiplyVector3(Vector3 vec1, Vector3 vec2) {
         return Vector3{ vec1.x * vec2.x,vec1.y * vec2.y, vec1.z * vec2.z };
     }
-    inline Vector3 AddVector3(Vector3 vec1, Vector3 vec2) {
+    inline static Vector3 AddVector3(Vector3 vec1, Vector3 vec2) {
         return Vector3{ vec1.x + vec2.x,vec1.y + vec2.y , vec1.z + vec2.z };
     }
-    inline Vector3 SubtractVector3(Vector3 vec1, Vector3 vec2) {
+    inline static  Vector3 SubtractVector3(Vector3 vec1, Vector3 vec2) {
         return Vector3{ vec1.x - vec2.x,vec1.y - vec2.y, vec1.z - vec2.z };
     }
-    inline Vector3 CrossVector3(Vector3 vector1, Vector3 vector2) {
+    inline static Vector3 CrossVector3(Vector3 vector1, Vector3 vector2) {
         return Vector3{
             vector1.y * vector2.z - vector1.z * vector2.y,
             vector1.z * vector2.x - vector1.x * vector2.z,
             vector1.x * vector2.y - vector1.y * vector2.x
         };
     }
-    inline Vector3 MultiplyVector3ByFloat(Vector3 vector, float val) {
+    inline static Vector3 MultiplyVector3ByFloat(Vector3 vector, float val) {
         return {
             vector.x * val,
             vector.y * val,
             vector.z * val
         };
     }
-    inline Vector3 DivideVector3ByFloat(Vector3 vector, float val) {
+    inline static  Vector3 DivideVector3ByFloat(Vector3 vector, float val) {
         return Vector3{
             vector.x / val,
             vector.y / val,
@@ -94,10 +88,10 @@ namespace Math {
         float magnitude = std::sqrt(vec.x * vec.x + vec.y * vec.y + vec.z * vec.z);
         return magnitude > 0 ? Vector3{ vec.x / magnitude, vec.y / magnitude, vec.z / magnitude } : Vector3{ 0, 0, 0 };
     }
-    inline float DotVector3(Vector3 a, Vector3 b) {
+    inline static float DotVector3(Vector3 a, Vector3 b) {
         return a.x * b.x + a.y * b.y + a.z * b.z;
     }
-    inline Vector3 RotateVector3(Vector3 vec, Vector3 axis, float angle) {
+    inline static Vector3 RotateVector3(Vector3 vec, Vector3 axis, float angle) {
         Vector3 normalizedAxis = NormalizeVector3(axis);
         float cosTheta = std::cos(angle);
         float sinTheta = std::sin(angle);
@@ -106,15 +100,15 @@ namespace Math {
         Vector3 term3 = scale(normalizedAxis, dot(normalizedAxis, vec) * (1 - cosTheta));
         return AddVector3(AddVector3(term1, term2), term3);
     }
-    inline float Radians(float degrees) {
+    inline static float Radians(float degrees) {
         return degrees * (3.14159f / 180);
     }
-    inline float Clamp(float val, float min, float max) {
+    inline static float Clamp(float val, float min, float max) {
         if (val > max) return max;
         if (val < min) return min;
         return val;
     }
-    inline int GetRandomValueStreamlined(int min, int max)
+    inline static int GetRandomValueStreamlined(int min, int max)
     {
         int value = 0;
 

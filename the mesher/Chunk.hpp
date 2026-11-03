@@ -223,57 +223,21 @@ struct World {
 			GLuint64 handle = 0;
 			int lod;
 			int lightIds[16];
+			int middleChild;
 			Region() {
 				for (int i = 0; i < 16; i++)
 					lightIds[i] = -1;
-
 			}
 		};
 		Region handle[mwx * mwy * mwz];
 	};
 	GlobalHandle handle;
-	struct VoxelObject {
-		int x;
-		int y;
-		int z;
-		int type;
-	};
 	std::vector<ChunkData> chunkData;
 	int lightCount = 0;
 	Math::Vector3 lightPositions[16];
 	Math::Vector3 lightValues[16];
 	int lightRadiusList[16];
-	std::map<int, std::vector<VoxelObject>> models;
-	std::vector<VoxelObject> loadVoxelPositionsFromFile(const char* path, int typeOffset)
-	{
-		std::vector<VoxelObject> positions;
-		FILE* f = fopen(path, "r");
-		if (!f) { TraceLog(LOG_ERROR, "Could not open %s", path); return positions; }
-
-		char section[64] = {};
-		char line[128] = {};
-		while (fgets(line, sizeof(line), f))
-		{
-			if (strncmp(line, "palette:", 8) == 0) { strcpy(section, "palette"); continue; }
-			if (strncmp(line, "voxel:", 6) == 0) { strcpy(section, "voxel");   continue; }
-
-			if (strcmp(section, "voxel") == 0)
-			{
-				int x, y, z, type;
-				if (sscanf(line, "%d %d %d %d", &x, &y, &z, &type) == 4)
-					positions.push_back({ x, y, z, type + typeOffset });
-			}
-		}
-
-		fclose(f);
-		return positions;
-	}
 	PhysicsAccelerationChunk* physicsAccelerationChunks;
-	void GenerateBiomeMap() {
-		//Generate heat map
-		//Generate moisture map
-		//Generate elevation map
-	}
 	void Setup() {
 		chunkData.resize(wx * wz * wy);
 		memset(handle.handle, 0, wx * wy * wz * sizeof(GLuint64));
@@ -420,7 +384,6 @@ public:
 			}
 		}
 	}
-
 	inline void GenerateMountains(ChunkData* chunkData, GenerationData generationData, int gx, int gy, int gz, int lod = 1, bool grass = false) {
 		this->gx = gx;
 		this->gy = gy;

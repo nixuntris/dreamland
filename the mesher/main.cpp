@@ -54,7 +54,7 @@ void ExampleUpdate(Particle& p) {
 	}
 }
 const int MAX_PARTICLES = 1000000;
-const bool DEBUG_FEATURES_ON = false;
+const bool DEBUG_FEATURES_ON = true;
 class ParticleRender {
 public:
 	Particle *particles;
@@ -896,56 +896,48 @@ public:
 	}
 	void PreGenerateFullDebug(int setLod=0) {
 		START_TIMER(data_gen)
-#pragma omp parallel 
-		{
-
-#pragma omp single
-			{
-				std::cout << "Actual threads: " << omp_get_num_threads() << "\n";
-			}
 #pragma omp for collapse(2)
-			for (int nx = 0; nx < wx; nx++) {
-				for (int nz = 0; nz < wz; nz++) {
-world.array[nx][nz] = true;
-					float dist = Vector2Distance({ (float)nx * chunkSize + chunkSize / 2,(float)nz * chunkSize + chunkSize / 2 }, { float(viewPort.camera.position.x),float(viewPort.camera.position.z) });
-					bool grass = false;
+		for (int nx = 0; nx < wx; nx++) {
+			for (int nz = 0; nz < wz; nz++) {
+				world.array[nx][nz] = true;
+				float dist = Vector2Distance({ (float)nx * chunkSize + chunkSize / 2,(float)nz * chunkSize + chunkSize / 2 }, { float(viewPort.camera.position.x),float(viewPort.camera.position.z) });
+				bool grass = false;
 
-					if (dist < 1920) grass = true;
+				if (dist < 1920) grass = true;
 
 
-					int lod = 1;
-					if (setLod != 0) {
-						lod = setLod;
-					}
-					else {
-
-						if (dist > 960) lod = 2;
-						if (dist > 960 * 2) lod = 4;
-						if (dist > 960 * 4) lod = 8;
-						if (dist > 960 * 8) lod = 16;
-						if (dist > 960 * 12) lod = 32;
-						if (dist > 960 * 24) lod = 64;
-					}
-					GenerationData gen;
-					gen.GenerateMountains(nx, nz);
-					gen.highestChunkY += 2;
-
-					for (int y = 0; y < wy; y++) {
-						world.chunkData[y * (wx * wz) + nz * wx + nx].lod = 0;
-					}
-					for (int y = 0; y < gen.highestChunkY && y < wy; y++) {
-						chunks[y * (wx * wz) + nz * wx + nx].GenerateMountains(&world.chunkData[y * (wx * wz) + nz * wx + nx], gen, nx, y, nz, lod, grass);
-
-					};
-					for (int y = 0; y < gen.highestChunkY && y < wy; y++) {
-						 chunks[y * (wx * wz) + nz * wx + nx].GenerateLod(&world.chunkData[y * (wx * wz) + nz * wx + nx], nx, y, nz);
-						chunks[y * (wx * wz) + nz * wx + nx].Compress(&world.chunkData[y * (wx * wz) + nz * wx + nx]);
-
-					};
-					world.setLod[nx][nz] = lod;
-					free(gen.heightMap);
-
+				int lod = 1;
+				if (setLod != 0) {
+					lod = setLod;
 				}
+				else {
+
+					if (dist > 960) lod = 2;
+					if (dist > 960 * 2) lod = 4;
+					if (dist > 960 * 4) lod = 8;
+					if (dist > 960 * 8) lod = 16;
+					if (dist > 960 * 12) lod = 32;
+					if (dist > 960 * 24) lod = 64;
+				}
+				GenerationData gen;
+				gen.GenerateMountains(nx, nz);
+				gen.highestChunkY += 2;
+
+				for (int y = 0; y < wy; y++) {
+					world.chunkData[y * (wx * wz) + nz * wx + nx].lod = 0;
+				}
+				for (int y = 0; y < gen.highestChunkY && y < wy; y++) {
+					chunks[y * (wx * wz) + nz * wx + nx].GenerateMountains(&world.chunkData[y * (wx * wz) + nz * wx + nx], gen, nx, y, nz, lod, grass);
+
+				};
+				for (int y = 0; y < gen.highestChunkY && y < wy; y++) {
+					 chunks[y * (wx * wz) + nz * wx + nx].GenerateLod(&world.chunkData[y * (wx * wz) + nz * wx + nx], nx, y, nz);
+					chunks[y * (wx * wz) + nz * wx + nx].Compress(&world.chunkData[y * (wx * wz) + nz * wx + nx]);
+
+				};
+				world.setLod[nx][nz] = lod;
+				free(gen.heightMap);
+
 			}
 		}
 		END_TIMER(data_gen)
@@ -967,7 +959,7 @@ world.array[nx][nz] = true;
 				for (int ny = 0; ny < wy; ny++) {
 
 					int neighbourId = ny * (wx * wz) + nz * wx + nx;
-					if (chunks[neighbourId].lod == 0) continue;
+					if (chunks[neighbourId].lod == 0 || chunks[neighbourId].lod==3000) continue;
 
 					int size = chunkSize / chunks[neighbourId].lod;
 
@@ -1051,10 +1043,10 @@ world.array[nx][nz] = true;
 				free(shortMapData[i]);
 			}
 		}
-		free(byteMapBatch);
-		free(shortMapBatch);
-		free(shortMapSizes);
-		free(byteMapSizes);
+		delete[] byteMapBatch;
+		delete[] shortMapBatch;
+		delete[] shortMapSizes;
+		delete[] byteMapSizes;
 		END_TIMER(upload)
 		shaders.display.UpdateSSBO(3, &world.handle, sizeof(world.handle), 0);
 		RecalculateParticlesFullDebug();

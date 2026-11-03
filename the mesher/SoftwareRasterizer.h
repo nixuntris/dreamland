@@ -44,21 +44,3 @@ void ExtractFrustumPlanes(Matrix view, Plane *planes)
 		planes[i].d /= len;
 	}
 }
-inline bool BoxInFrustum(Vector3 min, Vector3 max, Plane planes[6]) {
-	for (int i = 0; i < 6; i++) {
-		const Plane& p = planes[i];
-		Vector3 nVertex = {
-			(p.normal.x >= 0) ? max.x : min.x,
-			(p.normal.y >= 0) ? max.y : min.y,
-			(p.normal.z >= 0) ? max.z : min.z
-		};
-
-		float distance = p.normal.x * nVertex.x +
-			p.normal.y * nVertex.y +
-			p.normal.z * nVertex.z +
-			p.d;
-
-		if (distance < 0) return false;
-	}
-	return true;
-}

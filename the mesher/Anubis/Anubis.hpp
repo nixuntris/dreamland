@@ -510,59 +510,6 @@ namespace Anubis {
 
             return false;
         }
-        inline bool UpdateFPS(Math::Vector2 mousePos, Math::Vector2 oldMouse, Window window) {
-            bool output = false;
-            Math::Vector2 mouseDelta;
-            mouseDelta.x = mousePos.x - oldMouse.x;
-            mouseDelta.y = mousePos.y - oldMouse.y;
-
-            if (mousePos.x != oldMouse.x || mousePos.y != oldMouse.y) {
-                output = true;
-            }
-            double speed = (10 + (window.GetKeyPressed(KEY::LEFT_SHIFT)) * 50) * 0.01;
-
-            double sensitivity = 0.1;
-            if (fabs(mouseDelta.x) < 0.01f) mouseDelta.x = 0.0f;
-            if (fabs(mouseDelta.y) < 0.01f) mouseDelta.y = 0.0f;
-            mouseDelta.x *= -sensitivity;
-            mouseDelta.y *= -sensitivity;
-
-            static double yaw = 0.0f;
-            static double pitch = 0.0f;
-
-            yaw += mouseDelta.x;
-            pitch += mouseDelta.y;
-
-            pitch = Math::Clamp(pitch, -89.0f, 89.0f);
-
-            Math::Vector3 cameraFront;
-            cameraFront.x = cos(Math::Radians(yaw)) * cos(Math::Radians(pitch));
-            cameraFront.y = sin(Math::Radians(pitch));
-            cameraFront.z = sin(Math::Radians(yaw)) * cos(Math::Radians(pitch));
-            cameraFront = Math::NormalizeVector3(cameraFront);
-
-            this->target = Math::AddVector3(position, cameraFront);
-            if (window.GetKeyPressed(KEY::DOWN)) { Pitch(speed); Pitch(speed); output = true; };
-            if (window.GetKeyPressed(KEY::UP)) { Pitch(-speed); Pitch(-speed); output = true; }
-            if (window.GetKeyPressed(KEY::RIGHT)) { Yaw(speed); Yaw(speed); output = true; }
-            if (window.GetKeyPressed(KEY::LEFT)) { Yaw(-speed); Yaw(-speed); output = true; }
-            if (window.GetKeyPressed(KEY::W)) {
-                Math::Vector3 forward = GetForward();
-                forward.y = 0.0f; // prevent vertical movement
-                forward = Math::NormalizeVector3(forward);
-                position = Math::AddVector3(position, Math::MultiplyVector3ByFloat(forward, speed));
-                output = true;
-            }
-
-            if (window.GetKeyPressed(KEY::S)) {
-                Math::Vector3 forward = GetForward();
-                forward.y = 0.0f; // prevent vertical movement
-                forward = Math::NormalizeVector3(forward);
-                position = Math::AddVector3(position, Math::MultiplyVector3ByFloat(forward, -speed));
-                output = true;
-            }
-            return output;
-        }
     };
 
     void APIENTRY GLDebugCallback(GLenum source, GLenum type, GLuint id,
@@ -578,26 +525,4 @@ namespace Anubis {
         glDebugMessageCallback(GLDebugCallback, nullptr);
     }
     //need vulkan alternative
-    inline static bool IsInFrustum2D(Vector2 point, Math::Vector2 camPos, Math::Vector2 forward, float fovDegrees, float nearDist, float farDist)
-    {
-        float fLen = sqrtf(forward.x * forward.x + forward.y * forward.y);
-        if (fLen < 0.0001f) return true;
-        forward.x /= fLen;
-        forward.y /= fLen;
-
-        Vector2 right = { -forward.y, forward.x };
-
-        Vector2 toPoint = { point.x - camPos.x, point.y - camPos.y };
-
-        float alongForward = toPoint.x * forward.x + toPoint.y * forward.y;
-        float alongRight = toPoint.x * right.x + toPoint.y * right.y;
-
-        if (alongForward < nearDist) return false;
-        if (alongForward > farDist)  return false;
-
-        float halfAngle = (fovDegrees * 0.5f) * DEG2RAD;
-        float halfWidth = alongForward * tanf(halfAngle);
-
-        return fabsf(alongRight) <= halfWidth;
-    }
 }
