@@ -245,7 +245,7 @@ struct ViewPort {
 			shaders->primaryRays.Use(wWidth/32, wHeight/16, 1);
 
 		}
-		else if (triangleCount > 0) {
+		else {
 			Anubis::SwitchShaderStage(shaders->rasterizer.programID);
 			shaders->rasterizer.SetVector3({ pos.x,pos.y,pos.z }, "camPos");
 			shaders->rasterizer.SetVector3({ forward.x,forward.y,forward.z }, "camForward");
@@ -1294,10 +1294,10 @@ public:
 			int trianglesRendered = 0;
 			Anubis::GpuTimer raster;
 			raster.Start();
-			if (graphicsSettings.hardwareSoftwareRendering) {
-				viewPort.RasterizeMeshes(matView, pos, forward, ColorPallete, frame, triangleCount, wWidth, wHeight);
-				trianglesRendered = triangleCount;
-			}
+				
+			viewPort.RasterizeMeshes(matView, pos, forward, ColorPallete, frame, triangleCount, wWidth, wHeight);
+			trianglesRendered = triangleCount;
+			std::cout << triangleCount << "\n";
 			rasterTimeMs = raster.Stop();
 
 			Anubis::GpuTimer grassT;
