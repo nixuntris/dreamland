@@ -931,9 +931,11 @@ public:
 
 				};
 				for (int y = 0; y < gen.highestChunkY && y < wy; y++) {
-					 chunks[y * (wx * wz) + nz * wx + nx].GenerateLod(&world.chunkData[y * (wx * wz) + nz * wx + nx], nx, y, nz);
-					chunks[y * (wx * wz) + nz * wx + nx].Compress(&world.chunkData[y * (wx * wz) + nz * wx + nx]);
-
+					if (!world.chunkData[y * (wx * wz) + nz * wx + nx].skipped) {
+						chunks[y * (wx * wz) + nz * wx + nx].GenerateLod(&world.chunkData[y * (wx * wz) + nz * wx + nx], nx, y, nz);
+						chunks[y * (wx * wz) + nz * wx + nx].Compress(&world.chunkData[y * (wx * wz) + nz * wx + nx]);
+					}
+					
 				};
 				world.setLod[nx][nz] = lod;
 				free(gen.heightMap);
@@ -1343,33 +1345,34 @@ public:
 			}
 			oldChunkPos = currentChunkPos;
 			int drd = 0;
-			if (DEBUG_FEATURES_ON) {
-				Vector3 rayCastPos = pos;
-				bool hitDeadEnd = false;
-				for (int i = 0; i < 100; i++) {
-					rayCastPos.x += forward.x * 2;
-					rayCastPos.y += forward.y * 2;
-					rayCastPos.z += forward.z * 2;
-					int x = rayCastPos.x / chunkSize;
-					int y = rayCastPos.y / chunkSize;
-					int z = rayCastPos.z / chunkSize;
+			Vector3 rayCastPos = pos;
+			bool hitDeadEnd = false;
+			for (int i = 0; i < 100; i++) {
+				rayCastPos.x += forward.x * 2;
+				rayCastPos.y += forward.y * 2;
+				rayCastPos.z += forward.z * 2;
+				int x = rayCastPos.x / chunkSize;
+				int y = rayCastPos.y / chunkSize;
+				int z = rayCastPos.z / chunkSize;
 
-					int id = y * (wx * wz) + z * wx + x;
-					if (rayCastPos.x >= 0 && rayCastPos.y >= 0 && rayCastPos.z >= 0 && rayCastPos.x < wx * chunkSize && rayCastPos.y < wy * chunkSize && rayCastPos.z < wz * chunkSize) {
-						if (chunks[id].lod != 0) {
-							if (chunks[id].ReadVoxel(&world.chunkData[id], (int)rayCastPos.x % (chunkSize / chunks[id].lod), (int)rayCastPos.y % (chunkSize / chunks[id].lod), (int)rayCastPos.z % (chunkSize / chunks[id].lod)) != 0) {
-								hitDeadEnd = true;
-								break;
-							}
+				int id = y * (wx * wz) + z * wx + x;
+				if (rayCastPos.x >= 0 && rayCastPos.y >= 0 && rayCastPos.z >= 0 && rayCastPos.x < wx * chunkSize && rayCastPos.y < wy * chunkSize && rayCastPos.z < wz * chunkSize) {
+					if (chunks[id].lod != 0) {
+						if (chunks[id].ReadVoxel(&world.chunkData[id], (int)rayCastPos.x % (chunkSize / chunks[id].lod), (int)rayCastPos.y % (chunkSize / chunks[id].lod), (int)rayCastPos.z % (chunkSize / chunks[id].lod)) != 0) {
+							hitDeadEnd = true;
+							break;
 						}
-
 					}
-					else break;
-				}
-				if (!hitDeadEnd) {
-					rayCastPos = { pos.x + forward.x * 25,pos.y + forward.y * 25,pos.z + forward.z * 25 };
-				}
 
+				}
+				else break;
+			}
+			if (!hitDeadEnd) {
+				rayCastPos = { pos.x + forward.x * 25,pos.y + forward.y * 25,pos.z + forward.z * 25 };
+			}
+
+			if (!viewPort.raytracePrimaryRays) {
+				
 				if (window.GetMouseButtonPressed(0) && !menuOpen && selectedColorIndex >= 0) {
 
 					Vector3 ppp = rayCastPos;
@@ -1498,7 +1501,123 @@ public:
 
 				}
 			}
-			
+			else (window.GetMouseButtonPressed(0) ) {
+
+				Vector3 ppp = rayCastPos;
+
+				bool doneChanges = false;
+				bool allocatedThisRun = false;
+				for (int dx = 0; dx < editSize; dx++) {
+					for (int dy = 0; dy < editSize; dy++) {
+						for (int dz = 0; dz < editSize; dz++) {
+
+							Vector3 pp = ppp;
+							pp.x += dx;
+							pp.y += dy;
+							pp.z += dz;
+
+							int x = pp.x / chunkSize;
+							int y = pp.y / chunkSize;
+							int z = pp.z / chunkSize;
+
+							int id = y * (wx * wz) + z * wx + x;
+
+							if (id >= wx * wy * wz || id < 0) continue;
+							if (chunks[id].lod == 0 || chunks[id].voxelCount == 0 || world.chunkData[id].skipped) {
+								world.chunkData[id].skipped = false;
+								chunks[id].gx = x;
+								chunks[id].gy = y;
+								chunks[id].gz = z;
+								chunks[id].lod = 1;
+								chunks[id].size = chunkSize / chunks[id].lod;
+								world.chunkData[id].lod = 1;
+								world.chunkData[id].terrain = (uint16_t*)MemAlloc(chunkSize * chunkSize * chunkSize * sizeof(uint16_t));
+								int kx = int(fabs(pp.x)) % chunkSize;
+								int ky = int(fabs(pp.y)) % chunkSize;
+								int kz = int(fabs(pp.z)) % chunkSize;
+								int blockid = kx + ky * chunkSize + kz * chunkSize * chunkSize;
+								world.chunkData[id].terrain[blockid] = 3;
+								int size = chunkSize / chunks[id].lod;
+								chunks[id].GenerateBitMap(&world.chunkData[id]);
+								chunks[id].Compress(&world.chunkData[id]);
+
+								if (chunks[id].shortenedData) {
+									world.chunkData[id].fluidByteMap.Clear({ size,size,size });
+									world.chunkData[id].fluidByteMap.Upload(world.chunkData[id].compressedTerrain);
+									world.chunkData[id].fluidByteMap.GetBindlessHandle();
+									world.handle.handle[id].handle = world.chunkData[id].fluidByteMap.handle;
+								}
+								else {
+									world.chunkData[id].fluidShortMap.Clear({ size,size,size });
+									uint16_t* tt = chunks[id].DecompressChunk(&world.chunkData[id]);
+									world.chunkData[id].fluidShortMap.Upload(tt);
+									free(tt);
+									world.chunkData[id].fluidShortMap.GetBindlessHandle();
+									world.handle.handle[id].handle = world.chunkData[id].fluidShortMap.handle;
+
+								}
+								allocatedThisRun = true;
+								world.handle.handle[id].lod = world.chunkData[id].lod;
+								for (int dx = -1; dx <= 1; dx++) {
+									for (int dy = -1; dy <= 1; dy++) {
+										for (int dz = -1; dz <= 1; dz++) {
+
+											bool inGen = false;
+
+											for (int d = 0; d < chunkCount; d++) {
+												if (chunksUpdatedThisFrame[d].x == x + dx && chunksUpdatedThisFrame[d].y == y + dy && chunksUpdatedThisFrame[d].z == z + dz) {
+													inGen = true;
+												}
+											}
+											if (!inGen) {
+												chunksUpdatedThisFrame[chunkCount] = { x + dx,y + dy,z + dz };
+												chunkCount++;
+											}
+										}
+									}
+								}
+							}
+							if (chunks[id].lod == 1 && world.chunkData[id].lod == 1) {
+								if (chunks[id].ReadVoxel(&world.chunkData[id], int(fabs(pp.x)) % chunkSize, int(fabs(pp.y)) % chunkSize, int(fabs(pp.z)) % chunkSize) == 0) {
+									chunks[id].SetTerrain(&world.chunkData[id], int(fabs(pp.x)) % chunkSize, int(fabs(pp.y)) % chunkSize, int(fabs(pp.z)) % chunkSize, 3);
+									doneChanges = true;
+								}
+								for (int dx = -1; dx <= 1; dx++) {
+									for (int dy = -1; dy <= 1; dy++) {
+										for (int dz = -1; dz <= 1; dz++) {
+											bool inGen = false;
+											for (int d = 0; d < chunkCount; d++) {
+												if (chunksUpdatedThisFrame[d].x == x + dx && chunksUpdatedThisFrame[d].y == y + dy && chunksUpdatedThisFrame[d].z == z + dz) {
+													inGen = true;
+												}
+											}
+											if (!inGen) {
+												chunksUpdatedThisFrame[chunkCount] = { x + dx,y + dy,z + dz };
+												chunkCount++;
+											}
+										}
+									}
+								}
+							}
+
+						}
+					}
+				}
+				if (chunkCount > 0) {
+					std::cout << chunkCount << "\n";
+					for (int i = 0; i < chunkCount; i++) {
+						int dx = chunksUpdatedThisFrame[i].x;
+						int dy = chunksUpdatedThisFrame[i].y;
+						int dz = chunksUpdatedThisFrame[i].z;
+						int id = dy * (wx * wz) + dz * wx + dx;
+						if (chunks[id].lod != 0) {
+							uploadChunkSSBO(id);
+
+						}
+					}
+					chunkCount = 0;
+				}
+			}
 			Math::IVector2 generateArrayId[1024];
 			int generateCount = 0;
 			const float halfAngle = tanf((160 * 0.5f) * DEG2RAD);
