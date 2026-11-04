@@ -32,7 +32,7 @@ uniform vec3 camPos;
 uniform mat4 matView;
 uniform mat4 matProj;
 uniform int frameIndex;
-uint readVoxelData(ivec3 pos) {
+uint readVoxelData(ivec3 pos, inout int lod) {
     if (any(lessThan(pos, ivec3(0))) ||
         pos.x >= wx * chunkSize ||
         pos.y >= wy * chunkSize ||
@@ -41,6 +41,7 @@ uint readVoxelData(ivec3 pos) {
     ivec3 chunk = pos / chunkSize;
     int index = chunk.y * (wx * wz) + chunk.z * wx + chunk.x;
     int regionLod = handles[index].lod;
+    lod = regionLod;
     if (regionLod == 3000) return 1u;
     uvec2 handle = handles[index].handle;
     if (handle != uvec2(0)) {
@@ -92,12 +93,12 @@ uint packRGBA8(vec4 color)
         ( bytes.a << 24 );
 }
 
-void skipChunk(inout ivec3 cell, inout vec3 tMax, ivec3 stepDir, vec3 tDelta)
+void skipChunk(inout vec3 cell, inout vec3 tMax, ivec3 stepDir, vec3 tDelta)
 {
-    ivec3 chunkMin = (cell / chunkSize) * chunkSize;
+    ivec3 chunkMin = (ivec3(cell) / chunkSize) * chunkSize;
     ivec3 chunkMax = chunkMin + chunkSize;
-    ivec3 nI = mix(cell - chunkMin + 1,
-                   chunkMax - cell,
+    ivec3 nI = mix(ivec3(cell) - chunkMin + 1,
+                   chunkMax - ivec3(cell),
                    greaterThan(stepDir, ivec3(0)));
     vec3 n = vec3(nI);
     vec3 tAxisExit = tMax + (n - 1.0) * tDelta;
@@ -122,7 +123,7 @@ void main() {
     vec3 rd = normalize(far.xyz / far.w - camPos);
     rd = mix(rd, vec3(1e-6), lessThan(abs(rd), vec3(1e-6)));
 
-    ivec3 cell = ivec3(floor(camPos));
+    vec3 cell = ivec3(floor(camPos));
     ivec3 stepDir = ivec3(sign(rd));
     vec3 tDelta = abs(1.0 / rd);
     vec3 tMax = (vec3(cell) + vec3(max(stepDir, ivec3(0))) - camPos) / rd;
@@ -130,18 +131,20 @@ void main() {
     uint color = 0xFFF2BF87u; 
     int axis = 0;
     bool hitAnything = false;
-    for (int i = 0; i < 4096; i++) {
-        uint v = readVoxelData(cell);
+    for (int i = 0; i < 960; i++) {
+        int lod;
+        uint v = readVoxelData(ivec3(cell),lod);
+
         float distanceTravelled = distance(floor(camPos),cell);
         if (any(lessThan(cell, ivec3(0))) ||
             cell.x >= wx * chunkSize ||
             cell.y >= wy * chunkSize ||
             cell.z >= wz * chunkSize || 
-            distanceTravelled>4096)
+            distanceTravelled>960)
             break;   
             
 
-        ivec3 chunk = cell / chunkSize;
+        ivec3 chunk = ivec3(cell) / chunkSize;
         int index = chunk.y * (wx * wz) + chunk.z * wx + chunk.x;
 
         if (handles[index].lod == 0) { 
@@ -154,15 +157,46 @@ void main() {
             hitAnything = true;
             break;
         }
-        y    i+=1;
-        }
         bvec3 mask = lessThanEqual(tMax.xyz, min(tMax.yzx, tMax.zxy));
 
         ivec3 stepMask = ivec3(mask);
         cell += stepDir * stepMask;
         tMax += tDelta * vec3(stepMask);
+
     }
-    
+    if (!hitAnything) {
+        
+        for (int i = 0; i < 4096-960; i++) {
+            int lod;
+            uint v = readVoxelData(ivec3(cell),lod);
+
+            float distanceTravelled = distance(floor(camPos),cell);
+            if (any(lessThan(cell, ivec3(0))) ||
+                cell.x >= wx * chunkSize ||
+                cell.y >= wy * chunkSize ||
+                cell.z >= wz * chunkSize || 
+                distanceTravelled>4096)
+                break;   
+            
+
+            ivec3 chunk = ivec3(cell) / chunkSize;
+            int index = chunk.y * (wx * wz) + chunk.z * wx + chunk.x;
+
+            if (handles[index].lod == 0) { 
+                skipChunk(cell, tMax, stepDir, tDelta);
+                continue;
+            }
+        
+            if (v != 0u) {
+                color = packedColors[v-1];
+                hitAnything = true;
+                break;
+            }
+
+            cell += rd*float(lod);
+
+        }
+    }
     int distance = int(dot(cell-camPos, camForward));
     if (distance<depth[px.y * 3840 + px.x] && hitAnything) {
     
@@ -180,6 +214,7 @@ void main() {
         frame[px.y * 3840 + px.x] = color;
         depth[px.y * 3840 + px.x] = distance;
         pos[px.y * 3840 + px.x] = vec3(cell);
-        voxelId[px.y * 3840 + px.x] = int(readVoxelData(cell));
+        int lod;
+        voxelId[px.y * 3840 + px.x] = int(readVoxelData(ivec3(cell),lod));
     }
 }
