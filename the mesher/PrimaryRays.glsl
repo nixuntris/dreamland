@@ -132,12 +132,12 @@ void main() {
     bool hitAnything = false;
     for (int i = 0; i < 4096; i++) {
         uint v = readVoxelData(cell);
-        
+        float distanceTravelled = distance(floor(camPos),cell);
         if (any(lessThan(cell, ivec3(0))) ||
             cell.x >= wx * chunkSize ||
             cell.y >= wy * chunkSize ||
             cell.z >= wz * chunkSize || 
-            distance(floor(camPos),cell)>4096)
+            distanceTravelled>4096)
             break;   
             
 
@@ -153,6 +153,8 @@ void main() {
             color = packedColors[v-1];
             hitAnything = true;
             break;
+        }
+        y    i+=1;
         }
         bvec3 mask = lessThanEqual(tMax.xyz, min(tMax.yzx, tMax.zxy));
 

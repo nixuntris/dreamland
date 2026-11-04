@@ -38,6 +38,3 @@ Left and Right button for building and destruction
 K to enable the debug GUI, it allows to play around with different options
 Scroll wheel spawns physics entities
 
-
-# Worth noting:
-I didn't hand write the abstraction, it was primarily generated using an LLM. It's holding me back quite a bit, it needs a fundamental rewrite and changes.
