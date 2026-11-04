@@ -2,7 +2,7 @@
 #extension GL_ARB_bindless_texture : require
 #extension GL_ARB_shader_ballot : require
 #extension GL_ARB_shader_group_vote : require
-layout (local_size_x = 32, local_size_y = 16, local_size_z = 1) in;
+layout (local_size_x = 16, local_size_y = 16, local_size_z = 1) in;
 
 const int chunkSize = 32;
 
@@ -114,6 +114,7 @@ void skipChunk(inout vec3 cell, inout vec3 tMax, ivec3 stepDir, vec3 tDelta)
 void main() {
     ivec2 px = ivec2(gl_GlobalInvocationID.xy);
     px.y*=2;
+    px.x*=2;
     px.y += (frameIndex+1)%2;
     if (px.x >= renderWidth || px.y >= renderHeight) return;
 

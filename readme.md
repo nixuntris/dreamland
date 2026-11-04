@@ -19,6 +19,7 @@ It hasn't been tested on intel cards, I develop on AMD hardware.
 An x86 CPU with AVX2 instructions
 A modern GPU, must support opengl 4.6 with extensions (For now, an AMD GPU) with at least 4 gb of vram
 8GB of ram
+Installed Visual C++ Redistributable for Visual Studio 2015
 
 # Dependencies:
 
