@@ -346,6 +346,7 @@ class App {
 	int alreadySpawnedGrass = 0;
 	ViewPort viewPort;
 	ParticleRender particleRenderer;
+	CHUNKTYPE selectedType = DESERT;
 public:
 	App() {
 		//IMPLEMENT THE HARDWARE PIPELINE
@@ -434,7 +435,7 @@ public:
 		gen.GenerateMountains(x, z);
 #pragma omp parallel for num_threads(4)
 		for (int y = 0; y < gen.highestChunkY; y++) {
-			chunks[y * (wx * wz) + z * wx + x].GenerateMountains(&world.chunkData[y * (wx * wz) + z * wx + x], gen, x, y, z, lod, grass);
+			chunks[y * (wx * wz) + z * wx + x].GeneratePerType(selectedType,&world.chunkData[y * (wx * wz) + z * wx + x], gen, x, y, z, lod, grass);
 			chunks[y * (wx * wz) + z * wx + x].GenerateLod(
 				&world.chunkData[y * (wx * wz) + z * wx + x], x, y, z);
 			chunks[y * (wx * wz) + z * wx + x].Compress(
@@ -688,6 +689,7 @@ public:
 			}
 			};
 		int menuResolutionIndex = 0;
+		int worldTypeIndex = 0; 
 		int worldSize = 0;
 		bool running = true;
 		bool pregenerate = true;
@@ -762,6 +764,7 @@ public:
 				if (ImGui::Button(label, ImVec2(-1, 0))) {
 					menuResolutionIndex = i;
 				}
+
 				if (selected) ImGui::PopStyleColor();
 			}
 
@@ -785,6 +788,33 @@ public:
 				ImGui::Spacing();
 			}
 
+
+			ImGui::Spacing();
+			ImGui::Text("World Type");
+			const char* typeNames[] = { "Mountains", "Savanna", "Desert"};
+			for (int i = 0; i < 3; ++i) {
+				bool selected = (worldTypeIndex == i);
+				
+				if (selected) ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.2f, 0.55f, 0.9f, 1.0f));
+				if (ImGui::Button(typeNames[i], ImVec2(-1, 0))) {
+					worldTypeIndex = i;
+					switch (i) {
+						case 0:
+							selectedType = MOUNTAIN;
+							break;
+						case 1:
+							selectedType = SAVANNA;
+							break;
+						case 2:
+							selectedType = DESERT;
+							break;
+					}
+
+				}
+				if (selected) ImGui::PopStyleColor();
+			}
+
+			ImGui::Spacing();
 			ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.15f, 0.65f, 0.25f, 1.0f));
 			ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.20f, 0.80f, 0.30f, 1.0f));
 			if (ImGui::Button("Play", ImVec2(-1, 40))) {
@@ -838,6 +868,7 @@ public:
 				}
 				
 			}
+
 			ImGui::PopStyleColor(2);
 
 			if (ImGui::Button("Quit", ImVec2(-1, 30))) {
@@ -852,6 +883,7 @@ public:
 			window.UpdateBuffer();
 		}
 	}
+	
 	void RecalculateParticlesFullDebug() {
 
 		grass = 0;
@@ -925,7 +957,7 @@ public:
 					world.chunkData[y * (wx * wz) + nz * wx + nx].lod = 0;
 				}
 				for (int y = 0; y < gen.highestChunkY && y < wy; y++) {
-					chunks[y * (wx * wz) + nz * wx + nx].GenerateMountains(&world.chunkData[y * (wx * wz) + nz * wx + nx], gen, nx, y, nz, lod, grass);
+					chunks[y * (wx * wz) + nz * wx + nx].GeneratePerType(selectedType,&world.chunkData[y * (wx * wz) + nz * wx + nx], gen, nx, y, nz, lod, grass);
 				};
 				int base = 0;
 				int cy = gen.highestChunkY - 2;
@@ -1005,7 +1037,7 @@ public:
 						}
 					}
 					};
-				if (GetRandomValue(0, 10) == 5) {
+				if (GetRandomValue(0, 10) == 5 && selectedType==MOUNTAIN) {
 					for (int i = 0; i < 3; i++) {
 						int rx = Math::GetRandomValueStreamlined(8, 23);
 						int rz = Math::GetRandomValueStreamlined(8, 23);
@@ -1014,12 +1046,15 @@ public:
 					}
 
 				}
-				for (int i = 0; i < Math::GetRandomValueStreamlined(0,4); i++) {
-					int dx = Math::GetRandomValueStreamlined(10, 20);
-					int dz = Math::GetRandomValueStreamlined(10, 20);
-					int baseY = gen.heightMap[dx + dz * chunkSize];
-					if (baseY > 250) continue;
-					spawnTree(dx, baseY, dz, Math::GetRandomValueStreamlined(24, 48));
+				if (selectedType == MOUNTAIN) {
+					for (int i = 0; i < Math::GetRandomValueStreamlined(0, 4); i++) {
+						int dx = Math::GetRandomValueStreamlined(10, 20);
+						int dz = Math::GetRandomValueStreamlined(10, 20);
+						int baseY = gen.heightMap[dx + dz * chunkSize];
+						if (baseY > 250) continue;
+						spawnTree(dx, baseY, dz, Math::GetRandomValueStreamlined(24, 48));
+
+					}
 
 				}
 				
@@ -1797,7 +1832,7 @@ public:
 				gen.highestChunkY += 2;
 
 				for (int y = 0; y < gen.highestChunkY && y < wy; y++) {
-					chunks[y * (wx * wz) + nz * wx + nx].GenerateMountains(&world.chunkData[y * (wx * wz) + nz * wx + nx], gen, nx, y, nz, lod, grass);
+					chunks[y * (wx * wz) + nz * wx + nx].GeneratePerType(selectedType, &world.chunkData[y * (wx * wz) + nz * wx + nx], gen, nx, y, nz, lod, grass);
 					RecalculateParticles(nx,y,nz);
 				};
 				for (int y = 0; y < gen.highestChunkY && y < wy; y++) {

@@ -254,7 +254,7 @@ void main()
     vec4 prev = unpackUnorm4x8(frame[idx]);
     
     ivec3 chunk = ivec3(origin/chunkSize);
-    
+    /*
     uvec2 handle = handles[chunk.y * (wx * wz) + chunk.z * wx + chunk.x].handle;
     vec3 accumLightAdditional = vec3(0.0);
     for (int i = 0; i < 16; i++) {
@@ -275,8 +275,8 @@ void main()
         }
     } 
     
-    
-    vec3 col = prev.rgb * (mean*calculateLightStrength(frameIndex))+accumLightAdditional;
+    */
+    vec3 col = prev.rgb * (mean*calculateLightStrength(frameIndex));
     
     uint pp = packUnorm4x8(vec4(col, 1.0));
     frame[ gid.y * 3840 + gid.x] = pp;

@@ -261,7 +261,12 @@ struct World {
 };
 long globalMemUsage = 0;
 long afterGlobalMemUsage = 0;
-
+enum CHUNKTYPE {
+	DESERT = 0,
+	SAVANNA = 1,
+	BEACH = 2,
+	MOUNTAIN = 3
+};
 class Chunk {
 	int tallestY = 0;
 public:
@@ -280,6 +285,20 @@ public:
 	std::vector<Vector3> grassList;
 	bool hwOrSoftwareRaster = false;
 	bool shortenedData = false;
+	inline void GeneratePerType(CHUNKTYPE type, ChunkData* chunkData, GenerationData generationData, int gx, int gy, int gz, int lod = 1, bool grass = false) {
+		switch (type) {
+		case DESERT:
+			GenerateDesert(chunkData, generationData, gx, gy, gz, lod, grass);
+			break;
+		case SAVANNA:
+			GenerateSavanna(chunkData, generationData, gx, gy, gz, lod, grass);
+			break;
+		case MOUNTAIN:
+			GenerateMountains(chunkData, generationData, gx, gy, gz, grass);
+			break;
+		
+		}
+	}
 	inline void GenerateDesert(ChunkData* chunkData, GenerationData generationData, int gx, int gy, int gz, int lod = 1, bool grass = false) {
 		this->gx = gx;
 		this->gy = gy;
