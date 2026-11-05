@@ -929,11 +929,11 @@ public:
 				};
 				int base = 0;
 				int cy = gen.highestChunkY - 2;
-				#define TREE_SET(x, y, z, block) do { \
-					int _y = (y); \
-					if (_y >= 0 && _y < wy * 32) { \
+				#define SET_VOXEL(x, y, z, block) do { \
+					int _x = (x), _y = (y), _z = (z); \
+					if (_x >= 0 && _x < 32 && _z >= 0 && _z < 32 && _y >= 0 && _y < wy * 32) { \
 						ChunkData& _c = world.chunkData[(_y / 32) * (wx * wz) + nz * wx + nx]; \
-						if (!_c.skipped) _c.terrain[IDX((x), _y % 32, (z), 32)] = (block); \
+						if (!_c.skipped && _c.terrain) _c.terrain[IDX(_x, _y % 32, _z, 32)] = (block); \
 					} \
 				} while (0)
 
@@ -946,7 +946,7 @@ public:
 					const int diagonal[4][2] = { {1,1}, {-1,1}, {1,-1}, {-1,-1} };
 
 					for (int y = 0; y < trunkHeight; y++)
-						TREE_SET(dx, dy + y, dz, WOOD);
+						SET_VOXEL(dx, dy + y, dz, WOOD);
 
 					for (int tier = 0, h = firstTierHeight; h < trunkHeight - 1; h += tierSpacing, tier++) {
 						const int (*dirs)[2] = (tier % 2 == 0) ? straight : diagonal;
@@ -963,31 +963,57 @@ public:
 								int y = dy + h - step / 4;
 
 								if (step <= length - 3) {
-									TREE_SET(x, y, z, WOOD);
+									SET_VOXEL(x, y, z, WOOD);
 								}
 								else {
-									TREE_SET(x, y, z, LEAVES);
-									TREE_SET(x + sideX, y, z + sideZ, LEAVES);
-									TREE_SET(x - sideX, y, z - sideZ, LEAVES);
-									TREE_SET(x, y + 1, z, LEAVES);
+									SET_VOXEL(x, y, z, LEAVES);
+									SET_VOXEL(x + sideX, y, z + sideZ, LEAVES);
+									SET_VOXEL(x - sideX, y, z - sideZ, LEAVES);
+									SET_VOXEL(x, y + 1, z, LEAVES);
 								}
 							}
 
-							TREE_SET(dx + dirX * length, dy + h - length / 4 - 1, dz + dirZ * length, LEAVES);
+							SET_VOXEL(dx + dirX * length, dy + h - length / 4 - 1, dz + dirZ * length, LEAVES);
 						}
 
 						for (int i = 0; i < 4; i++)
-							TREE_SET(dx + straight[i][0], dy + h + 1, dz + straight[i][1], LEAVES);
+							SET_VOXEL(dx + straight[i][0], dy + h + 1, dz + straight[i][1], LEAVES);
 					}
 
 					for (int i = 0; i < 4; i++) {
-						TREE_SET(dx + straight[i][0], dy + trunkHeight - 2, dz + straight[i][1], LEAVES);
-						TREE_SET(dx + straight[i][0], dy + trunkHeight - 1, dz + straight[i][1], LEAVES);
+						SET_VOXEL(dx + straight[i][0], dy + trunkHeight - 2, dz + straight[i][1], LEAVES);
+						SET_VOXEL(dx + straight[i][0], dy + trunkHeight - 1, dz + straight[i][1], LEAVES);
 					}
-					TREE_SET(dx, dy + trunkHeight, dz, LEAVES);
-					TREE_SET(dx, dy + trunkHeight + 1, dz, LEAVES);
+					SET_VOXEL(dx, dy + trunkHeight, dz, LEAVES);
+					SET_VOXEL(dx, dy + trunkHeight + 1, dz, LEAVES);
 					};
-#undef TREE_SET
+
+				auto spawnRock = [&](int cx, int cy, int cz, int size) {
+					float rx = size + Math::GetRandomValueStreamlined(0, size / 2);
+					float rz = size + Math::GetRandomValueStreamlined(0, size / 2);
+					float ry = size * 0.6f;
+					cy -= (int)(ry * 0.4f);
+
+					for (int y = -(int)ry; y <= (int)ry; y++) {
+						for (int x = -(int)rx; x <= (int)rx; x++) {
+							for (int z = -(int)rz; z <= (int)rz; z++) {
+								float d = (x * x) / (rx * rx) + (y * y) / (ry * ry) + (z * z) / (rz * rz);
+								float jitter = Math::GetRandomValueStreamlined(-25, 25) / 100.0f;
+								if (d <= 0.75f || d <= 1.0f + jitter)
+									SET_VOXEL(cx + x, cy + y, cz + z, STONE);
+							}
+						}
+					}
+					};
+				if (GetRandomValue(0, 10) == 5) {
+					for (int i = 0; i < 3; i++) {
+						int rx = Math::GetRandomValueStreamlined(8, 23);
+						int rz = Math::GetRandomValueStreamlined(8, 23);
+						int groundY = gen.heightMap[rx + rz * chunkSize];
+						spawnRock(rx, groundY, rz, Math::GetRandomValueStreamlined(2, 5));
+					}
+
+				}
 				for (int i = 0; i < Math::GetRandomValueStreamlined(0,4); i++) {
 					int dx = Math::GetRandomValueStreamlined(10, 20);
 					int dz = Math::GetRandomValueStreamlined(10, 20);
