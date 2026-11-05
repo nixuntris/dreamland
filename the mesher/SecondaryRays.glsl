@@ -2,6 +2,8 @@
 #extension GL_ARB_gpu_shader_int64 : require
 #extension GL_NV_gpu_shader5 : enable
 #extension GL_ARB_bindless_texture : require
+#extension GL_ARB_shader_ballot : require
+#extension GL_ARB_shader_group_vote : require
 
 layout (local_size_x = 16, local_size_y = 16, local_size_z = 1) in;
 
@@ -68,22 +70,35 @@ const vec3 bounceDirs[4] = vec3[](
     vec3(-0.2, 0.9,-0.1)
 );
 int chunkSize = 32;
+
 uint readVoxelData(ivec3 pos) {
-    ivec3 chunk = pos/chunkSize;
-    
-    uvec2 handle = handles[chunk.y * (wx * wz) + chunk.z * wx + chunk.x].handle;
-    if (handles[chunk.y * (wx * wz) + chunk.z * wx + chunk.x].lod==0) return 1;
-
-    if (handle != uvec2(0))
-    {
+    if (any(lessThan(pos, ivec3(0))) ||
+        pos.x >= wx * chunkSize ||
+        pos.y >= wy * chunkSize ||
+        pos.z >= wz * chunkSize)
+        return 0u;   
+    ivec3 chunk = pos / chunkSize;
+    int index = chunk.y * (wx * wz) + chunk.z * wx + chunk.x;
+    int regionLod = handles[index].lod;
+    if (regionLod == 3000) return 1u;
+    uvec2 handle = handles[index].handle;
+    if (handle != uvec2(0)) {
         uimage3D fluidMap = uimage3D(handle);
-        ivec3 lp = ivec3(mod(pos, float(chunkSize)));
-        
-        lp/=handles[chunk.y * (wx * wz) + chunk.z * wx + chunk.x].lod;
-        return imageLoad(fluidMap,lp).x;
+        ivec3 lp = (pos & (chunkSize - 1)) / regionLod;
+        uint r = 0u;
+        bool pending = true;
+        while (anyInvocationARB(pending)) {
+            if (pending) {
+                uvec2 cur = uvec2(readFirstInvocationARB(handle.x), readFirstInvocationARB(handle.y));
+                if (handle == cur) {
+                    r = imageLoad(uimage3D(cur), lp).x;
+                    pending = false;
+                }
+            }
+        }
+        return r;
     }
-    return 0;
-
+    return 0u;
 }
 bool inBounds(ivec3 p) {
     
@@ -248,7 +263,9 @@ void main()
         
         radiance += T;
     }
-
+    if (sunRayOccluded(origin+sunDir*2, sunDir, 100)) {
+        radiance *= 0.5;
+    }
     float mean = radiance / 2.0;
 
     vec4 prev = unpackUnorm4x8(frame[idx]);
