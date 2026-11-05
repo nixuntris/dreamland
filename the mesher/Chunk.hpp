@@ -25,7 +25,7 @@ enum VOXEL_ENUM_NAMES {
 	STONE = 2,   // palette[1]
 	DIRT = 3,   // palette[2]
 	WOOD = 4,   // palette[3]
-	LEAF = 5,   // palette[4]
+	LEAVES = 5,   // palette[4]
 	SNOW = 6,   // palette[5]
 	WATER = 7,   // palette[6]
 	SAND = 9,   // palette[8]
@@ -627,6 +627,7 @@ public:
 	inline bool SetTerrain(ChunkData* chunkdata, int x, int y, int z, uint16_t t, bool setGPUDATA=true) {
 		int id = x + y * size + z * size * size;
 		bool set = false;
+		
 		if (shortenedData) {
 			if (chunkdata->compressedTerrain[id] == 0) {
 				voxelCount++;
@@ -634,6 +635,7 @@ public:
 			chunkdata->compressedTerrain[id] = (uint8_t)t;
 			if (setGPUDATA) chunkdata->fluidByteMap.ChangePixel(x, y, z, t);
 			//edit byte map
+			if (t == 7) hasFluid = true;
 			return true;
 		}
 		if (chunkdata->compressed) {
@@ -674,6 +676,7 @@ public:
 
 		if (set) {
 			voxelCount += set ? 1 : 0;
+			if (t == 7) hasFluid = true;
 		}
 		return set;
 	}

@@ -447,12 +447,10 @@ public:
 			int neighbourId = ny * (wx * wz) + z * wx + x;
 			if (x < 0 || ny < 0 || z < 0 || x >= wx || ny >= wy || z >= wz) continue;
 			if (chunks[neighbourId].lod == 0) continue;
-			if (chunks[neighbourId].hasFluid) continue;
 			if (chunks[neighbourId].voxelCount ==
 				chunks[neighbourId].size * chunks[neighbourId].size * chunks[neighbourId].size)
 				continue;
 
-			chunks[neighbourId].hasFluid = true;
 			int size = chunkSize / chunks[neighbourId].lod;
 			if (world.chunkData[neighbourId].skipped) {
 				world.handle.handle[neighbourId].lod = 3000;
@@ -560,14 +558,14 @@ public:
 			auto batchUploadEnd = std::chrono::high_resolution_clock::now();
 			Anubis::GpuTimer mesh;
 			mesh.Start();
-			Anubis::SwitchShaderStage(shaders.fluidRender.programID);
-			shaders.fluidRender.SetInt(wx, "wx");
-			shaders.fluidRender.SetInt(wy, "wy");
-			shaders.fluidRender.SetInt(wz, "wz");
-			shaders.fluidRender.SetFloat(timeSpeed, "timeSpeed");
-			shaders.fluidRender.SetInt(wWidth, "renderWidth");
-			shaders.fluidRender.SetInt(wHeight, "renderHeight");
-			shaders.fluidRender.Use(drd, 1, 1);
+			Anubis::SwitchShaderStage(shaders.generateMesh.programID);
+			shaders.generateMesh.SetInt(wx, "wx");
+			shaders.generateMesh.SetInt(wy, "wy");
+			shaders.generateMesh.SetInt(wz, "wz");
+			shaders.generateMesh.SetFloat(timeSpeed, "timeSpeed");
+			shaders.generateMesh.SetInt(wWidth, "renderWidth");
+			shaders.generateMesh.SetInt(wHeight, "renderHeight");
+			shaders.generateMesh.Use(drd, 1, 1);
 			glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT | GL_BUFFER_UPDATE_BARRIER_BIT);
 
 			constexpr GLintptr N = 1024 * 1024;                       // array length in the shader
@@ -889,7 +887,7 @@ public:
 			}
 		}
 		if (grass > 0) {
-
+			std::cout << "grass: " << grass << "\n";
 			shaders.display.UpdateSSBO(20, particles, grass * 3 * sizeof(float), 0);
 		}
 		free(particles);
@@ -928,18 +926,86 @@ public:
 				}
 				for (int y = 0; y < gen.highestChunkY && y < wy; y++) {
 					chunks[y * (wx * wz) + nz * wx + nx].GenerateMountains(&world.chunkData[y * (wx * wz) + nz * wx + nx], gen, nx, y, nz, lod, grass);
-
 				};
+				int base = 0;
+				int cy = gen.highestChunkY - 2;
+				#define TREE_SET(x, y, z, block) do { \
+					int _y = (y); \
+					if (_y >= 0 && _y < wy * 32) { \
+						ChunkData& _c = world.chunkData[(_y / 32) * (wx * wz) + nz * wx + nx]; \
+						if (!_c.skipped) _c.terrain[IDX((x), _y % 32, (z), 32)] = (block); \
+					} \
+				} while (0)
+
+				auto spawnTree = [&](int dx, int dy, int dz, int trunkHeight) {
+					//trunk height should be at least 24
+					const int firstTierHeight = 6;
+					const int tierSpacing = 4;
+
+					const int straight[4][2] = { {1,0}, {-1,0}, {0,1}, {0,-1} };
+					const int diagonal[4][2] = { {1,1}, {-1,1}, {1,-1}, {-1,-1} };
+
+					for (int y = 0; y < trunkHeight; y++)
+						TREE_SET(dx, dy + y, dz, WOOD);
+
+					for (int tier = 0, h = firstTierHeight; h < trunkHeight - 1; h += tierSpacing, tier++) {
+						const int (*dirs)[2] = (tier % 2 == 0) ? straight : diagonal;
+
+						int length = 1 + (trunkHeight - h) * 6 / (trunkHeight - firstTierHeight);
+
+						for (int i = 0; i < 4; i++) {
+							int dirX = dirs[i][0], dirZ = dirs[i][1];
+							int sideX = -dirZ, sideZ = dirX;
+
+							for (int step = 1; step <= length; step++) {
+								int x = dx + dirX * step;
+								int z = dz + dirZ * step;
+								int y = dy + h - step / 4;
+
+								if (step <= length - 3) {
+									TREE_SET(x, y, z, WOOD);
+								}
+								else {
+									TREE_SET(x, y, z, LEAVES);
+									TREE_SET(x + sideX, y, z + sideZ, LEAVES);
+									TREE_SET(x - sideX, y, z - sideZ, LEAVES);
+									TREE_SET(x, y + 1, z, LEAVES);
+								}
+							}
+
+							TREE_SET(dx + dirX * length, dy + h - length / 4 - 1, dz + dirZ * length, LEAVES);
+						}
+
+						for (int i = 0; i < 4; i++)
+							TREE_SET(dx + straight[i][0], dy + h + 1, dz + straight[i][1], LEAVES);
+					}
+
+					for (int i = 0; i < 4; i++) {
+						TREE_SET(dx + straight[i][0], dy + trunkHeight - 2, dz + straight[i][1], LEAVES);
+						TREE_SET(dx + straight[i][0], dy + trunkHeight - 1, dz + straight[i][1], LEAVES);
+					}
+					TREE_SET(dx, dy + trunkHeight, dz, LEAVES);
+					TREE_SET(dx, dy + trunkHeight + 1, dz, LEAVES);
+					};
+#undef TREE_SET
+				for (int i = 0; i < Math::GetRandomValueStreamlined(0,4); i++) {
+					int dx = Math::GetRandomValueStreamlined(10, 20);
+					int dz = Math::GetRandomValueStreamlined(10, 20);
+					int baseY = gen.heightMap[dx + dz * chunkSize];
+					if (baseY > 250) continue;
+					spawnTree(dx, baseY, dz, Math::GetRandomValueStreamlined(24, 48));
+
+				}
+				
 				for (int y = 0; y < gen.highestChunkY && y < wy; y++) {
 					if (!world.chunkData[y * (wx * wz) + nz * wx + nx].skipped) {
 						chunks[y * (wx * wz) + nz * wx + nx].GenerateLod(&world.chunkData[y * (wx * wz) + nz * wx + nx], nx, y, nz);
 						chunks[y * (wx * wz) + nz * wx + nx].Compress(&world.chunkData[y * (wx * wz) + nz * wx + nx]);
 					}
-					
 				};
+
 				world.setLod[nx][nz] = lod;
 				free(gen.heightMap);
-
 			}
 		}
 		END_TIMER(data_gen)
@@ -970,7 +1036,6 @@ public:
 						world.handle.handle[neighbourId].lod = 3000;
 					}
 
-					chunks[neighbourId].hasFluid = true;
 
 					if (world.chunkData[neighbourId].voxelCount != 0 &&
 						!world.chunkData[neighbourId].skipped) {
@@ -1083,7 +1148,9 @@ public:
 					{ 69,  50,  36, 255 },  // 15: Inner Heavy Branch Brown (Replaced Intense Lemon)
 					{ 56,  40,  29, 255 },  // 16: Deep Core Wood/Shadow Brown (Replaced Pale Yellow)
 					{ 53,  76,  40, 255 },  // 17: Alternative Leaf Green (Replaced Pear Green)
-					{ 45,  66,  33, 255 }   // 18: Alternative Leaf Green (Replaced Apple Green)
+					{ 45,  66,  33, 255 },   // 18: Alternative Leaf Green (Replaced Apple Green)
+					{255,255,255,255},
+					{0,0,0,255}
 		};
 		std::vector<uint32_t> ColorPallete;
 		for (auto t : palette) {
@@ -1408,7 +1475,7 @@ public:
 									int ky = int(fabs(pp.y)) % chunkSize;
 									int kz = int(fabs(pp.z)) % chunkSize;
 									int blockid = kx + ky * chunkSize + kz * chunkSize * chunkSize;
-									world.chunkData[id].terrain[blockid] = 3;
+									world.chunkData[id].terrain[blockid] = selectedColorIndex;
 									int size = chunkSize / chunks[id].lod;
 									chunks[id].GenerateBitMap(&world.chunkData[id]);
 									chunks[id].Compress(&world.chunkData[id]);
@@ -1451,7 +1518,7 @@ public:
 								}
 								if (chunks[id].lod == 1 && world.chunkData[id].lod == 1) {
 									if (chunks[id].ReadVoxel(&world.chunkData[id], int(fabs(pp.x)) % chunkSize, int(fabs(pp.y)) % chunkSize, int(fabs(pp.z)) % chunkSize) == 0) {
-										chunks[id].SetTerrain(&world.chunkData[id], int(fabs(pp.x)) % chunkSize, int(fabs(pp.y)) % chunkSize, int(fabs(pp.z)) % chunkSize, 3);
+										chunks[id].SetTerrain(&world.chunkData[id], int(fabs(pp.x)) % chunkSize, int(fabs(pp.y)) % chunkSize, int(fabs(pp.z)) % chunkSize, selectedColorIndex);
 										doneChanges = true;
 									}
 									for (int dx = -1; dx <= 1; dx++) {
@@ -1480,7 +1547,6 @@ public:
 				if (!window.GetMouseButtonPressed(0) && releasedMouseButton) {
 
 					if (chunkCount > 0) {
-						std::cout << chunkCount << "\n";
 						for (int i = 0; i < chunkCount; i++) {
 							int dx = chunksUpdatedThisFrame[i].x;
 							int dy = chunksUpdatedThisFrame[i].y;
@@ -1501,7 +1567,7 @@ public:
 
 				}
 			}
-			else (window.GetMouseButtonPressed(0) ) {
+			else if (window.GetMouseButtonPressed(0)) {
 
 				Vector3 ppp = rayCastPos;
 
@@ -1536,7 +1602,7 @@ public:
 								int ky = int(fabs(pp.y)) % chunkSize;
 								int kz = int(fabs(pp.z)) % chunkSize;
 								int blockid = kx + ky * chunkSize + kz * chunkSize * chunkSize;
-								world.chunkData[id].terrain[blockid] = 3;
+								world.chunkData[id].terrain[blockid] = selectedColorIndex;
 								int size = chunkSize / chunks[id].lod;
 								chunks[id].GenerateBitMap(&world.chunkData[id]);
 								chunks[id].Compress(&world.chunkData[id]);
@@ -1579,7 +1645,7 @@ public:
 							}
 							if (chunks[id].lod == 1 && world.chunkData[id].lod == 1) {
 								if (chunks[id].ReadVoxel(&world.chunkData[id], int(fabs(pp.x)) % chunkSize, int(fabs(pp.y)) % chunkSize, int(fabs(pp.z)) % chunkSize) == 0) {
-									chunks[id].SetTerrain(&world.chunkData[id], int(fabs(pp.x)) % chunkSize, int(fabs(pp.y)) % chunkSize, int(fabs(pp.z)) % chunkSize, 3);
+									chunks[id].SetTerrain(&world.chunkData[id], int(fabs(pp.x)) % chunkSize, int(fabs(pp.y)) % chunkSize, int(fabs(pp.z)) % chunkSize, selectedColorIndex);
 									doneChanges = true;
 								}
 								for (int dx = -1; dx <= 1; dx++) {
@@ -1604,7 +1670,6 @@ public:
 					}
 				}
 				if (chunkCount > 0) {
-					std::cout << chunkCount << "\n";
 					for (int i = 0; i < chunkCount; i++) {
 						int dx = chunksUpdatedThisFrame[i].x;
 						int dy = chunksUpdatedThisFrame[i].y;
@@ -1725,13 +1790,11 @@ public:
 					int neighbourId = ny * (wx * wz) + nz * wx + nx;
 					if (nx < 0 || ny < 0 || nz < 0 || nx >= wx || ny >= wy || nz >= wz) continue;
 					if (chunks[neighbourId].lod == 0) continue;
-					if (chunks[neighbourId].hasFluid) continue;
 					if (chunks[neighbourId].voxelCount == 0) {
 
 						world.handle.handle[neighbourId].lod = 0;
 						uploadChunkSSBO(neighbourId);
 					}
-					chunks[neighbourId].hasFluid = true;
 					int size = chunkSize / chunks[neighbourId].lod;
 					if (world.chunkData[neighbourId].voxelCount != 0 && !world.chunkData[neighbourId].skipped)
 					{
@@ -1791,19 +1854,19 @@ public:
 				auto batchUploadEnd = std::chrono::high_resolution_clock::now();
 				Anubis::GpuTimer mesh;
 				mesh.Start();
-				Anubis::SwitchShaderStage(shaders.fluidRender.programID);
-				shaders.fluidRender.SetVector3({ pos.x,pos.y,pos.z }, "camPos");
-				shaders.fluidRender.SetVector3({ forward.x,forward.y,forward.z }, "camForward");
-				shaders.fluidRender.SetMatrix({ matView.m0,matView.m1,matView.m2,matView.m3,matView.m4,matView.m5,matView.m6,matView.m7,matView.m8,matView.m9,matView.m10,matView.m11,matView.m12,matView.m13,matView.m14,matView.m15 }, "matView");
-				shaders.fluidRender.SetMatrix({ matProj.m0,matProj.m1,matProj.m2,matProj.m3,matProj.m4,matProj.m5,matProj.m6,matProj.m7,matProj.m8,matProj.m9,matProj.m10,matProj.m11,matProj.m12,matProj.m13,matProj.m14,matProj.m15 }, "matProj");
-				shaders.fluidRender.SetInt(wx, "wx");
-				shaders.fluidRender.SetInt(wy, "wy");
-				shaders.fluidRender.SetInt(wz, "wz");
-				shaders.fluidRender.SetFloat(timeSpeed, "timeSpeed");
-				shaders.fluidRender.SetInt(wWidth, "renderWidth");
-				shaders.fluidRender.SetInt(wHeight, "renderHeight");
-				shaders.fluidRender.SetInt(frame, "frameIndex");
-				shaders.fluidRender.Use(drd, 1, 1);
+				Anubis::SwitchShaderStage(shaders.generateMesh.programID);
+				shaders.generateMesh.SetVector3({ pos.x,pos.y,pos.z }, "camPos");
+				shaders.generateMesh.SetVector3({ forward.x,forward.y,forward.z }, "camForward");
+				shaders.generateMesh.SetMatrix({ matView.m0,matView.m1,matView.m2,matView.m3,matView.m4,matView.m5,matView.m6,matView.m7,matView.m8,matView.m9,matView.m10,matView.m11,matView.m12,matView.m13,matView.m14,matView.m15 }, "matView");
+				shaders.generateMesh.SetMatrix({ matProj.m0,matProj.m1,matProj.m2,matProj.m3,matProj.m4,matProj.m5,matProj.m6,matProj.m7,matProj.m8,matProj.m9,matProj.m10,matProj.m11,matProj.m12,matProj.m13,matProj.m14,matProj.m15 }, "matProj");
+				shaders.generateMesh.SetInt(wx, "wx");
+				shaders.generateMesh.SetInt(wy, "wy");
+				shaders.generateMesh.SetInt(wz, "wz");
+				shaders.generateMesh.SetFloat(timeSpeed, "timeSpeed");
+				shaders.generateMesh.SetInt(wWidth, "renderWidth");
+				shaders.generateMesh.SetInt(wHeight, "renderHeight");
+				shaders.generateMesh.SetInt(frame, "frameIndex");
+				shaders.generateMesh.Use(drd, 1, 1);
 				glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT | GL_BUFFER_UPDATE_BARRIER_BIT);
 
 				constexpr GLintptr N = 1024 * 1024;

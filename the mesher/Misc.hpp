@@ -15,7 +15,7 @@ struct ShaderManager {
 	Anubis::ComputeShader meshletRenderer;
 	Anubis::ComputeShader grassRenderer;
 	Anubis::ComputeShader secondaryRaysRender;
-	Anubis::ComputeShader fluidRender;
+	Anubis::ComputeShader generateMesh;
 	Anubis::ComputeShader fillOut;
 	Anubis::ComputeShader clouds;
 	Anubis::ComputeShader bilboards;
@@ -48,7 +48,7 @@ struct ShaderManager {
 		hwRender.LoadFromFile(path("fes.fs").c_str(), path("ver.vs").c_str());
 		hwRenderForObjects.LoadFromFile(path("hwMesh.fs").c_str(), path("hwMesh.vs").c_str());
 		secondaryRaysRender.Setup(path("SecondaryRays.glsl").c_str());
-		fluidRender.Setup(path("RenderFluids.glsl").c_str());
+		generateMesh.Setup(path("GenerateMesh.glsl").c_str());
 		fillOut.Setup(path("FillOutPhysicsData.glsl").c_str());
 		renderPhysicalObjects.Setup(path("PhysicsObject.glsl").c_str());
 		clearPhysicalObjects.Setup(path("ClearPhysicalObject.glsl").c_str());

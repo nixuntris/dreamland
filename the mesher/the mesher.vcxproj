@@ -160,7 +160,7 @@
     <None Include="PhysicsObject.glsl" />
     <None Include="PrimaryRays.glsl" />
     <None Include="quad_display_shader.fs" />
-    <None Include="RenderFluids.glsl" />
+    <None Include="GenerateMesh.glsl" />
     <None Include="grassParticle.glsl" />
     <None Include="Rasterize.glsl" />
     <None Include="renderAABB.glsl" />

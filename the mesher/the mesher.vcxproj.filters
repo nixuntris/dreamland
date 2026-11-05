@@ -118,7 +118,7 @@
     <None Include="SecondaryRays.glsl">
       <Filter>Source Files\Shaders\Raytracing\Illumination</Filter>
     </None>
-    <None Include="RenderFluids.glsl">
+    <None Include="GenerateMesh.glsl">
       <Filter>Source Files\Shaders\Rasterizer\Physics</Filter>
     </None>
     <None Include="hwMesh.vs">
