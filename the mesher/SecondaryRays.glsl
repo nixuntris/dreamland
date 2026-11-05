@@ -71,7 +71,7 @@ const vec3 bounceDirs[4] = vec3[](
 );
 int chunkSize = 32;
 
-uint readVoxelData(ivec3 pos) {
+uint readVoxelData(ivec3 pos, inout int lod) {
     if (any(lessThan(pos, ivec3(0))) ||
         pos.x >= wx * chunkSize ||
         pos.y >= wy * chunkSize ||
@@ -81,6 +81,7 @@ uint readVoxelData(ivec3 pos) {
     int index = chunk.y * (wx * wz) + chunk.z * wx + chunk.x;
     int regionLod = handles[index].lod;
     if (regionLod == 3000) return 1u;
+    lod = regionLod;
     uvec2 handle = handles[index].handle;
     if (handle != uvec2(0)) {
         uimage3D fluidMap = uimage3D(handle);
@@ -206,29 +207,56 @@ float calculateLightStrength(int frameIndex)
     
     return lightStrength;
 }
-bool outOfBounds(ivec3 p) {
-    return any(lessThan(p, ivec3(0))) ||
-           any(greaterThanEqual(p, ivec3(wx, wy, wz) * chunkSize));
+bool outOfBounds(vec3 p) {
+    return any(lessThan(p, vec3(0))) ||
+           any(greaterThanEqual(p, vec3(wx, wy, wz) * chunkSize));
+}
+
+bool skipChunkFloat(inout vec3 cell, vec3 rd, inout int steps, ivec3 chunkSize)
+{
+    ivec3 c = ivec3(floor(cell));
+    ivec3 chunkMin = ivec3(floor(vec3(c) / vec3(chunkSize))) * chunkSize;
+    ivec3 chunkMax = chunkMin + chunkSize; 
+    vec3 tExit;
+    for (int a = 0; a < 3; a++)
+    {
+        float r = rd[a];
+        if (abs(r) < 1e-8) { tExit[a] = 1e30; continue; }
+        float bound = (r > 0.0) ? float(chunkMax[a]) : float(chunkMin[a]);
+        tExit[a] = (bound - cell[a]) / r;
+    }
+    float t = min(tExit.x, min(tExit.y, tExit.z));
+    if (t <= 0.0 || t > 1e29) return false;
+
+    int skipped = int(ceil(t / length(rd))); 
+    if (skipped <= 0) skipped = 1;
+
+    if (skipped >= steps) {
+        cell += rd * (float(steps) + 1e-4);
+        steps = 0;
+        return false;
+    }
+
+    cell += rd * t + rd * 1e-4;
+    steps += skipped;
+    return true;
 }
 bool sunRayOccluded(vec3 ro, vec3 rd, int maxSteps)
 {
-    vec3 invD   = 1.0 / (rd + vec3(equal(rd, vec3(0.0))) * 1e-8);
-    ivec3 cell  = ivec3(floor(ro));
-    ivec3 stepV = ivec3(sign(rd));
-    vec3 tDelta = abs(invD);
+    vec3 cell  = floor(ro);
 
     vec3 nextB  = vec3(cell) + vec3(greaterThan(rd, vec3(0.0)));
-    vec3 tMax   = (nextB - ro) * invD;
 
     for (int i = 0; i < maxSteps; i++)
     {
-        if (tMax.x < tMax.y && tMax.x < tMax.z) { cell.x += stepV.x; tMax.x += tDelta.x; }
-        else if (tMax.y < tMax.z)               { cell.y += stepV.y; tMax.y += tDelta.y; }
-        else                                    { cell.z += stepV.z; tMax.z += tDelta.z; }
-
+        cell += rd;
         if (outOfBounds(cell)) return false;
-
-        if (readVoxelData(cell) != 0u) return true;
+        
+        int lod;        
+        if (lod==0) {
+            skipChunkFloat(cell,rd,i,ivec3(32));
+        }
+        if (readVoxelData(ivec3(cell),lod) != 0u) return true;
     }
     return false;
 }
@@ -246,27 +274,31 @@ void main()
     float time = float(frameIndex) *timeSpeed;
     float radiance = 0.0;
 
-    for (int d = 0; d < 2; d++)
-    {
-        vec3 ro = origin + offsets[d];
-        vec3 rd = normalize(sunDir);
-        vec3  invD      = 1.0 / (rd + vec3(equal(rd, vec3(0.0))) * 1e-8);
+    vec3 ro = origin;
+    vec3 rd = normalize(sunDir);
+    vec3  invD      = 1.0 / (rd + vec3(equal(rd, vec3(0.0))) * 1e-8);
     
-        float T = 1.0;
+    float T = 1.0;
 
-        float t = 0;
-        float jitter = hash3(vec3(gid, frameIndex * 2 + d));
-        float shadow = cloudShadow(ro, rd, time, jitter);
-        shadow = mix(1.0, shadow, 0.3);
-        T *= shadow;   
+    float t = 0;
+    float jitter = hash3(vec3(gid, frameIndex));
+    float shadow = cloudShadow(ro, rd, time, jitter);
+    shadow = mix(1.0, shadow, 0.3);
+    T *= shadow;   
 
         
-        radiance += T;
+    radiance += T;
+    
+    float hitValue = 0;
+    int sampleCount = 4;
+    for (int i = 0; i < sampleCount; i++) {
+        vec3 offsetDir = normalize(sunDir+offsets[i]);
+        if (sunRayOccluded(origin+offsetDir*2, offsetDir, 100)) {
+            hitValue+=0.5;
+        }
     }
-    if (sunRayOccluded(origin+sunDir*2, sunDir, 100)) {
-        radiance *= 0.5;
-    }
-    float mean = radiance / 2.0;
+    
+    float mean = 1.0-((hitValue) / float(sampleCount));
 
     vec4 prev = unpackUnorm4x8(frame[idx]);
     
@@ -294,6 +326,7 @@ void main()
     
     */
     vec3 col = prev.rgb * (mean*calculateLightStrength(frameIndex));
+    // vec3 col = prev.rgb * (mean);
     
     uint pp = packUnorm4x8(vec4(col, 1.0));
     frame[ gid.y * 3840 + gid.x] = pp;

@@ -295,8 +295,7 @@ public:
 			break;
 		case MOUNTAIN:
 			GenerateMountains(chunkData, generationData, gx, gy, gz, grass);
-			break;
-		
+			break;	
 		}
 	}
 	inline void GenerateDesert(ChunkData* chunkData, GenerationData generationData, int gx, int gy, int gz, int lod = 1, bool grass = false) {
@@ -408,7 +407,11 @@ public:
 		this->gy = gy;
 		this->gz = gz;
 		START_TIMER(total)
-			this->size = chunkSize / lod;
+			if (lod == 0) {
+				chunkData->skipped = true;
+				return;
+		}
+		this->size = chunkSize / lod;
 		chunkData->terrain = (uint16_t*)MemAlloc(chunkSize * chunkSize * chunkSize * sizeof(uint16_t));
 		this->lod = lod;
 		START_TIMER(voxel_fill)

@@ -346,7 +346,7 @@ class App {
 	int alreadySpawnedGrass = 0;
 	ViewPort viewPort;
 	ParticleRender particleRenderer;
-	CHUNKTYPE selectedType = DESERT;
+	CHUNKTYPE selectedType = MOUNTAIN;
 public:
 	App() {
 		//IMPLEMENT THE HARDWARE PIPELINE
@@ -2298,7 +2298,7 @@ public:
 			if (remaining > 0.0) {
 				std::this_thread::sleep_for(std::chrono::duration<double>(remaining));
 			}
-
+			frame = frame % 6;
 			frame++;
 		}
 	}
