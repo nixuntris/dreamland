@@ -158,8 +158,8 @@ uniform int wz;
 
 struct Region {
     uvec2 handle;
+    uvec2 probeHandle;
     int lod;
-    int lightIds[16];
 };
 layout(std430, binding = 3) buffer BitHandles {
     Region handles[];

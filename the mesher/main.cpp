@@ -354,7 +354,7 @@ class App {
 	float timeSpeed = 0.0004;
 	bool mainMenu = false;
 	int alreadySpawnedGrass = 0;
-	int sampleCount = 1;
+	int sampleCount = 9;
 	ViewPort viewPort;
 	ParticleRender particleRenderer;
 	CHUNKTYPE selectedType = MOUNTAIN;
@@ -378,7 +378,7 @@ public:
 		viewPort.camera.target = { 0,1,0 };
 		SetRandomSeed(100);
 		shaders.Load();
-		shaders.display.CreateSSBO(0, sizeof(uint32_t) * 3840 * 2160 *6);
+		shaders.display.CreateSSBO(0, sizeof(uint32_t) * 3840 * 2160 * 6);
 		int maxSSBOCount = 0;
 		glGetIntegerv(GL_MAX_SHADER_STORAGE_BUFFER_BINDINGS, &maxSSBOCount);
 		if (gpuMeshing) {
@@ -460,16 +460,16 @@ public:
 			int neighbourId = ny * (wx * wz) + z * wx + x;
 			if (x < 0 || ny < 0 || z < 0 || x >= wx || ny >= wy || z >= wz) continue;
 			if (chunks[neighbourId].lod == 0) continue;
-			if (chunks[neighbourId].voxelCount ==
-				chunks[neighbourId].size * chunks[neighbourId].size * chunks[neighbourId].size)
-				continue;
+		//	if (chunks[neighbourId].voxelCount ==
+	//			chunks[neighbourId].size * chunks[neighbourId].size * chunks[neighbourId].size)
+//				continue;
 
 			int size = chunkSize / chunks[neighbourId].lod;
-			if (world.chunkData[neighbourId].skipped) {
-				world.handle.handle[neighbourId].lod = 3000;
-			}
+			//if (world.chunkData[neighbourId].skipped) {
+			//	world.handle.handle[neighbourId].lod = 3000;
+			//}
 			if (world.chunkData[neighbourId].voxelCount != 0 &&
-				!world.chunkData[neighbourId].skipped) {
+				!world.chunkData[neighbourId].skipped && chunks[neighbourId].voxelCount > chunkSize* chunkSize* chunkSize) {
 
 				if (chunks[neighbourId].shortenedData) {
 					world.chunkData[neighbourId].fluidByteMap.Clear({ size, size, size });
@@ -947,7 +947,6 @@ public:
 
 				if (dist < 1920) grass = true;
 
-
 				int lod = 1;
 				if (setLod != 0) {
 					lod = setLod;
@@ -1083,7 +1082,7 @@ public:
 		}
 		END_TIMER(data_gen)
 		START_TIMER(upload)
-		int maxCount = wx * wy * wz;
+		int maxCount = wx * wy * wz*2;
 
 		Anubis::GPUONLYByteMap** byteMapBatch = new Anubis::GPUONLYByteMap * [maxCount];
 		uint8_t** byteMapData = new uint8_t * [maxCount];
@@ -1094,7 +1093,6 @@ public:
 		uint16_t** shortMapData = new uint16_t * [maxCount];
 		Math::IVector3* shortMapSizes = new Math::IVector3[maxCount];
 		int shortMapCount = 0;
-
 		for (int nx = 0; nx < wx; nx++) {
 			for (int nz = 0; nz < wz; nz++) {
 				for (int ny = 0; ny < wy; ny++) {
@@ -1103,15 +1101,15 @@ public:
 					if (chunks[neighbourId].lod == 0 || chunks[neighbourId].lod==3000) continue;
 
 					int size = chunkSize / chunks[neighbourId].lod;
-
-					if (world.chunkData[neighbourId].skipped ||
-						world.chunkData[neighbourId].voxelCount >= chunkSize * chunkSize * chunkSize) {
-						world.handle.handle[neighbourId].lod = 3000;
-					}
-
-
+					
 					if (world.chunkData[neighbourId].voxelCount != 0 &&
-						!world.chunkData[neighbourId].skipped) {
+						!world.chunkData[neighbourId].skipped && !(world.chunkData[neighbourId].voxelCount >= chunkSize * chunkSize * chunkSize)) {
+						world.chunkData[neighbourId].probeMap.Clear({ size,size,size });
+						world.chunkData[neighbourId].probeMap.Upload(0);
+						world.chunkData[neighbourId].probeMap.GetBindlessHandle();
+						world.handle.handle[neighbourId].lightStorageHandle = world.chunkData[neighbourId].probeMap.handle;
+
+						
 
 						if (chunks[neighbourId].shortenedData) {
 							auto& map = world.chunkData[neighbourId].fluidByteMap;
@@ -1183,6 +1181,15 @@ public:
 				free(shortMapData[i]);
 			}
 		}
+		size_t memUsage = 0;
+		for (int i = 0; i < byteMapCount; i++) {
+			memUsage += byteMapBatch[i]->size.x * byteMapBatch[i]->size.y * byteMapBatch[i]->size.z;
+
+		}for (int i = 0; i < shortMapCount; i++) {
+			memUsage += (shortMapBatch[i]->size.x * shortMapBatch[i]->size.y * shortMapBatch[i]->size.z)*2;
+
+		}
+		std::cout << "Uploaded " << memUsage << " bytes\n";
 		delete[] byteMapBatch;
 		delete[] shortMapBatch;
 		delete[] shortMapSizes;
@@ -1264,6 +1271,15 @@ public:
 			oldMouse = window.GetMousePos();
 			Matrix matView = MatrixLookAt(pos, tag, { 0,1,0 });
 
+			Anubis::SwitchShaderStage(shaders.hizBuilder.programID);
+			shaders.hizBuilder.SetInt(frame-1, "frameIndex");
+			shaders.hizBuilder.SetInt(1, "buildLevel");
+			shaders.hizBuilder.SetVector3({ pos.x,pos.y,pos.z }, "camPos");
+			shaders.hizBuilder.SetVector3({ forward.x,forward.y,forward.z }, "camForward");
+			shaders.hizBuilder.SetMatrix({ matView.m0,matView.m1,matView.m2,matView.m3,matView.m4,matView.m5,matView.m6,matView.m7,matView.m8,matView.m9,matView.m10,matView.m11,matView.m12,matView.m13,matView.m14,matView.m15 }, "matView");
+			shaders.hizBuilder.SetMatrix({ matProj.m0,matProj.m1,matProj.m2,matProj.m3,matProj.m4,matProj.m5,matProj.m6,matProj.m7,matProj.m8,matProj.m9,matProj.m10,matProj.m11,matProj.m12,matProj.m13,matProj.m14,matProj.m15 }, "matProj");
+
+			shaders.hizBuilder.Use(wWidth / 32, 1, wHeight / 32);
 			int renderedChunks = 0;
 			Anubis::GpuTimer frustum;
 			Anubis::GpuTimer timerFrustum;
@@ -1640,7 +1656,7 @@ public:
 
 				}
 			}
-			else if (window.GetMouseButtonPressed(0)) {
+			else if (window.GetMouseButtonPressed(0) && selectedColorIndex > 0) {
 
 				Vector3 ppp = rayCastPos;
 
@@ -2284,15 +2300,6 @@ public:
 			ImGui::Render();
 			ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 			window.UpdateBuffer();
-			Anubis::SwitchShaderStage(shaders.hizBuilder.programID);
-			shaders.hizBuilder.SetInt(frame, "frameIndex");
-			shaders.hizBuilder.SetInt(1, "buildLevel");
-			shaders.hizBuilder.SetVector3({ pos.x,pos.y,pos.z }, "camPos");
-			shaders.hizBuilder.SetVector3({ forward.x,forward.y,forward.z }, "camForward");
-			shaders.hizBuilder.SetMatrix({ matView.m0,matView.m1,matView.m2,matView.m3,matView.m4,matView.m5,matView.m6,matView.m7,matView.m8,matView.m9,matView.m10,matView.m11,matView.m12,matView.m13,matView.m14,matView.m15 }, "matView");
-			shaders.hizBuilder.SetMatrix({ matProj.m0,matProj.m1,matProj.m2,matProj.m3,matProj.m4,matProj.m5,matProj.m6,matProj.m7,matProj.m8,matProj.m9,matProj.m10,matProj.m11,matProj.m12,matProj.m13,matProj.m14,matProj.m15 }, "matProj");
-
-			shaders.hizBuilder.Use(wWidth / 32, 1, wHeight / 32);
 
 			double elapsed = glfwGetTime() - frameStart;
 			double remaining = (1.0 / 150.0) - elapsed;

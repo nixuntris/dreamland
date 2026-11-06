@@ -10,7 +10,9 @@ layout(std430, binding = 0) buffer GBufferEx {
     vec3 pos[3840*2160];
     int depth[3840* 2160];
     int voxelId[3840*2160];
+    float lightVal[3840*2160];
 };
+
 layout(std430, binding = 2) buffer VerticesBuffer {
     float vertices[];
 };
@@ -116,6 +118,7 @@ uint packRGBA8(vec4 color)
         ( bytes.b << 16 ) |
         ( bytes.a << 24 );
 }
+
 void main()
 {
     int dx = int(gl_GlobalInvocationID.x);

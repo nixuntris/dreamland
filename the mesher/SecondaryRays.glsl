@@ -9,13 +9,14 @@ layout (local_size_x = 16, local_size_y = 16, local_size_z = 1) in;
 
 
 //This shader somewhere has a bug causing any chunk over wy 0 to have bugged lighting
+
 layout(std430, binding = 0) buffer GBufferEx {
     uint frame[3840 * 2160];
     vec3 pos[3840*2160];
     int depth[3840* 2160];
     int voxelId[3840*2160];
+    float lightVal[3840*2160];
 };
-
 uint packRGBA8(vec4 color)
 {
     vec4  c     = clamp(color, 0.0, 1.0);
@@ -42,8 +43,9 @@ uniform int sampleCount;
 vec3 sunDir = normalize(vec3(0.0, 1.0, 0.0));
 struct Region {
     uvec2 handle;
+    uvec2 probeHandle;
+
     int lod;
-    int lightIds[16];
 };
 layout(std430, binding = 3) buffer BitHandles {
     Region handles[];
@@ -267,41 +269,45 @@ void main()
     gid.x*=2;
     gid.y+=(frameIndex+1)%2;
     int idx = gid.y * 3840 + gid.x;
-
     if (depth[idx] == 1000000) return;
-
+     float time = float(frameIndex) *timeSpeed;
+   
     vec3 origin = pos[idx];
-    float time = float(frameIndex) *timeSpeed;
-    float radiance = 0.0;
+    ivec3 chunk = ivec3(origin/chunkSize);
+    int lod = handles[chunk.y * (wx * wz) + chunk.z * wx + chunk.x].lod;
+    uimage3D probeMap = uimage3D(handles[chunk.y * (wx * wz) + chunk.z * wx + chunk.x].probeHandle);
+    uint val = imageLoad(probeMap,ivec3(mod(origin,32)/lod)).r;
+    if (val==0) {
+        float radiance = 0.0;
 
-    vec3 ro = origin;
-    vec3 rd = normalize(sunDir);
-    vec3  invD      = 1.0 / (rd + vec3(equal(rd, vec3(0.0))) * 1e-8);
+        vec3 ro = origin;
+        vec3 rd = normalize(sunDir);
+        vec3  invD      = 1.0 / (rd + vec3(equal(rd, vec3(0.0))) * 1e-8);
     
-    float T = 1.0;
+        float T = 1.0;
 
-    float t = 0;
-    float jitter = hash3(vec3(gid, frameIndex));
-    float shadow = cloudShadow(ro, rd, time, jitter);
-    shadow = mix(1.0, shadow, 0.3);
-    T *= shadow;   
+        float t = 0;
+        float jitter = hash3(vec3(gid, frameIndex));
+        float shadow = cloudShadow(ro, rd, time, jitter);
+        shadow = mix(1.0, shadow, 0.3);
+        T *= shadow;   
 
         
-    radiance += T;
+        radiance += T;
     
-    float hitValue = 0;
-    for (int i = 0; i < sampleCount; i++) {
-        vec3 offsetDir = normalize(sunDir+offsets[i]);
-        if (sunRayOccluded(origin+offsetDir*2, offsetDir, 100)) {
-            hitValue+=0.5;
+        uint hitValue = 0;
+        for (int i = 0; i < sampleCount; i++) {
+            vec3 offsetDir = normalize(sunDir+offsets[i]);
+            if (sunRayOccluded(origin+offsetDir*2, offsetDir, 100)) {
+                hitValue+=1;
+            }
         }
+    
+        val = hitValue;
+        imageStore(probeMap,ivec3(mod(origin,32)/lod), uvec4(hitValue));
+
     }
     
-    float mean = 1.0-((hitValue) / float(sampleCount));
-
-    vec4 prev = unpackUnorm4x8(frame[idx]);
-    
-    ivec3 chunk = ivec3(origin/chunkSize);
     /*
     uvec2 handle = handles[chunk.y * (wx * wz) + chunk.z * wx + chunk.x].handle;
     vec3 accumLightAdditional = vec3(0.0);
@@ -324,6 +330,8 @@ void main()
     } 
     
     */
+    vec4 prev = unpackUnorm4x8(frame[idx]);
+    float mean = 1.0-(((float(val)/2)) / float(sampleCount));
     vec3 col = prev.rgb * (mean*calculateLightStrength(frameIndex));
     // vec3 col = prev.rgb * (mean);
     

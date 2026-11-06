@@ -10,11 +10,12 @@ layout(std430, binding = 0) buffer GBufferEx {
     vec3 pos[3840*2160];
     int depth[3840* 2160];
     int voxelId[3840*2160];
+    float lightVal[3840*2160];
 };
 struct Region {
     uvec2 handle;
+    uvec2 probeHandle;
     int lod;
-    int lightIds[16];
 };
 layout(std430, binding = 3) buffer BitHandles {
     Region handles[];
@@ -92,6 +93,11 @@ vec3 fetchFrame(ivec2 p) {
     return unpackRGBA8(frame[p.y * 3840 + p.x]).rgb;
 }
 
+float fetchLightVal(ivec2 p) {
+    p = clamp(p, ivec2(0), ivec2(3839, 2159));
+    return lightVal[p.y * 3840 + p.x];
+}
+
 void main() {
     vec2 src = vec2(gl_FragCoord.x, float(resY) - gl_FragCoord.y + 0.5) * renderPercentage - 0.5;
 
@@ -104,5 +110,7 @@ void main() {
     vec3 c11 = fetchFrame(base + ivec2(1, 1));
 
     vec3 color = mix(mix(c00, c10, f.x), mix(c01, c11, f.x), f.y);
+    
+
     FragColor = vec4(color, 1.0);
 }

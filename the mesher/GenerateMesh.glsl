@@ -34,8 +34,8 @@ layout(std430, binding = 7) buffer AABBBuffer {
 
 struct Region {
     uvec2 handle;
+    uvec2 probeHandle;
     int lod;
-    int lightIds[16];
 };
 
 layout(std430, binding = 3) buffer BitHandles {

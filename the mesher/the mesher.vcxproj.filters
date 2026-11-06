@@ -106,9 +106,6 @@
     <None Include="frustumCull.glsl">
       <Filter>Source Files\Shaders\Rasterizer\Meshlets</Filter>
     </None>
-    <None Include="HizBuilder.glsl">
-      <Filter>Source Files\Shaders\Rasterizer\Meshlets</Filter>
-    </None>
     <None Include="Rasterize.glsl">
       <Filter>Source Files\Shaders\Rasterizer\Meshlets</Filter>
     </None>
@@ -117,9 +114,6 @@
     </None>
     <None Include="SecondaryRays.glsl">
       <Filter>Source Files\Shaders\Raytracing\Illumination</Filter>
-    </None>
-    <None Include="GenerateMesh.glsl">
-      <Filter>Source Files\Shaders\Rasterizer\Physics</Filter>
     </None>
     <None Include="hwMesh.vs">
       <Filter>Source Files\Shaders\Rasterizer\Hardware</Filter>
@@ -159,6 +153,12 @@
     </None>
     <None Include="PrimaryRays.glsl">
       <Filter>Source Files\Shaders\Raytracing\Primary Rays</Filter>
+    </None>
+    <None Include="GenerateMesh.glsl">
+      <Filter>Source Files\Shaders\Rasterizer\Meshlets</Filter>
+    </None>
+    <None Include="HizBuilder.glsl">
+      <Filter>Source Files\Shaders\Raytracing\Illumination\Display Output</Filter>
     </None>
   </ItemGroup>
   <ItemGroup>

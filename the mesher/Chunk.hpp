@@ -197,6 +197,7 @@ struct ChunkData {
 	int lod;
 	Anubis::GPUONLYShortMap fluidShortMap;
 	Anubis::GPUONLYByteMap fluidByteMap;
+	Anubis::GPUONLYByteMap probeMap;
 	uint16_t* terrain;
 	uint16_t* palette;
 	int paletteSize;
@@ -221,13 +222,8 @@ struct World {
 	struct GlobalHandle {
 		struct Region {
 			GLuint64 handle = 0;
+			GLuint64 lightStorageHandle = 0;
 			int lod;
-			int lightIds[16];
-			int middleChild;
-			Region() {
-				for (int i = 0; i < 16; i++)
-					lightIds[i] = -1;
-			}
 		};
 		Region handle[mwx * mwy * mwz];
 	};
@@ -241,10 +237,6 @@ struct World {
 	void Setup() {
 		chunkData.resize(wx * wz * wy);
 		memset(handle.handle, 0, wx * wy * wz * sizeof(GLuint64));
-		for (int i = 0; i < wx * wy * wz; i++) {
-			for (int d = 0; d < 16; d++) handle.handle[i].lightIds[d] = -1;
-
-		}
 		for (int x = 0; x < wx; x++) {
 			for (int y = 0; y < wz; y++) {
 				array[x][y] = false;
