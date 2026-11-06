@@ -38,7 +38,7 @@ uniform mat4  matView;
 uniform mat4  matProj;
 uniform int   wx, wy, wz;
 uniform int   frameIndex;
-
+uniform int sampleCount;
 vec3 sunDir = normalize(vec3(0.0, 1.0, 0.0));
 struct Region {
     uvec2 handle;
@@ -290,7 +290,6 @@ void main()
     radiance += T;
     
     float hitValue = 0;
-    int sampleCount = 4;
     for (int i = 0; i < sampleCount; i++) {
         vec3 offsetDir = normalize(sunDir+offsets[i]);
         if (sunRayOccluded(origin+offsetDir*2, offsetDir, 100)) {

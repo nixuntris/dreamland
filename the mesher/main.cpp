@@ -143,6 +143,15 @@ struct ViewPort {
 	Anubis::Camera camera;
 	float planeDs[6];
 	bool raytracePrimaryRays = false;
+	float renderPercentage = 0.8f;
+	void Display(int frame, int wHeight) {
+		shaders->display.Use();
+		shaders->display.SetInt(frame, "frameIndex");
+		shaders->display.SetInt(wHeight, "resY");
+		shaders->display.SetFloat(renderPercentage, "renderPercentage");
+		shaders->display.SetVector4({ 1.0f, 1.0f, 1.0f, 1.0f }, "color");
+	
+	}
 	void FrustumCull(Matrix matView, Vector3 pos, Vector3 forward, int totalMeshletCount) {
 
 		ExtractFrustumPlanes(matView, planes);
@@ -174,12 +183,12 @@ struct ViewPort {
 		shaders->clouds.SetInt(wy, "wy");
 		shaders->clouds.SetInt(wz, "wz");
 		shaders->clouds.SetFloat(timeSpeed, "timeSpeed");
-		shaders->clouds.SetInt(wWidth, "renderWidth");
-		shaders->clouds.SetInt(wHeight, "renderHeight");
+		shaders->clouds.SetInt(wWidth * renderPercentage, "renderWidth");
+		shaders->clouds.SetInt(wHeight * renderPercentage, "renderHeight");
 		shaders->clouds.SetInt(frame, "frameIndex");
 		shaders->clouds.Use(wWidth / 32, wHeight / 32, 1);
 	}
-	void SecondaryRays(Matrix matView, Vector3 pos, Vector3 forward, const std::vector<uint32_t> palette, int frame, float timeSpeed, int wWidth, int wHeight, World *world) {
+	void SecondaryRays(int sampleCount, Matrix matView, Vector3 pos, Vector3 forward, const std::vector<uint32_t> palette, int frame, float timeSpeed, int wWidth, int wHeight, World *world) {
 
 		Anubis::SwitchShaderStage(shaders->secondaryRaysRender.programID);
 		shaders->secondaryRaysRender.SetVector3({ pos.x,pos.y,pos.z }, "camPos");
@@ -195,10 +204,12 @@ struct ViewPort {
 		shaders->secondaryRaysRender.SetIntArray(world->lightRadiusList, 16, "lightRadiusList");
 
 		shaders->secondaryRaysRender.SetFloat(timeSpeed, "timeSpeed");
-		shaders->secondaryRaysRender.SetInt(wWidth, "renderWidth");
-		shaders->secondaryRaysRender.SetInt(wHeight, "renderHeight");
+		shaders->secondaryRaysRender.SetInt(wWidth * renderPercentage, "renderWidth");
+		shaders->secondaryRaysRender.SetInt(wHeight * renderPercentage, "renderHeight");
+		shaders->secondaryRaysRender.SetInt(sampleCount, "sampleCount");
 		shaders->secondaryRaysRender.SetInt(frame, "frameIndex");
-		shaders->secondaryRaysRender.Use(wWidth / 32, wHeight / 32, 1);
+		shaders->secondaryRaysRender.Use((wWidth / 32) * renderPercentage, (wHeight / 32) * renderPercentage, 1);
+		
 		shaders->secondaryRaysRender.SetUIntArray(palette.data(), palette.size(), "packedColors");
 	}
 	void RenderPhysicsObject(ShaderManager* shaders, Anubis::Camera camera, Matrix matView, Anubis::HWVIrGeomMesh& renderSphere, Vector3 vv, int frame, int voxelType, int size, uint32_t* pack, int packCount, GLuint handle, Vector3 rotation, int wHeight) {
@@ -237,12 +248,12 @@ struct ViewPort {
 			shaders->primaryRays.SetInt(wy, "wy");
 			shaders->primaryRays.SetInt(wz, "wz");
 			shaders->primaryRays.SetUIntArray(palette.data(), palette.size(), "packedColors");
-			shaders->primaryRays.SetInt(wWidth, "renderWidth");
-			shaders->primaryRays.SetInt(wHeight, "renderHeight");
+			shaders->primaryRays.SetInt(wWidth * renderPercentage, "renderWidth");
+			shaders->primaryRays.SetInt(wHeight * renderPercentage, "renderHeight");
 			shaders->primaryRays.SetInt(frame, "frameIndex");
 			shaders->primaryRays.SetInt(0, "offset");
 
-			shaders->primaryRays.Use(wWidth/32, wHeight/16, 1);
+			shaders->primaryRays.Use((wWidth/32)*renderPercentage, (wHeight/16) * renderPercentage, 1);
 
 		}
 		else {
@@ -255,8 +266,8 @@ struct ViewPort {
 			shaders->rasterizer.SetInt(wy, "wy");
 			shaders->rasterizer.SetInt(wz, "wz");
 			shaders->rasterizer.SetUIntArray(palette.data(), palette.size(), "packedColors");
-			shaders->rasterizer.SetInt(wWidth, "renderWidth");
-			shaders->rasterizer.SetInt(wHeight, "renderHeight");
+			shaders->rasterizer.SetInt(wWidth * renderPercentage, "renderWidth");
+			shaders->rasterizer.SetInt(wHeight * renderPercentage, "renderHeight");
 			shaders->rasterizer.SetInt(frame, "frameIndex");
 			shaders->rasterizer.SetInt(0, "offset");
 
@@ -268,8 +279,8 @@ struct ViewPort {
 		Anubis::SwitchShaderStage(shaders->grassRenderer.programID);
 		shaders->grassRenderer.SetVector3({ pos.x,pos.y,pos.z }, "camPos");
 		shaders->grassRenderer.SetVector3({ forward.x,forward.y,forward.z }, "camForward");
-		shaders->grassRenderer.SetInt(wWidth, "renderWidth");
-		shaders->grassRenderer.SetInt(wHeight, "renderHeight");
+		shaders->grassRenderer.SetInt(wWidth * renderPercentage, "renderWidth");
+		shaders->grassRenderer.SetInt(wHeight*renderPercentage, "renderHeight");
 		shaders->grassRenderer.SetMatrix({ matView.m0,matView.m1,matView.m2,matView.m3,matView.m4,matView.m5,matView.m6,matView.m7,matView.m8,matView.m9,matView.m10,matView.m11,matView.m12,matView.m13,matView.m14,matView.m15 }, "matView");
 		shaders->grassRenderer.SetMatrix({ matProj.m0,matProj.m1,matProj.m2,matProj.m3,matProj.m4,matProj.m5,matProj.m6,matProj.m7,matProj.m8,matProj.m9,matProj.m10,matProj.m11,matProj.m12,matProj.m13,matProj.m14,matProj.m15 }, "matProj");
 		shaders->grassRenderer.SetInt(wx, "wx");
@@ -280,8 +291,7 @@ struct ViewPort {
 		shaders->grassRenderer.SetInt(frame, "frameIndex");
 		shaders->grassRenderer.Use(grass / 64, 1, 1);
 	}
-	/*
-	void RenderPhysicalObjects(Matrix matView, Vector3 pos, Vector3 forward, std::vector<uint32_t> palette, int frame, std::vector<std::unique_ptr<PhysicsObject>> physicalObjects, int wWidth, int wHeight) {
+	void RenderPhysicalObjects(Matrix matView, Vector3 pos, Vector3 forward, std::vector<uint32_t> palette, int frame, std::vector<std::unique_ptr<PhysicsObject>> &physicalObjects, int wWidth, int wHeight) {
 
 		for (auto& k : physicalObjects) {
 			bool downardsCollision = false;
@@ -320,7 +330,7 @@ struct ViewPort {
 				shaders->renderPhysicalObjects.Use(4, 4, 4);
 			}
 		}
-	}*/
+	}
 };
 class App {
 	Anubis::Window window;
@@ -344,15 +354,17 @@ class App {
 	float timeSpeed = 0.0004;
 	bool mainMenu = false;
 	int alreadySpawnedGrass = 0;
+	int sampleCount = 1;
 	ViewPort viewPort;
 	ParticleRender particleRenderer;
 	CHUNKTYPE selectedType = MOUNTAIN;
 public:
 	App() {
-		//IMPLEMENT THE HARDWARE PIPELINE
-		//39873 - voxels
-		//239238 - quads
-		//478476 - triangles
+		//Implement HiZ for meshlets
+		//Optimize ray traversal
+		//Speed up chunk generation
+		//Fix the editing in meshlets
+
 		wWidth = graphicsSettings.resolutions[currentResolutionWindow].width;
 		wHeight = graphicsSettings.resolutions[currentResolutionWindow].height;
 
@@ -1418,7 +1430,7 @@ public:
 					world.physicsAccelerationChunks[id].allocated = false;
 				}
 			}
-			//viewPort.RenderPhysicalObjects(matView, pos, forward, ColorPallete, frame, physicalObjects, wWidth, wHeight);
+			viewPort.RenderPhysicalObjects(matView, pos, forward, ColorPallete, frame, physicalObjects, wWidth, wHeight);
 			Math::Vector3 pp[2] = { viewPort.camera.target,{wx * 32,150,wy * 32} };
 			double rasterTimeMs;
 			int trianglesRendered = 0;
@@ -2004,7 +2016,7 @@ public:
 			if (graphicsSettings.secondaryRays) {
 
 				secondaryRays.Start();
-				viewPort.SecondaryRays(matView, pos, forward, ColorPallete, frame, timeSpeed,wWidth,wHeight, &world);
+				viewPort.SecondaryRays(sampleCount,matView, pos, forward, ColorPallete, frame, timeSpeed,wWidth,wHeight, &world);
 			}
 			auto secondaryRaysMs = secondaryRays.Stop();
 			if (graphicsSettings.renderClouds) {
@@ -2123,20 +2135,7 @@ public:
 				k->position.z += k->velocity.z;
 
 			}
-			
-			shaders.display.Use();
-			shaders.display.SetInt(frame, "frameIndex");
-
-			shaders.display.SetVector3({ pos.x,pos.y,pos.z }, "camPos");
-			shaders.display.SetVector3({ forward.x,forward.y,forward.z }, "camForward");
-			shaders.display.SetMatrix({ matView.m0,matView.m1,matView.m2,matView.m3,matView.m4,matView.m5,matView.m6,matView.m7,matView.m8,matView.m9,matView.m10,matView.m11,matView.m12,matView.m13,matView.m14,matView.m15 }, "matView");
-			shaders.display.SetMatrix({ matProj.m0,matProj.m1,matProj.m2,matProj.m3,matProj.m4,matProj.m5,matProj.m6,matProj.m7,matProj.m8,matProj.m9,matProj.m10,matProj.m11,matProj.m12,matProj.m13,matProj.m14,matProj.m15 }, "matProj");
-			shaders.display.SetInt(wx, "wx");
-			shaders.display.SetInt(wy, "wy");
-			shaders.display.SetInt(wz, "wz");
-			shaders.display.SetUIntArray(ColorPallete.data(), ColorPallete.size(), "packedColors");
-			shaders.display.SetInt(wHeight, "resY");
-			shaders.display.SetVector4({ 1.0f, 1.0f, 1.0f, 1.0f }, "color");
+			viewPort.Display(frame,wHeight);
 			Anubis::Quad quad;
 			quad.Create();
 			window.DrawQuad(quad);
@@ -2196,10 +2195,12 @@ public:
 
 				ImGui::SliderInt("Edit Size", &editSize, 1, 300);
 				ImGui::SliderInt("Render Distance", &renderDistance, 1, 1000);
-
+				ImGui::SliderFloat("Render Percentage", &viewPort.renderPercentage, 0.1f, 1.0f);
 				CustomToggle("Render grass", &graphicsSettings.grassRender);
 				CustomToggle("Hardware/Software rendering", &graphicsSettings.hardwareSoftwareRendering);
 				CustomToggle("Secondary rays", &graphicsSettings.secondaryRays);
+
+				ImGui::SliderInt("Sample Count", &sampleCount, 1, 9);
 
 				if (ImGui::Button("Recompile shaders")) {
 					shaders.Load();

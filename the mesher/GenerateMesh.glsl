@@ -91,6 +91,7 @@ uint PackMetaData(uint mask, uint lod, uint type)
     return (mask & 0x3Fu)
          | ((lod  & 0x3Fu) << 6)
          | ((type & 0xFFFFu) << 12);
+    //so this is a 32 bit value, which leaves 26 bits for me to cache the data
 }
 
 layout(std430, binding = 10) buffer GPUBatch {

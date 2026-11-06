@@ -84,11 +84,25 @@ vec4 unpackRGBA8(uint packedr)
         float((packedr >> 24) & 0xFFu)
     ) * (1.0 / 255.0);
 }
+uniform float renderPercentage;
 uniform int frameIndex;
 uniform int resY;
+vec3 fetchFrame(ivec2 p) {
+    p = clamp(p, ivec2(0), ivec2(3839, 2159));
+    return unpackRGBA8(frame[p.y * 3840 + p.x]).rgb;
+}
+
 void main() {
-	ivec2 pixelCoords = ivec2(vec2(gl_FragCoord.xy));
-    FragColor = vec4(unpackRGBA8(frame[(resY-pixelCoords.y) * 3840 + pixelCoords.x]).rgb,1);
-    
-    
+    vec2 src = vec2(gl_FragCoord.x, float(resY) - gl_FragCoord.y + 0.5) * renderPercentage - 0.5;
+
+    ivec2 base = ivec2(floor(src));
+    vec2  f    = fract(src);
+
+    vec3 c00 = fetchFrame(base);
+    vec3 c10 = fetchFrame(base + ivec2(1, 0));
+    vec3 c01 = fetchFrame(base + ivec2(0, 1));
+    vec3 c11 = fetchFrame(base + ivec2(1, 1));
+
+    vec3 color = mix(mix(c00, c10, f.x), mix(c01, c11, f.x), f.y);
+    FragColor = vec4(color, 1.0);
 }
