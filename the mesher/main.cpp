@@ -910,18 +910,11 @@ public:
 				if (dist < 1920) grass = true;
 
 				int lod = 1;
-				if (setLod != 0) {
-					lod = setLod;
-				}
-				else {
-
-					if (dist > 960) lod = 2;
-					if (dist > 960 * 2) lod = 4;
-
-					if (dist > 960 * 4) lod = 8;
-					if (dist > 960 * 8) lod = 16;
-					if (dist > 960 * 12) lod = 32;
-				}
+				if (dist > 960) lod = 2;
+				if (dist > 960 * 2) lod = 4;
+				if (dist > 960 * 4) lod = 8;
+				if (dist > 960 * 8) lod = 16;
+				if (dist > 960 * 12) lod = 32;
 				GenerationData gen;
 				gen.GenerateMountains(nx, nz);
 				gen.highestChunkY += 2;
@@ -929,7 +922,7 @@ public:
 				for (int y = 0; y < wy; y++) {
 					world.chunkData[y * (wx * wz) + nz * wx + nx].lod = 0;
 				}
-				for (int y = 0; y < gen.highestChunkY && y < wy; y++) {
+				for (int y = gen.lowestChunkY; y < gen.highestChunkY && y < wy; y++) {
 					chunks[y * (wx * wz) + nz * wx + nx].GeneratePerType(selectedType,&world.chunkData[y * (wx * wz) + nz * wx + nx], gen, nx, y, nz, lod, grass);
 				};
 				int base = 0;
@@ -994,8 +987,8 @@ public:
 					};
 
 				auto spawnRock = [&](int cx, int cy, int cz, int size) {
-					float rx = size + Math::GetRandomValueStreamlined(0, size / 2);
-					float rz = size + Math::GetRandomValueStreamlined(0, size / 2);
+					float rx = size + Math::GetRandomValueStreamlinedFast(0, size / 2);
+					float rz = size + Math::GetRandomValueStreamlinedFast(0, size / 2);
 					float ry = size * 0.6f;
 					cy -= (int)(ry * 0.4f);
 
@@ -1003,7 +996,7 @@ public:
 						for (int x = -(int)rx; x <= (int)rx; x++) {
 							for (int z = -(int)rz; z <= (int)rz; z++) {
 								float d = (x * x) / (rx * rx) + (y * y) / (ry * ry) + (z * z) / (rz * rz);
-								float jitter = Math::GetRandomValueStreamlined(-25, 25) / 100.0f;
+								float jitter = Math::GetRandomValueStreamlinedFast(-25, 25) / 100.0f;
 								if (d <= 0.75f || d <= 1.0f + jitter)
 									SET_VOXEL(cx + x, cy + y, cz + z, STONE);
 							}
@@ -1012,26 +1005,26 @@ public:
 					};
 				if (GetRandomValue(0, 10) == 5 && selectedType == MOUNTAIN) {
 					for (int i = 0; i < 3; i++) {
-						int rx = Math::GetRandomValueStreamlined(8, 23);
-						int rz = Math::GetRandomValueStreamlined(8, 23);
+						int rx = Math::GetRandomValueStreamlinedFast(8, 23);
+						int rz = Math::GetRandomValueStreamlinedFast(8, 23);
 						int groundY = gen.heightMap[rx + rz * chunkSize];
-						spawnRock(rx, groundY, rz, Math::GetRandomValueStreamlined(2, 5));
+						spawnRock(rx, groundY, rz, Math::GetRandomValueStreamlinedFast(2, 5));
 					}
 
 				}
 				if (selectedType == MOUNTAIN) {
-					for (int i = 0; i < Math::GetRandomValueStreamlined(0, 4); i++) {
-						int dx = Math::GetRandomValueStreamlined(10, 20);
-						int dz = Math::GetRandomValueStreamlined(10, 20);
+					for (int i = 0; i < Math::GetRandomValueStreamlinedFast(0, 4); i++) {
+						int dx = Math::GetRandomValueStreamlinedFast(10, 20);
+						int dz = Math::GetRandomValueStreamlinedFast(10, 20);
 						int baseY = gen.heightMap[dx + dz * chunkSize];
 						if (baseY > 250) continue;
-						spawnTree(dx, baseY, dz, Math::GetRandomValueStreamlined(24, 48));
+						spawnTree(dx, baseY, dz, Math::GetRandomValueStreamlinedFast(24, 48));
 
 					}
 
 				}
 			
-				for (int y = 0; y < gen.highestChunkY && y < wy; y++) {
+				for (int y = gen.lowestChunkY; y < gen.highestChunkY && y < wy; y++) {
 					if (!world.chunkData[y * (wx * wz) + nz * wx + nx].skipped) {
 						chunks[y * (wx * wz) + nz * wx + nx].GenerateLod(&world.chunkData[y * (wx * wz) + nz * wx + nx], nx, y, nz);
 						chunks[y * (wx * wz) + nz * wx + nx].Compress(&world.chunkData[y * (wx * wz) + nz * wx + nx]);
@@ -1141,15 +1134,6 @@ public:
 				free(shortMapData[i]);
 			}
 		}
-		size_t memUsage = 0;
-		for (int i = 0; i < byteMapCount; i++) {
-			memUsage += byteMapBatch[i]->size.x * byteMapBatch[i]->size.y * byteMapBatch[i]->size.z;
-
-		}for (int i = 0; i < shortMapCount; i++) {
-			memUsage += (shortMapBatch[i]->size.x * shortMapBatch[i]->size.y * shortMapBatch[i]->size.z)*2;
-
-		}
-		std::cout << "Uploaded " << memUsage << " bytes\n";
 		delete[] byteMapBatch;
 		delete[] shortMapBatch;
 		delete[] shortMapSizes;

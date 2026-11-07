@@ -109,10 +109,25 @@ namespace Math {
         if (val < min) return min;
         return val;
     }
+    inline static uint64_t NextU64(uint64_t& s)
+    {
+        s ^= s << 13;
+        s ^= s >> 7;
+        s ^= s << 17;
+        return s;
+    }
     inline static int GetRandomValueStreamlined(int min, int max)
     {
         thread_local std::mt19937 engine{ std::random_device{}() };
         std::uniform_int_distribution<int> dist(min, max);
         return dist(engine);
+    }
+    inline static int GetRandomValueStreamlinedFast(int min, int max)
+    {
+        thread_local uint64_t s = 0x9E3779B97F4A7C15ULL;
+
+        uint64_t range = (uint64_t)(max - min) + 1;
+        uint64_t r = NextU64(s);
+        return min + (int)(r % range);
     }
 }

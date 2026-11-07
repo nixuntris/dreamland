@@ -208,7 +208,7 @@ public:
 		for (uint8_t x = 0; x < chunkSize; x += 1) {
 			for (uint8_t z = 0; z < chunkSize; z += 1) {
 				int terrainHeight = generationData.heightMap[x + z * chunkSize]/5+125;
-				int grassLineOffset = Math::GetRandomValueStreamlined(-50, 50);
+				int grassLineOffset = Math::GetRandomValueStreamlinedFast(-50, 50);
 				for (int y = chunkSize - 1; y >= 0; y -= 1) {
 					int worldY = gy * chunkSize + y;
 					if (worldY < terrainHeight - 6) {
@@ -216,7 +216,7 @@ public:
 							IDX(x, y, z, chunkSize)
 						] = 9; // sand
 						if (chunkData->terrain[IDX(x, y + 1, z,chunkSize)] == 0) {
-							if ((x + y + Math::GetRandomValueStreamlined(-1, 1)) % 2 == 0 && grass && Math::GetRandomValueStreamlined(0,1000)==150) grassList.push_back({ (float)x + gx * chunkSize,(float)y + gy * chunkSize,(float)z + gz * chunkSize});
+							if ((x + y + Math::GetRandomValueStreamlinedFast(-1, 1)) % 2 == 0 && grass && Math::GetRandomValueStreamlinedFast(0,1000)==150) grassList.push_back({ (float)x + gx * chunkSize,(float)y + gy * chunkSize,(float)z + gz * chunkSize});
 						}
 					}
 				}
@@ -243,7 +243,7 @@ public:
 		for (uint8_t x = 0; x < chunkSize; x += 1) {
 			for (uint8_t z = 0; z < chunkSize; z += 1) {
 				int terrainHeight = generationData.heightMap[x + z * chunkSize];
-				int grassLineOffset = Math::GetRandomValueStreamlined(-50, 50);
+				int grassLineOffset = Math::GetRandomValueStreamlinedFast(-50, 50);
 				for (int y = chunkSize - 1; y >= 0; y -= 1) {
 					int worldY = gy * chunkSize + y;
 					if (worldY < terrainHeight - 6) {
@@ -260,7 +260,7 @@ public:
 							if (chunkData->terrain[
 								IDX(x, y + 1, z, chunkSize)
 							] == 0) {
-								if ((x + y + Math::GetRandomValueStreamlined(-1, 1)) % 2 == 0 && grass) grassList.push_back({ (float)x + gx * chunkSize,(float)y + gy * chunkSize,(float)z + gz * chunkSize });
+								if ((x + y + Math::GetRandomValueStreamlinedFast(-1, 1)) % 2 == 0 && grass) grassList.push_back({ (float)x + gx * chunkSize,(float)y + gy * chunkSize,(float)z + gz * chunkSize });
 							}
 						}
 						else if (worldY < 400 + grassLineOffset) {
