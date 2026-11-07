@@ -1007,7 +1007,7 @@ public:
 						}
 					}
 					};
-				if (GetRandomValue(0, 10) == 5 && selectedType==MOUNTAIN) {
+				/*if (GetRandomValue(0, 10) == 5 && selectedType == MOUNTAIN) {
 					for (int i = 0; i < 3; i++) {
 						int rx = Math::GetRandomValueStreamlined(8, 23);
 						int rz = Math::GetRandomValueStreamlined(8, 23);
@@ -1027,7 +1027,7 @@ public:
 					}
 
 				}
-				
+				*/
 				for (int y = 0; y < gen.highestChunkY && y < wy; y++) {
 					if (!world.chunkData[y * (wx * wz) + nz * wx + nx].skipped) {
 						chunks[y * (wx * wz) + nz * wx + nx].GenerateLod(&world.chunkData[y * (wx * wz) + nz * wx + nx], nx, y, nz);

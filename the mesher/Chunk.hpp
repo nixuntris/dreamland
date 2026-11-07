@@ -328,19 +328,15 @@ public:
 			return;
 		}
 		chunkData->compressed = false;
-		uint16_t voxels[65535];
-		for (int i = 0; i < 65535; i++) {
-			voxels[i] = 0;
-		}
 		bool over255 = true;
 		for (int i = 0; i < size * size * size; i++) {
-			voxels[chunkData->terrain[i]] += 1;
 			if (chunkData->terrain[i] > 255) {
 				over255 = false;
+				break;
 			}
 		}
 		if (over255) {
-			chunkData->compressedTerrain = (uint8_t*)MemAlloc(size*size*size);
+			chunkData->compressedTerrain = (uint8_t*)MemAlloc(size * size * size);
 
 			for (int i = 0; i < size * size * size; i++) {
 				chunkData->compressedTerrain[i] = (uint8_t)chunkData->terrain[i];
@@ -351,6 +347,13 @@ public:
 			free(chunkData->terrain);
 			chunkData->terrain = NULL;
 			return;
+		}
+		uint16_t voxels[65535];
+		for (int i = 0; i < 65535; i++) {
+			voxels[i] = 0;
+		}
+		for (int i = 0; i < size * size * size; i++) {
+			voxels[chunkData->terrain[i]] += 1;
 		}
 		int originalVoxels = 0;
 		uint16_t palette[255]; 
