@@ -1,4 +1,5 @@
 #pragma once
+#include <random>
 #include "math.h"
 namespace Math {
 
@@ -110,23 +111,8 @@ namespace Math {
     }
     inline static int GetRandomValueStreamlined(int min, int max)
     {
-        int value = 0;
-
-        int range = (max - min) + 1;
-
-        const unsigned long c = (unsigned long)RAND_MAX + 1UL;  // number of possible rand() results
-        unsigned long m = (unsigned long)range;           // size of the target interval
-        unsigned long t = c - (c % m);                    // largest multiple of m <= c
-        unsigned long r = 0;
-
-        for (;;)
-        {
-            r = (unsigned long)rand();
-            if (r < t) break;
-        }
-
-        value = min + (int)(r % m);
-
-        return value;
+        thread_local std::mt19937 engine{ std::random_device{}() };
+        std::uniform_int_distribution<int> dist(min, max);
+        return dist(engine);
     }
 }

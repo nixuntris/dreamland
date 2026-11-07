@@ -508,7 +508,6 @@ public:
 		if (dist > 960 * 4) lod = 8;
 		if (dist > 960 * 8) lod = 16;
 		if (dist > 960 * 12) lod = 32;
-		if (dist > 960 * 24) lod = 64;
 		if (world.array[nx][nz]) {
 			world.setLod[nx][nz] = lod;
 			for (int ny = 0; ny < wy; ny++) {
@@ -746,10 +745,10 @@ public:
 			if (ImGui::CollapsingHeader("Advanced")) {
 				ImGui::Indent();
 
-				ImGui::Checkbox("Pregenerate World", &pregenerate);
-				if (ImGui::IsItemHovered()) {
-					ImGui::SetTooltip("Generate all chunks during loading before the game starts.\n");
-				}
+				//ImGui::Checkbox("Pregenerate World", &pregenerate);
+				//if (ImGui::IsItemHovered()) {
+//					ImGui::SetTooltip("Generate all chunks during loading before the game starts.\n");
+	//			}
 				ImGui::Checkbox("Spawn Critters", &spawnCritters);
 				if (ImGui::IsItemHovered()) {
 					ImGui::SetTooltip("Currently it's just debug flies.\n");
@@ -897,10 +896,14 @@ public:
 	}
 	void PreGenerateFullDebug(int setLod=0) {
 		START_TIMER(data_gen)
-#pragma omp for collapse(2)
 		for (int nx = 0; nx < wx; nx++) {
 			for (int nz = 0; nz < wz; nz++) {
 				world.array[nx][nz] = true;
+			}
+		}
+#pragma omp for collapse(2)
+		for (int nx = 0; nx < wx; nx++) {
+			for (int nz = 0; nz < wz; nz++) {
 				float dist = Vector2Distance({ (float)nx * chunkSize + chunkSize / 2,(float)nz * chunkSize + chunkSize / 2 }, { float(viewPort.camera.position.x),float(viewPort.camera.position.z) });
 				bool grass = false;
 
@@ -914,10 +917,10 @@ public:
 
 					if (dist > 960) lod = 2;
 					if (dist > 960 * 2) lod = 4;
+
 					if (dist > 960 * 4) lod = 8;
 					if (dist > 960 * 8) lod = 16;
 					if (dist > 960 * 12) lod = 32;
-					if (dist > 960 * 24) lod = 64;
 				}
 				GenerationData gen;
 				gen.GenerateMountains(nx, nz);
@@ -1007,7 +1010,7 @@ public:
 						}
 					}
 					};
-				/*if (GetRandomValue(0, 10) == 5 && selectedType == MOUNTAIN) {
+				if (GetRandomValue(0, 10) == 5 && selectedType == MOUNTAIN) {
 					for (int i = 0; i < 3; i++) {
 						int rx = Math::GetRandomValueStreamlined(8, 23);
 						int rz = Math::GetRandomValueStreamlined(8, 23);
@@ -1027,7 +1030,7 @@ public:
 					}
 
 				}
-				*/
+			
 				for (int y = 0; y < gen.highestChunkY && y < wy; y++) {
 					if (!world.chunkData[y * (wx * wz) + nz * wx + nx].skipped) {
 						chunks[y * (wx * wz) + nz * wx + nx].GenerateLod(&world.chunkData[y * (wx * wz) + nz * wx + nx], nx, y, nz);
@@ -1067,8 +1070,6 @@ public:
 						world.chunkData[neighbourId].probeMap.Upload(0);
 						world.chunkData[neighbourId].probeMap.GetBindlessHandle();
 						world.handle.handle[neighbourId].lightStorageHandle = world.chunkData[neighbourId].probeMap.handle;
-
-						
 
 						if (chunks[neighbourId].shortenedData) {
 							auto& map = world.chunkData[neighbourId].fluidByteMap;
@@ -1294,7 +1295,6 @@ public:
 						if (dist > 960 * 4) lod = 8;
 						if (dist > 960 * 8) lod = 16;
 						if (dist > 960 * 12) lod = 32;
-						if (dist > 960 * 24) lod = 64;
 						if (world.setLod[x][z] != lod && lodchanged<10) {
 							SetLODChunks(x, z, lod);
 							for (int y = 0; y < wy; y++) {
@@ -1662,7 +1662,6 @@ public:
 				if (dist > 960 * 4) lod = 8;
 				if (dist > 960 * 8) lod = 16;
 				if (dist > 960 * 12) lod = 32;
-				if (dist > 960 * 24) lod = 64;
 				world.setLod[nx][nz] = lod;
 				
 				GenerationData gen;
