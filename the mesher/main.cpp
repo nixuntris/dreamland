@@ -405,8 +405,9 @@ public:
 		GenerationData gen;
 		gen.GenerateMountains(x, z);
 #pragma omp parallel for num_threads(4)
-		for (int y = 0; y < gen.highestChunkY; y++) {
+		for (int y = gen.lowestChunkY; y < gen.highestChunkY; y++) {
 			chunks[y * (wx * wz) + z * wx + x].GeneratePerType(selectedType,&world.chunkData[y * (wx * wz) + z * wx + x], gen, x, y, z, lod, grass);
+			
 			chunks[y * (wx * wz) + z * wx + x].GenerateLod(
 				&world.chunkData[y * (wx * wz) + z * wx + x], x, y, z);
 			chunks[y * (wx * wz) + z * wx + x].Compress(
@@ -419,14 +420,14 @@ public:
 			int neighbourId = ny * (wx * wz) + z * wx + x;
 			if (x < 0 || ny < 0 || z < 0 || x >= wx || ny >= wy || z >= wz) continue;
 			if (chunks[neighbourId].lod == 0) continue;
-		//	if (chunks[neighbourId].voxelCount ==
-	//			chunks[neighbourId].size * chunks[neighbourId].size * chunks[neighbourId].size)
-//				continue;
 
 			int size = chunkSize / chunks[neighbourId].lod;
-			//if (world.chunkData[neighbourId].skipped) {
-			//	world.handle.handle[neighbourId].lod = 3000;
-			//}
+			if (world.chunkData[neighbourId].skipped) {
+				world.handle.handle[neighbourId].lod = 3000;
+				world.handle.handle[neighbourId].filled = 1;
+
+				continue;
+			}
 			if (world.chunkData[neighbourId].voxelCount != 0 &&
 				!world.chunkData[neighbourId].skipped && chunks[neighbourId].voxelCount > chunkSize* chunkSize* chunkSize) {
 
@@ -1273,7 +1274,7 @@ public:
 			START_TIMER(chunkAllocator)
 			
 			Math::IVector2 currentChunkPos= { int(viewPort.camera.position.x / chunkSize),int(viewPort.camera.position.z / chunkSize )};
-/*			if (oldChunkPos.x != currentChunkPos.x || oldChunkPos.y != currentChunkPos.y) {
+			if (oldChunkPos.x != currentChunkPos.x || oldChunkPos.y != currentChunkPos.y) {
 				int lodchanged = 0;
 				
 				for (int x = 0; x < wx; x++) {
@@ -1300,7 +1301,7 @@ public:
 					}
 				}
 
-			}*/
+			}
 			oldChunkPos = currentChunkPos;
 			int drd = 0;
 			Vector3 rayCastPos = pos;
@@ -1652,8 +1653,9 @@ public:
 				if (dist > 960) lod = 2;
 				if (dist > 960 * 2) lod = 4;
 				if (dist > 960 * 4) lod = 8;
-				if (dist > 960 * 8) lod = 16;
-				if (dist > 960 * 12) lod = 32;
+				//so I care at most about 4 points, which turns into overhead from meshlets
+				if (dist > 960 * 8) { continue; lod = 16; }
+				if (dist > 960 * 12) { continue; lod = 32; }
 				world.setLod[nx][nz] = lod;
 				
 				GenerationData gen;

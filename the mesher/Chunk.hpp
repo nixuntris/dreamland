@@ -116,7 +116,7 @@ public:
 			GenerateSavanna(chunkData, generationData, gx, gy, gz, lod, grass);
 			break;
 		case MOUNTAIN:
-			GenerateMountains(chunkData, generationData, gx, gy, gz,lod, false); //the problem is grass, specifically if it's set to true, it makes the program randomly hang after generation
+			GenerateMountains(chunkData, generationData, gx, gy, gz,lod, grass); //the problem is grass, specifically if it's set to true, it makes the program randomly hang after generation
 			break;	
 		}
 	}
@@ -285,6 +285,7 @@ public:
 		}
 	}
 	inline void GenerateLod(ChunkData* chunkData, int gx, int gy, int gz) {
+		
 		voxelCount = 0;
 		for (int i = 0; i < chunkSize * chunkSize * chunkSize; i++) {
 			voxelCount += chunkData->terrain[i] != 0;
@@ -585,7 +586,7 @@ public:
 		if (!cd) return;
 		if (cd->voxelCount != 0) {
 
-			if (cd->terrain && !cd->compressed) {
+			if (cd->terrain && !cd->compressed && cd->lod!=32) {
 				MemFree(cd->terrain);
 				cd->terrain = NULL;
 			}

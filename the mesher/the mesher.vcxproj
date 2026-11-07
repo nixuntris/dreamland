@@ -149,15 +149,12 @@
     <None Include="..\readme.md" />
     <None Include="Anubis\BaseShaders\quad_display_shader.vs" />
     <None Include="bilboard.glsl" />
-    <None Include="ClearPhysicalObject.glsl" />
     <None Include="Clouds.glsl" />
     <None Include="desert.txt" />
     <None Include="fes.fs" />
-    <None Include="FillOutPhysicsData.glsl" />
     <None Include="frustumCull.glsl" />
     <None Include="hwMesh.fs" />
     <None Include="hwMesh.vs" />
-    <None Include="PhysicsObject.glsl" />
     <None Include="PrimaryRays.glsl" />
     <None Include="quad_display_shader.fs" />
     <None Include="GenerateMesh.glsl" />
