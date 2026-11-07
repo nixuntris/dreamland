@@ -44,8 +44,8 @@ vec3 sunDir = normalize(vec3(0.0, 1.0, 0.0));
 struct Region {
     uvec2 handle;
     uvec2 probeHandle;
-
     int lod;
+    int filled;
 };
 layout(std430, binding = 3) buffer BitHandles {
     Region handles[];
@@ -82,6 +82,7 @@ uint readVoxelData(ivec3 pos, inout int lod) {
     ivec3 chunk = pos / chunkSize;
     int index = chunk.y * (wx * wz) + chunk.z * wx + chunk.x;
     int regionLod = handles[index].lod;
+    if (regionLod==32) return handles[index].filled;
     if (regionLod == 3000) return 1u;
     lod = regionLod;
     uvec2 handle = handles[index].handle;

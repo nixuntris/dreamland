@@ -313,7 +313,7 @@ class App {
 	float timeSpeed = 0.0004;
 	bool mainMenu = false;
 	int alreadySpawnedGrass = 0;
-	int sampleCount = 9;
+	int sampleCount = 1;
 	ViewPort viewPort;
 	ParticleRender particleRenderer;
 	CHUNKTYPE selectedType = MOUNTAIN;
@@ -353,7 +353,7 @@ public:
 
 		if (firstGen && gpuMeshing) {
 			std::cout << "gpu meshing on\n";
-			totalTriangleCount = 59259259;
+			totalTriangleCount = 59259259/2;
 			totalMeshletCount = totalTriangleCount/64;
 			shaders.display.CreatePersistentSSBO(5, (totalMeshletCount + 1) * sizeof(int) * 8);
 			shaders.display.CreatePersistentSSBO(2, totalTriangleCount * sizeof(uint32_t) * 8);
@@ -901,20 +901,24 @@ public:
 				world.array[nx][nz] = true;
 			}
 		}
+		//wx = 100, wz = 100 takes 6 seconds to generate on 32 threads
+		//wx = 50, wz = 50 takes 1 second to generate on 32 threads
+		//and it's something causes by GenerateMountains()
 #pragma omp for collapse(2)
 		for (int nx = 0; nx < wx; nx++) {
 			for (int nz = 0; nz < wz; nz++) {
 				float dist = Vector2Distance({ (float)nx * chunkSize + chunkSize / 2,(float)nz * chunkSize + chunkSize / 2 }, { float(viewPort.camera.position.x),float(viewPort.camera.position.z) });
 				bool grass = false;
 
-				if (dist < 1920) grass = true;
-
+				
 				int lod = 1;
 				if (dist > 960) lod = 2;
 				if (dist > 960 * 2) lod = 4;
 				if (dist > 960 * 4) lod = 8;
 				if (dist > 960 * 8) lod = 16;
 				if (dist > 960 * 12) lod = 32;
+				if (lod == 1) grass = true;
+
 				GenerationData gen;
 				gen.GenerateMountains(nx, nz);
 				gen.highestChunkY += 2;
@@ -1023,12 +1027,16 @@ public:
 					}
 
 				}
-			
+				for (int y = 0; y < gen.lowestChunkY; y++) {
+					world.handle.handle[y * (wx * wz) + nz * wx + nx].lod = 32;
+					world.handle.handle[y * (wx * wz) + nz * wx + nx].filled = 1;
+				}
 				for (int y = gen.lowestChunkY; y < gen.highestChunkY && y < wy; y++) {
 					if (!world.chunkData[y * (wx * wz) + nz * wx + nx].skipped) {
 						chunks[y * (wx * wz) + nz * wx + nx].GenerateLod(&world.chunkData[y * (wx * wz) + nz * wx + nx], nx, y, nz);
 						chunks[y * (wx * wz) + nz * wx + nx].Compress(&world.chunkData[y * (wx * wz) + nz * wx + nx]);
 					}
+					
 				};
 
 				world.setLod[nx][nz] = lod;
@@ -1256,7 +1264,7 @@ public:
 			Anubis::GpuTimer grassT;
 			grassT.Start();
 			if (graphicsSettings.grassRender && grass > 0) {
-				viewPort.RenderGrass(matView, pos, forward, frame, wWidth, wHeight, grass);
+				//viewPort.RenderGrass(matView, pos, forward, frame, wWidth, wHeight, grass);
 			}
 
 			auto grassTimeMs = grassT.Stop();
@@ -1265,7 +1273,7 @@ public:
 			START_TIMER(chunkAllocator)
 			
 			Math::IVector2 currentChunkPos= { int(viewPort.camera.position.x / chunkSize),int(viewPort.camera.position.z / chunkSize )};
-			if (oldChunkPos.x != currentChunkPos.x || oldChunkPos.y != currentChunkPos.y) {
+/*			if (oldChunkPos.x != currentChunkPos.x || oldChunkPos.y != currentChunkPos.y) {
 				int lodchanged = 0;
 				
 				for (int x = 0; x < wx; x++) {
@@ -1292,7 +1300,7 @@ public:
 					}
 				}
 
-			}
+			}*/
 			oldChunkPos = currentChunkPos;
 			int drd = 0;
 			Vector3 rayCastPos = pos;

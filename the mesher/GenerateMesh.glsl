@@ -36,6 +36,7 @@ struct Region {
     uvec2 handle;
     uvec2 probeHandle;
     int lod;
+    int filled;
 };
 
 layout(std430, binding = 3) buffer BitHandles {
@@ -67,6 +68,7 @@ uint readVoxelData(ivec3 pos) {
     int index = chunk.y * (wx * wz) + chunk.z * wx + chunk.x;
     int regionLod = handles[index].lod;
     if (regionLod == 3000) return 1u;
+    if (regionLod==32) return handles[index].filled;
     uvec2 handle = handles[index].handle;
     if (handle != uvec2(0)) {
         uimage3D fluidMap = uimage3D(handle);

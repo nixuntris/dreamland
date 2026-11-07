@@ -160,6 +160,7 @@ struct Region {
     uvec2 handle;
     uvec2 probeHandle;
     int lod;
+    int filled;
 };
 layout(std430, binding = 3) buffer BitHandles {
     Region handles[];

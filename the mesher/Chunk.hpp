@@ -58,6 +58,7 @@ struct World {
 			GLuint64 handle = 0;
 			GLuint64 lightStorageHandle = 0;
 			int lod;
+			int filled; 
 		};
 		Region handle[mwx * mwy * mwz];
 	};
@@ -115,7 +116,7 @@ public:
 			GenerateSavanna(chunkData, generationData, gx, gy, gz, lod, grass);
 			break;
 		case MOUNTAIN:
-			GenerateMountains(chunkData, generationData, gx, gy, gz, grass);
+			GenerateMountains(chunkData, generationData, gx, gy, gz,lod, false); //the problem is grass, specifically if it's set to true, it makes the program randomly hang after generation
 			break;	
 		}
 	}
@@ -233,13 +234,14 @@ public:
 			return;
 		}
 		this->size = chunkSize / lod;
-		chunkData->terrain = (uint16_t*)MemAlloc(chunkSize * chunkSize * chunkSize * sizeof(uint16_t));
 		this->lod = lod;
 		START_TIMER(voxel_fill)
-			if (gy * chunkSize + chunkSize< generationData.lowestChunkY * chunkSize || gy * chunkSize> generationData.highestChunkY * chunkSize) {
-				chunkData->skipped = true;
-				return;
-			}
+		if (gy * chunkSize + chunkSize< generationData.lowestChunkY * chunkSize || gy * chunkSize> generationData.highestChunkY * chunkSize) {
+			chunkData->skipped = true;
+			return;
+		}
+		chunkData->terrain = (uint16_t*)MemAlloc(chunkSize * chunkSize * chunkSize * sizeof(uint16_t));
+
 		for (uint8_t x = 0; x < chunkSize; x += 1) {
 			for (uint8_t z = 0; z < chunkSize; z += 1) {
 				int terrainHeight = generationData.heightMap[x + z * chunkSize];
