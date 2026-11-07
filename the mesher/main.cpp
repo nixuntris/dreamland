@@ -291,46 +291,6 @@ struct ViewPort {
 		shaders->grassRenderer.SetInt(frame, "frameIndex");
 		shaders->grassRenderer.Use(grass / 64, 1, 1);
 	}
-	void RenderPhysicalObjects(Matrix matView, Vector3 pos, Vector3 forward, std::vector<uint32_t> palette, int frame, std::vector<std::unique_ptr<PhysicsObject>> &physicalObjects, int wWidth, int wHeight) {
-
-		for (auto& k : physicalObjects) {
-			bool downardsCollision = false;
-			bool rightLeftCollision = false;
-			bool frontBackCollision = false;
-
-
-			if (Vector3Distance({ (float)k->position.x,(float)k->position.y,(float)k->position.z }, { (float)camera.position.x,(float)camera.position.y,(float)camera.position.z }) < 20) {
-				RenderPhysicsObject(shaders, camera, matView, k->mesh, { (float)k->position.x,(float)k->position.y,(float)k->position.z }, frame, 1, 1, palette.data(), palette.size(), k->byte.handle, { (float)k->rotation.x,(float)k->rotation.y,(float)k->rotation.z },wHeight);
-
-				Anubis::SwitchShaderStage(shaders->fillOut.programID);
-				shaders->fillOut.SetVector3(k->position, "objectPos");
-				shaders->fillOut.SetUVec2(k->byte.handle, "handle");
-				shaders->fillOut.SetInt(wx, "wx");
-				shaders->fillOut.SetInt(wy, "wy");
-				shaders->fillOut.SetInt(wz, "wz");
-				shaders->fillOut.Use(4, 4, 4);
-			}
-			else {
-				Anubis::SwitchShaderStage(shaders->renderPhysicalObjects.programID);
-				shaders->renderPhysicalObjects.SetVector3({ pos.x,pos.y,pos.z }, "camPos");
-				shaders->renderPhysicalObjects.SetVector3(k->rotation, "objectRotation");
-				shaders->renderPhysicalObjects.SetVector3(k->position, "objectPos");
-				shaders->renderPhysicalObjects.SetVector3({ forward.x,forward.y,forward.z }, "camForward");
-				shaders->renderPhysicalObjects.SetMatrix({ matView.m0,matView.m1,matView.m2,matView.m3,matView.m4,matView.m5,matView.m6,matView.m7,matView.m8,matView.m9,matView.m10,matView.m11,matView.m12,matView.m13,matView.m14,matView.m15 }, "matView");
-				shaders->renderPhysicalObjects.SetMatrix({ matProj.m0,matProj.m1,matProj.m2,matProj.m3,matProj.m4,matProj.m5,matProj.m6,matProj.m7,matProj.m8,matProj.m9,matProj.m10,matProj.m11,matProj.m12,matProj.m13,matProj.m14,matProj.m15 }, "matProj");
-				shaders->renderPhysicalObjects.SetUIntArray(palette.data(), palette.size(), "packedColors");
-				shaders->renderPhysicalObjects.SetInt(wWidth, "renderWidth");
-				shaders->renderPhysicalObjects.SetInt(wHeight, "renderHeight");
-				shaders->renderPhysicalObjects.SetInt(frame, "frameIndex");
-				shaders->renderPhysicalObjects.SetInt(0, "offset");
-				shaders->renderPhysicalObjects.SetInt(wx, "wx");
-				shaders->renderPhysicalObjects.SetInt(wy, "wy");
-				shaders->renderPhysicalObjects.SetInt(wz, "wz");
-				shaders->renderPhysicalObjects.SetUVec2(k->byte.handle, "handle");
-				shaders->renderPhysicalObjects.Use(4, 4, 4);
-			}
-		}
-	}
 };
 class App {
 	Anubis::Window window;
@@ -349,7 +309,6 @@ class App {
 	int editSize = 5;
 	Math::IVector3* vv;
 	Settings graphicsSettings;
-	std::vector<std::unique_ptr<PhysicsObject>> physicalObjects;
 	std::vector<std::string> worlds = { "Mountains", "Desert", "Caves", "Sky" };
 	float timeSpeed = 0.0004;
 	bool mainMenu = false;
@@ -1841,47 +1800,6 @@ public:
 				}
 			}
 			offfr++;
-			if (window.GetMouseButtonPressed(1) && offfr>5) {
-				offfr = 0;
-				Math::Vector3 angularVelocity = Math::NormalizeVector3(Math::SubtractVector3(viewPort.camera.target, viewPort.camera.position));
-				angularVelocity.x *= 4;
-				angularVelocity.y *= 4;
-				angularVelocity.z *= 4;
-				auto pp = std::make_unique<PhysicsObject>();
-				pp->values = (uint16_t*)MemAlloc(16 * 16 * 16 * sizeof(uint16_t));
-				pp->visibility = (bool*)MemAlloc(16 * 16 * 16 * sizeof(bool));
-				pp->position = viewPort.camera.target;
-				pp->velocity = angularVelocity;
-				pp->angularVelocity = { 0,0,0 };
-				pp->rotation = { 0,0,0 };
-				double radius = 7.0;
-				double centerX = 7.5;
-				double centerY = 7.5;
-				double centerZ = 7.5;
-				pp->Clean();
-				int type = GetRandomValue(2,10);
-				for (int x = 0; x < 16; x++) {
-					for (int y = 0; y < 16; y++) {
-						for (int z = 0; z < 16; z++) {
-							double dx = x - centerX;
-							double dy = y - centerY;
-							double dz = z - centerZ;
-							double distance = sqrt(dx * dx + dy * dy + dz * dz);
-
-							if (distance <= radius) {
-								pp->values[IDX(x, y, z, 16)] = type;
-							}
-							else {
-								pp->values[IDX(x, y, z, 16)] = 0;
-							}
-						}
-					}
-				}
-				pp->CheckVisibility();
-				pp->Upload(palette);
-				
-				physicalObjects.push_back(std::move(pp));
-			}
 			
 			if (graphicsSettings.secondaryRays) {
 
@@ -1891,119 +1809,6 @@ public:
 			auto secondaryRaysMs = secondaryRays.Stop();
 			if (graphicsSettings.renderClouds) {
 				viewPort.RenderClouds(matView, frame, pos, forward, wWidth,wHeight,timeSpeed);
-			}
-			for (auto& k : physicalObjects) {
-				bool downardsCollision = false;
-				bool rightLeftCollision = false;
-				bool frontBackCollision = false;
-
-				Anubis::SwitchShaderStage(shaders.clearPhysicalObjects.programID);
-				shaders.clearPhysicalObjects.SetVector3({ pos.x,pos.y,pos.z }, "camPos");
-				shaders.clearPhysicalObjects.SetVector3(k->position, "objectPos");
-				shaders.clearPhysicalObjects.SetVector3({ forward.x,forward.y,forward.z }, "camForward");
-				shaders.clearPhysicalObjects.SetMatrix({ matView.m0,matView.m1,matView.m2,matView.m3,matView.m4,matView.m5,matView.m6,matView.m7,matView.m8,matView.m9,matView.m10,matView.m11,matView.m12,matView.m13,matView.m14,matView.m15 }, "matView");
-				shaders.clearPhysicalObjects.SetMatrix({ matProj.m0,matProj.m1,matProj.m2,matProj.m3,matProj.m4,matProj.m5,matProj.m6,matProj.m7,matProj.m8,matProj.m9,matProj.m10,matProj.m11,matProj.m12,matProj.m13,matProj.m14,matProj.m15 }, "matProj");
-				shaders.clearPhysicalObjects.SetUIntArray(ColorPallete.data(), ColorPallete.size(), "packedColors");
-				shaders.clearPhysicalObjects.SetInt(wWidth, "renderWidth");
-				shaders.clearPhysicalObjects.SetInt(wHeight, "renderHeight");
-				shaders.clearPhysicalObjects.SetInt(frame, "frameIndex");
-				shaders.clearPhysicalObjects.SetInt(0, "offset");
-				shaders.clearPhysicalObjects.SetInt(wx, "wx");
-				shaders.clearPhysicalObjects.SetInt(wy, "wy");
-				shaders.clearPhysicalObjects.SetInt(wz, "wz");
-
-				shaders.clearPhysicalObjects.SetUVec2(k->byte.handle, "handle");
-
-				shaders.clearPhysicalObjects.Use(4, 4, 4);
-
-				for (int x = 0; x < 16; x++) {
-					for (int y = 0; y < 16; y++) {
-						for (int z = 0; z < 16; z++) {
-							if (k->visibility[IDX(x, y, z, 16)]) {
-
-								int wx_ = int(k->position.x) + x;
-								int wy_ = int(k->position.y) + y;
-								int wz_ = int(k->position.z) + z;
-
-								int chunkx = wx_ / chunkSize;
-								int chunky = wy_ / chunkSize;
-								int chunkz = wz_ / chunkSize;
-
-								// bounds check — non-negotiable
-								if (chunkx < 0 || chunky < 0 || chunkz < 0 ||
-									chunkx >= wx || chunky >= wy || chunkz >= wz)
-									continue;
-
-								int id = chunky * (wx * wz) + chunkz * wx + chunkx;
-
-								if (world.chunkData[id].lod != 0) {
-									int lod = world.chunkData[id].lod;
-									int cs = chunkSize;
-
-									downardsCollision |= chunks[id].ReadVoxel(&world.chunkData[id],
-										(wx_ % cs) / lod,
-										((wy_ - 1) % cs) / lod,
-										(wz_ % cs) / lod) != 0;
-
-									rightLeftCollision |=
-										chunks[id].ReadVoxel(&world.chunkData[id],
-											((wx_ - 1) % cs) / lod, (wy_ % cs) / lod, (wz_ % cs) / lod) != 0 ||
-										chunks[id].ReadVoxel(&world.chunkData[id],
-											((wx_ + 1) % cs) / lod, (wy_ % cs) / lod, (wz_ % cs) / lod) != 0;
-
-									frontBackCollision |=
-										chunks[id].ReadVoxel(&world.chunkData[id],
-											(wx_ % cs) / lod, (wy_ % cs) / lod, ((wz_ + 1) % cs) / lod) != 0 ||
-										chunks[id].ReadVoxel(&world.chunkData[id],
-											(wx_ % cs) / lod, (wy_ % cs) / lod, ((wz_ - 1) % cs) / lod) != 0;
-								}
-							}
-						}
-					}
-				}
-
-				
-				if (rightLeftCollision)
-				{
-					k->velocity.x *= -0.15f;
-					if (fabs(k->velocity.x) < 0.02f)
-						k->velocity.x = 0.0f;
-				}
-
-				if (frontBackCollision)
-				{
-					k->velocity.z *= -0.15f;
-					if (fabs(k->velocity.z) < 0.02f)
-						k->velocity.z = 0.0f;
-				}
-
-				if (downardsCollision)
-				{
-					if (k->velocity.y < 0.0f)
-					{
-						k->velocity.y *= -0.2f;    // small bounce
-						if (fabs(k->velocity.y) < 0.05f)
-							k->velocity.y = 0.0f;
-
-						if (!rightLeftCollision)
-							k->velocity.x += k->velocity.y * 0.25f;
-
-						// Slide in Z
-						if (!frontBackCollision)
-							k->velocity.z += k->velocity.y * 0.25f;
-					}
-				}
-				else
-				{
-					k->velocity.y -= 0.1f;
-				}
-				k->velocity.x *= 0.98;
-				k->velocity.y *= 0.98;
-				k->velocity.z *= 0.98;
-				k->position.y += k->velocity.y;
-				k->position.x += k->velocity.x;
-				k->position.z += k->velocity.z;
-
 			}
 			viewPort.Display(frame,wHeight);
 			Anubis::Quad quad;
