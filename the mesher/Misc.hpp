@@ -19,6 +19,7 @@ struct ShaderManager {
 	Anubis::ComputeShader clouds;
 	Anubis::ComputeShader bilboards;
 	Anubis::ComputeShader primaryRays;
+	Anubis::ComputeShader prepassPrimaryRays;
 	void Load() {
 
 		std::string shaderDir = "";
@@ -48,6 +49,7 @@ struct ShaderManager {
 		generateMesh.Setup(path("GenerateMesh.glsl").c_str());
 		clouds.Setup(path("Clouds.glsl").c_str());
 		bilboards.Setup(path("bilboard.glsl").c_str());
+		prepassPrimaryRays.Setup(path("PrePassPrimary.glsl").c_str());
 	}
 
 };

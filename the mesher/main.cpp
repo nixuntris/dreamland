@@ -239,6 +239,22 @@ struct ViewPort {
 	};
 	void RasterizeMeshes(Matrix matView, Vector3 pos, Vector3 forward, const std::vector<uint32_t> palette, int frame, int triangleCount, int wWidth, int wHeight) {
 		if (raytracePrimaryRays) {
+
+			Anubis::SwitchShaderStage(shaders->prepassPrimaryRays.programID);
+			shaders->prepassPrimaryRays.SetVector3({ pos.x,pos.y,pos.z }, "camPos");
+			shaders->prepassPrimaryRays.SetVector3({ forward.x,forward.y,forward.z }, "camForward");
+			shaders->prepassPrimaryRays.SetMatrix({ matView.m0,matView.m1,matView.m2,matView.m3,matView.m4,matView.m5,matView.m6,matView.m7,matView.m8,matView.m9,matView.m10,matView.m11,matView.m12,matView.m13,matView.m14,matView.m15 }, "matView");
+			shaders->prepassPrimaryRays.SetMatrix({ matProj.m0,matProj.m1,matProj.m2,matProj.m3,matProj.m4,matProj.m5,matProj.m6,matProj.m7,matProj.m8,matProj.m9,matProj.m10,matProj.m11,matProj.m12,matProj.m13,matProj.m14,matProj.m15 }, "matProj");
+			shaders->prepassPrimaryRays.SetInt(wx, "wx");
+			shaders->prepassPrimaryRays.SetInt(wy, "wy");
+			shaders->prepassPrimaryRays.SetInt(wz, "wz");
+			shaders->prepassPrimaryRays.SetInt(wWidth/4 * renderPercentage, "renderWidth");
+			shaders->prepassPrimaryRays.SetInt(wHeight/4 * renderPercentage, "renderHeight");
+			shaders->prepassPrimaryRays.SetInt(frame, "frameIndex");
+			shaders->prepassPrimaryRays.SetInt(0, "offset");
+
+			shaders->prepassPrimaryRays.Use((wWidth / 32/4) * renderPercentage, (wHeight/4 / 16) * renderPercentage, 1);
+
 			Anubis::SwitchShaderStage(shaders->primaryRays.programID);
 			shaders->primaryRays.SetVector3({ pos.x,pos.y,pos.z }, "camPos");
 			shaders->primaryRays.SetVector3({ forward.x,forward.y,forward.z }, "camForward");
@@ -746,7 +762,7 @@ public:
 			if (ImGui::CollapsingHeader("Advanced")) {
 				ImGui::Indent();
 
-				ImGui::Checkbox("Pregenerate World", &pregenerate);
+//				ImGui::Checkbox("Pregenerate World", &pregenerate);
 				//if (ImGui::IsItemHovered()) {
 //					ImGui::SetTooltip("Generate all chunks during loading before the game starts.\n");
 	//			}
@@ -754,7 +770,7 @@ public:
 				if (ImGui::IsItemHovered()) {
 					ImGui::SetTooltip("Currently it's just debug flies.\n");
 				}
-//				ImGui::Checkbox("Rasterize/Raytrace", &viewPort.raytracePrimaryRays);
+				ImGui::Checkbox("Rasterize/Raytrace", &viewPort.raytracePrimaryRays);
 				ImGui::Unindent();
 				ImGui::Spacing();
 			}
@@ -1931,6 +1947,7 @@ public:
 			if (remaining > 0.0) {
 				std::this_thread::sleep_for(std::chrono::duration<double>(remaining));
 			}
+			frame = (frame % 6);
 			frame++;
 		}
 	}

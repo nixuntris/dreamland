@@ -124,15 +124,6 @@
     <None Include="quad_display_shader.fs">
       <Filter>Source Files\Shaders\Raytracing\Illumination\Display Output</Filter>
     </None>
-    <None Include="PhysicsObject.glsl">
-      <Filter>Source Files\Shaders\Rasterizer\Particles</Filter>
-    </None>
-    <None Include="ClearPhysicalObject.glsl">
-      <Filter>Source Files\Shaders\Rasterizer\Particles</Filter>
-    </None>
-    <None Include="FillOutPhysicsData.glsl">
-      <Filter>Source Files\Shaders\Rasterizer\Particles</Filter>
-    </None>
     <None Include="hwMesh.fs">
       <Filter>Source Files\Shaders\Rasterizer\Hardware</Filter>
     </None>
@@ -159,6 +150,9 @@
     </None>
     <None Include="HizBuilder.glsl">
       <Filter>Source Files\Shaders\Raytracing\Illumination\Display Output</Filter>
+    </None>
+    <None Include="PrePassPrimary.glsl">
+      <Filter>Source Files\Shaders\Raytracing\Primary Rays</Filter>
     </None>
   </ItemGroup>
   <ItemGroup>

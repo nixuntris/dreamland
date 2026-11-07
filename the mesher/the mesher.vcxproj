@@ -155,6 +155,7 @@
     <None Include="frustumCull.glsl" />
     <None Include="hwMesh.fs" />
     <None Include="hwMesh.vs" />
+    <None Include="PrePassPrimary.glsl" />
     <None Include="PrimaryRays.glsl" />
     <None Include="quad_display_shader.fs" />
     <None Include="GenerateMesh.glsl" />

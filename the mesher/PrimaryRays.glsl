@@ -134,6 +134,11 @@ void main() {
     uint color = 0xFFF2BF87u; 
     int axis = 0;
     bool hitAnything = false;
+    if (depth[(px.y/4) * 3840 + (px.x/4)]==4096) {
+        
+        frame[px.y * 3840 + px.x] = color;
+        return;
+    }
     for (int i = 0; i < 960; i++) {
         int lod;
         uint v = readVoxelData(ivec3(cell),lod);
@@ -200,8 +205,8 @@ void main() {
 
         }
     }
-    int distance = int(dot(cell-camPos, camForward));
-    if (distance<depth[px.y * 3840 + px.x] && hitAnything) {
+    int distanceTravelled = int(dot(cell-camPos, camForward));
+    if (distanceTravelled<depth[px.y * 3840 + px.x] && hitAnything) {
     
         uint hash = hashVec3(vec3(cell));
         if (hash%2==0) {
@@ -215,7 +220,7 @@ void main() {
             color = packRGBA8(hr);
         }
         frame[px.y * 3840 + px.x] = color;
-        depth[px.y * 3840 + px.x] = distance;
+        depth[px.y * 3840 + px.x] = distanceTravelled;
         pos[px.y * 3840 + px.x] = vec3(cell);
         int lod;
         voxelId[px.y * 3840 + px.x] = int(readVoxelData(ivec3(cell),lod));
