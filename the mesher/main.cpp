@@ -1298,155 +1298,6 @@ public:
 			glClientWaitSync(fence, GL_SYNC_FLUSH_COMMANDS_BIT, 1000000000);
 			glDeleteSync(fence);
 			int triangleCount = *p_triangleCounter;
-
-			const float radius = 0.5f;
-
-			for (size_t i = 0; i < physicalObjects.size(); i++) {
-				auto& a = physicalObjects[i];
-				int offx = ceil((a->size.x / 2) / chunkSize) + 2;
-				int offy = ceil((a->size.y / 2) / chunkSize) + 2;
-				int offz = ceil((a->size.z / 2) / chunkSize) + 2;
-				for (int x = -offx; x <= offx; x++) {
-					for (int y = -offy; y <= offy; y++) {
-						for (int z = -offz; z <= offz; z++) {
-							int chunkX = int(floor(a->position.x / chunkSize)) + x;
-							int chunkY = int(floor(a->position.y / chunkSize)) + y;
-							int chunkZ = int(floor(a->position.z / chunkSize)) + z;
-							int id = INDEX(chunkX, chunkY, chunkZ, wx, wy);
-							if (!world.physicsAccelerationChunks[id].allocated) {
-								world.physicsAccelerationChunks[id].objectsInChunk = 0;
-								world.physicsAccelerationChunks[id].idReferences = (int*)MemAlloc(sizeof(int) * 1024);
-								world.physicsAccelerationChunks[id].allocated = true;
-							}
-							if (world.physicsAccelerationChunks[id].objectsInChunk < 1024) {
-								world.physicsAccelerationChunks[id].idReferences[world.physicsAccelerationChunks[id].objectsInChunk++] = i;
-							}
-
-						}
-					}
-				}
-
-			}
-			for (size_t i = 0; i < physicalObjects.size(); i++)
-			{
-				auto& a = physicalObjects[i];
-				int chunkX = int(floor(a->position.x / chunkSize));
-				int chunkY = int(floor(a->position.y / chunkSize));
-				int chunkZ = int(floor(a->position.z / chunkSize));
-				int id = INDEX(chunkX, chunkY, chunkZ, wx, wy);
-
-				for (size_t f = i + 1; f < world.physicsAccelerationChunks[id].objectsInChunk; f++)
-				{
-					int j = world.physicsAccelerationChunks[id].idReferences[f];
-					auto& b = physicalObjects[j];
-
-					int ox = int(round(b->position.x - a->position.x));
-					int oy = int(round(b->position.y - a->position.y));
-					int oz = int(round(b->position.z - a->position.z));
-
-					bool collided = false;
-
-					for (int ax = 0; ax < 16 && !collided; ax++)
-					{
-						int bx = ax - ox;
-						if (bx < 0 || bx >= 16)
-							continue;
-
-						for (int ay = 0; ay < 16 && !collided; ay++)
-						{
-							int by = ay - oy;
-							if (by < 0 || by >= 16)
-								continue;
-
-							for (int az = 0; az < 16 && !collided; az++)
-							{
-								int bz = az - oz;
-								if (bz < 0 || bz >= 16)
-									continue;
-
-								if (!a->visibility[IDX(ax, ay, az, 16)] ||
-									!b->visibility[IDX(bx, by, bz, 16)])
-									continue;
-
-								collided = true;
-
-								float dx = (b->position.x + bx) - (a->position.x + ax);
-								float dy = (b->position.y + by) - (a->position.y + ay);
-								float dz = (b->position.z + bz) - (a->position.z + az);
-
-								float dist2 = dx * dx + dy * dy + dz * dz;
-
-								if (dist2 < 0.0001f)
-								{
-									dx = 1.0f;
-									dy = 0.0f;
-									dz = 0.0f;
-									dist2 = 1.0f;
-								}
-
-								float dist = sqrtf(dist2);
-
-								float nx = dx / dist;
-								float ny = dy / dist;
-								float nz = dz / dist;
-
-								float overlap = 1.0f - dist;
-
-								a->position.x -= nx * overlap * 0.75f;
-								a->position.y -= ny * overlap * 0.75f;
-								a->position.z -= nz * overlap * 0.75f;
-
-								b->position.z += nz * overlap * 0.75f;
-								b->position.x += nx * overlap * 0.75f;
-								b->position.y += ny * overlap * 0.75f;
-
-								float rvx = b->velocity.x - a->velocity.x;
-								float rvy = b->velocity.y - a->velocity.y;
-								float rvz = b->velocity.z - a->velocity.z;
-
-								float velAlongNormal =
-									rvx * nx +
-									rvy * ny +
-									rvz * nz;
-
-								if (velAlongNormal < 0.0f)
-								{
-									float restitution = 0.5f;
-
-									float impulse = -(1.0f + restitution) * velAlongNormal;
-
-									a->velocity.x -= nx * impulse * 0.75f;
-									a->velocity.y -= ny * impulse * 0.75f;
-									a->velocity.z -= nz * impulse * 0.75f;
-
-									b->velocity.x += nx * impulse * 0.75f;
-									b->velocity.y += ny * impulse * 0.75f;
-									b->velocity.z += nz * impulse * 0.75f;
-								}
-							}
-						}
-					}
-				}
-			}
-			float t = 0.5f + 0.5f * sinf((float)GetTime() * 2.0f);
-			t *= t;
-
-			world.lightValues[0] = { 1.0f,  0.15f + 0.35f * t, 0.0f + 0.05f * t };
-			world.lightRadiusList[0] = 90 * (0.75f + 0.35f * t);
-
-
-			for (size_t i = 0; i < physicalObjects.size(); i++) {
-				auto& a = physicalObjects[i];
-				int chunkX = int(floor(a->position.x / chunkSize));
-				int chunkY = int(floor(a->position.y / chunkSize));
-				int chunkZ = int(floor(a->position.z / chunkSize));
-				int id = INDEX(chunkX, chunkY, chunkZ, wx, wy);
-				if (world.physicsAccelerationChunks[id].allocated) {
-					MemFree(world.physicsAccelerationChunks[id].idReferences);
-					world.physicsAccelerationChunks[id].allocated = false;
-				}
-			}
-			viewPort.RenderPhysicalObjects(matView, pos, forward, ColorPallete, frame, physicalObjects, wWidth, wHeight);
 			Math::Vector3 pp[2] = { viewPort.camera.target,{wx * 32,150,wy * 32} };
 			double rasterTimeMs;
 			int trianglesRendered = 0;
@@ -1566,7 +1417,6 @@ public:
 									int blockid = kx + ky * chunkSize + kz * chunkSize * chunkSize;
 									world.chunkData[id].terrain[blockid] = selectedColorIndex;
 									int size = chunkSize / chunks[id].lod;
-									chunks[id].GenerateBitMap(&world.chunkData[id]);
 									chunks[id].Compress(&world.chunkData[id]);
 
 									if (chunks[id].shortenedData) {
@@ -1693,7 +1543,6 @@ public:
 								int blockid = kx + ky * chunkSize + kz * chunkSize * chunkSize;
 								world.chunkData[id].terrain[blockid] = selectedColorIndex;
 								int size = chunkSize / chunks[id].lod;
-								chunks[id].GenerateBitMap(&world.chunkData[id]);
 								chunks[id].Compress(&world.chunkData[id]);
 
 								if (chunks[id].shortenedData) {
@@ -1835,11 +1684,11 @@ public:
 
 					if (!world.array[nx][nz]) {
 						world.array[nx][nz] = true;
-						world.setLod[nx][nz] = chunks[nz * wx + nx].lod;
 						generateArrayId[generateCount++] = { nx,nz };
 					}
 				}
 			}
+			std::cout << "total meshlet count: "<<totalMeshletCount << "\n";
 			for (int i = 0; i < generateCount; i++) {
 				int nx = generateArrayId[i].x;
 				int nz = generateArrayId[i].y;
@@ -1855,17 +1704,21 @@ public:
 				if (dist > 960 * 8) lod = 16;
 				if (dist > 960 * 12) lod = 32;
 				if (dist > 960 * 24) lod = 64;
+				world.setLod[nx][nz] = lod;
+				
 				GenerationData gen;
 				gen.GenerateMountains(nx, nz);
 				gen.highestChunkY += 2;
 
 				for (int y = 0; y < gen.highestChunkY && y < wy; y++) {
 					chunks[y * (wx * wz) + nz * wx + nx].GeneratePerType(selectedType, &world.chunkData[y * (wx * wz) + nz * wx + nx], gen, nx, y, nz, lod, grass);
-					RecalculateParticles(nx,y,nz);
+				//	RecalculateParticles(nx,y,nz);
 				};
 				for (int y = 0; y < gen.highestChunkY && y < wy; y++) {
-					chunks[y * (wx * wz) + nz * wx + nx].GenerateLod(&world.chunkData[y * (wx * wz) + nz * wx + nx], nx, y, nz);
-					chunks[y * (wx * wz) + nz * wx + nx].Compress(&world.chunkData[y * (wx * wz) + nz * wx + nx]);
+					if (!world.chunkData[y * (wx * wz) + nz * wx + nx].skipped) {
+						chunks[y * (wx * wz) + nz * wx + nx].GenerateLod(&world.chunkData[y * (wx * wz) + nz * wx + nx], nx, y, nz);
+						chunks[y * (wx * wz) + nz * wx + nx].Compress(&world.chunkData[y * (wx * wz) + nz * wx + nx]);
+					}
 				};
 				free(gen.heightMap);
 			}
@@ -1937,6 +1790,7 @@ public:
 					}
 				}
 			}
+
 			if (drd > 0 && !viewPort.raytracePrimaryRays) {
 				shaders.display.UpdateSSBO(10, vv, drd * sizeof(Math::IVector3), 0);
 
@@ -2306,7 +2160,6 @@ public:
 			if (remaining > 0.0) {
 				std::this_thread::sleep_for(std::chrono::duration<double>(remaining));
 			}
-			frame = frame % 6;
 			frame++;
 		}
 	}

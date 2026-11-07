@@ -184,14 +184,6 @@ struct PhysicsObject {
 		BuildHWMesh(palette);
 	}
 };
-struct Faces {
-	uint8_t w;
-	uint8_t d;
-	uint8_t mask; //6
-	uint8_t x; //6
-	uint8_t y; //6
-	uint8_t z; //6
-};
 struct ChunkData {
 	bool skipped = false;
 	int lod;
@@ -205,11 +197,6 @@ struct ChunkData {
 	bool compressed;
 	int voxelCount = 0;
 	bool updated = false;
-};
-struct PhysicsAccelerationChunk {
-	int* idReferences;
-	uint16_t objectsInChunk=0;
-	bool allocated=false;
 };
 const int mwx = 300;
 const int mwy = 32;
@@ -233,7 +220,6 @@ struct World {
 	Math::Vector3 lightPositions[16];
 	Math::Vector3 lightValues[16];
 	int lightRadiusList[16];
-	PhysicsAccelerationChunk* physicsAccelerationChunks;
 	void Setup() {
 		chunkData.resize(wx * wz * wy);
 		memset(handle.handle, 0, wx * wy * wz * sizeof(GLuint64));
@@ -243,10 +229,8 @@ struct World {
 				setLod[x][y] = 0;
 			}
 		}
-		physicsAccelerationChunks = (PhysicsAccelerationChunk*)MemAlloc(wx * wy * wz * sizeof(PhysicsAccelerationChunk));
 	}
 	~World() {
-		free(physicsAccelerationChunks);
 		chunkData.clear();
 		chunkData.reserve(0);
 	}
@@ -262,7 +246,6 @@ enum CHUNKTYPE {
 class Chunk {
 	int tallestY = 0;
 public:
-	bool hasFluid = false;
 	int gx;
 	int gy;
 	int gz;
@@ -275,7 +258,6 @@ public:
 	int endTri;
 	int beginningTri;
 	std::vector<Vector3> grassList;
-	bool hwOrSoftwareRaster = false;
 	bool shortenedData = false;
 	inline void GeneratePerType(CHUNKTYPE type, ChunkData* chunkData, GenerationData generationData, int gx, int gy, int gz, int lod = 1, bool grass = false) {
 		switch (type) {
@@ -399,9 +381,9 @@ public:
 		this->gy = gy;
 		this->gz = gz;
 		START_TIMER(total)
-			if (lod == 0) {
-				chunkData->skipped = true;
-				return;
+		if (lod == 0) {
+			chunkData->skipped = true;
+			return;
 		}
 		this->size = chunkSize / lod;
 		chunkData->terrain = (uint16_t*)MemAlloc(chunkSize * chunkSize * chunkSize * sizeof(uint16_t));
@@ -453,12 +435,51 @@ public:
 			}
 		}
 	}
+	inline void GenerateLod(ChunkData* chunkData, int gx, int gy, int gz) {
+		voxelCount = 0;
+		for (int i = 0; i < chunkSize * chunkSize * chunkSize; i++) {
+			voxelCount += chunkData->terrain[i] != 0;
+		}
+		chunkData->voxelCount = voxelCount;
+		if (voxelCount == 0) {
+			free(chunkData->terrain);
+			voxelCount = 0;
+			return;
+		}
+		if (lod != 1) {
+			START_TIMER(lod_generation)
+			uint16_t* lodVals = (uint16_t*)MemAlloc(this->size * this->size * this->size * sizeof(uint16_t));
+
+			for (int x = 0; x < this->size; x++) {
+				for (int z = 0; z < this->size; z++) {
+					for (int y = 0; y < this->size; y++) {
+						for (int cx = 0; cx < this->lod; cx++) {
+							for (int cy = 0; cy < this->lod; cy++) {
+								for (int cz = 0; cz < this->lod; cz++) {
+									if (chunkData->terrain[IDX(x * this->lod + cx, y * this->lod + cy, z * this->lod + cz, chunkSize)] != 0) {
+										lodVals[IDX(x, y, z, this->size)] = chunkData->terrain[IDX(x * this->lod + cx, y * this->lod + cy, z * this->lod + cz, chunkSize)];
+										break;
+										break;
+										break;
+									}
+								}
+							}
+						}
+
+					}
+				}
+			}
+			MemFree(chunkData->terrain);
+
+			chunkData->terrain = lodVals;
+		}
+		chunkData->lod = lod;
+	}
 	inline void Compress(ChunkData* chunkData) {
 
 		if (voxelCount == 0) {
 			return;
 		}
-		globalMemUsage += size * size * size * sizeof(uint16_t);
 		chunkData->compressed = false;
 		uint16_t voxels[65535];
 		for (int i = 0; i < 65535; i++) {
@@ -471,7 +492,6 @@ public:
 				over255 = false;
 			}
 		}
-
 		if (over255) {
 			chunkData->compressedTerrain = (uint8_t*)MemAlloc(size*size*size);
 
@@ -483,8 +503,6 @@ public:
 
 			free(chunkData->terrain);
 			chunkData->terrain = NULL;
-
-			afterGlobalMemUsage += size*size*size;
 			return;
 		}
 		int originalVoxels = 0;
@@ -495,10 +513,7 @@ public:
 				originalVoxels++;
 			}
 		}
-		if (originalVoxels < 15) {
-			//do the same but 4 bit
-		}
-		else  if (originalVoxels < 255) {
+		if (originalVoxels < 255) {
 			chunkData->compressed = true;
 			chunkData->compressedTerrain = (uint8_t*)MemAlloc(size * size * size);
 			uint8_t lookup[65535] = { 0 }; 
@@ -517,7 +532,6 @@ public:
 
 			free(chunkData->terrain);
 			chunkData->terrain = NULL; 
-			afterGlobalMemUsage += size * size * size + originalVoxels * sizeof(uint16_t);
 		}
 	}
 	inline uint16_t* DecompressChunk(ChunkData* chunkData) {
@@ -535,109 +549,6 @@ public:
 
 		return decompressedData;
 	}
-	inline void GenerateLod(ChunkData* chunkData, int gx, int gy, int gz) {
-		voxelCount = 0;
-		for (int i = 0; i < chunkSize * chunkSize * chunkSize; i++) {
-			if (chunkData->compressed || shortenedData) {
-				voxelCount += chunkData->compressedTerrain[i] != 0;
-			}
-			else {
-				voxelCount += chunkData->terrain[i] != 0;
-			}
-		}
-		chunkData->voxelCount = voxelCount;
-		if (voxelCount == 0) {
-			free(chunkData->terrain);
-			voxelCount = 0;
-			return;
-		}
-		if (lod != 1) {
-			START_TIMER(lod_generation)
-			if (chunkData->compressed) {
-
-				uint8_t* lodVals = (uint8_t*)MemAlloc(this->size * this->size * this->size * sizeof(uint8_t));
-
-				for (int x = 0; x < this->size; x++) {
-					for (int z = 0; z < this->size; z++) {
-						for (int y = 0; y < this->size; y++) {
-							for (int cx = 0; cx < this->lod; cx++) {
-								for (int cy = 0; cy < this->lod; cy++) {
-									for (int cz = 0; cz < this->lod; cz++) {
-										if (chunkData->compressedTerrain[IDX(x * this->lod + cx, y * this->lod + cy, z * this->lod + cz, chunkSize)] != 0) {
-											lodVals[IDX(x, y, z, this->size)] = chunkData->compressedTerrain[IDX(x * this->lod + cx, y * this->lod + cy, z * this->lod + cz, chunkSize)];
-											break;
-											break;
-											break;
-										}
-									}
-								}
-							}
-
-						}
-					}
-				}
-				MemFree(chunkData->compressedTerrain);
-
-				chunkData->compressedTerrain = lodVals;
-			}
-			else {
-				uint16_t* lodVals = (uint16_t*)MemAlloc(this->size * this->size * this->size * sizeof(uint16_t));
-
-				for (int x = 0; x < this->size; x++) {
-					for (int z = 0; z < this->size; z++) {
-						for (int y = 0; y < this->size; y++) {
-							for (int cx = 0; cx < this->lod; cx++) {
-								for (int cy = 0; cy < this->lod; cy++) {
-									for (int cz = 0; cz < this->lod; cz++) {
-										if (chunkData->terrain[IDX(x * this->lod + cx, y * this->lod + cy, z * this->lod + cz, chunkSize)] != 0) {
-											lodVals[IDX(x, y, z, this->size)] = chunkData->terrain[IDX(x * this->lod + cx, y * this->lod + cy, z * this->lod + cz, chunkSize)];
-											break;
-											break;
-											break;
-										}
-									}
-								}
-							}
-
-						}
-					}
-				}
-				MemFree(chunkData->terrain);
-
-				chunkData->terrain = lodVals;
-			}
-		}
-		chunkData->lod = lod;
-		GenerateBitMap(chunkData);
-	}
-	inline void GenerateBitMap(ChunkData* chunkData) {
-		const int total = size * size * size;
-		voxelCount = 0;
-		if (chunkData->terrain != nullptr) {
-			for (int x = 0; x < size; x++) {
-				for (int y = 0; y < size; y++) {
-					for (int z = 0; z < size; z++) {
-						int id = x + y * size + z * size * size;
-						if (chunkData->terrain[id] != 0) {
-							voxelCount++;
-						}
-					}
-				}
-			}
-		}
-		else {
-			for (int x = 0; x < size; x++) {
-				for (int y = 0; y < size; y++) {
-					for (int z = 0; z < size; z++) {
-						int id = x + y * size + z * size * size;
-						if (chunkData->compressedTerrain[id] != 0) {
-							voxelCount++;
-						}
-					}
-				}
-			}
-		}
-	}
 	inline bool SetTerrain(ChunkData* chunkdata, int x, int y, int z, uint16_t t, bool setGPUDATA=true) {
 		int id = x + y * size + z * size * size;
 		bool set = false;
@@ -649,7 +560,6 @@ public:
 			chunkdata->compressedTerrain[id] = (uint8_t)t;
 			if (setGPUDATA) chunkdata->fluidByteMap.ChangePixel(x, y, z, t);
 			//edit byte map
-			if (t == 7) hasFluid = true;
 			return true;
 		}
 		if (chunkdata->compressed) {
@@ -690,7 +600,6 @@ public:
 
 		if (set) {
 			voxelCount += set ? 1 : 0;
-			if (t == 7) hasFluid = true;
 		}
 		return set;
 	}
@@ -791,7 +700,6 @@ public:
 				chunkData->voxelCount = voxelCount;
 			}
 
-		GenerateBitMap(chunkData);
 	}
 	inline uint32_t PackMetaData(uint8_t mask, uint8_t lod, uint16_t type)
 	{
@@ -852,7 +760,6 @@ public:
 		cd->updated = false;
 
 		shortenedData = false;
-		hasFluid = false;
 		updated = false;
 		voxelCount = 0;
 		allocatedTriSize = 0;
