@@ -423,7 +423,7 @@ public:
 
 			int size = chunkSize / chunks[neighbourId].lod;
 			if (world.chunkData[neighbourId].skipped) {
-				world.handle.handle[neighbourId].lod = 3000;
+				world.handle.handle[neighbourId].lod = 32;
 				world.handle.handle[neighbourId].filled = 1;
 
 				continue;
@@ -746,7 +746,7 @@ public:
 			if (ImGui::CollapsingHeader("Advanced")) {
 				ImGui::Indent();
 
-				//ImGui::Checkbox("Pregenerate World", &pregenerate);
+				ImGui::Checkbox("Pregenerate World", &pregenerate);
 				//if (ImGui::IsItemHovered()) {
 //					ImGui::SetTooltip("Generate all chunks during loading before the game starts.\n");
 	//			}
@@ -754,7 +754,7 @@ public:
 				if (ImGui::IsItemHovered()) {
 					ImGui::SetTooltip("Currently it's just debug flies.\n");
 				}
-				ImGui::Checkbox("Rasterize/Raytrace", &viewPort.raytracePrimaryRays);
+//				ImGui::Checkbox("Rasterize/Raytrace", &viewPort.raytracePrimaryRays);
 				ImGui::Unindent();
 				ImGui::Spacing();
 			}
@@ -1259,7 +1259,6 @@ public:
 				
 			viewPort.RasterizeMeshes(matView, pos, forward, ColorPallete, frame, triangleCount, wWidth, wHeight);
 			trianglesRendered = triangleCount;
-			std::cout << triangleCount << "\n";
 			rasterTimeMs = raster.Stop();
 
 			Anubis::GpuTimer grassT;
@@ -1596,55 +1595,20 @@ public:
 				int chunkZ = -1;
 				for (int x = 0; x < wx; x++) {
 					for (int z = 0; z < wz; z++) {
-						Vector2 point = { x * chunkSize+ chunkSize/2,z * chunkSize + chunkSize /2};
-						float dd = Vector2Distance(point, camPos2D);
-						if (dd < renderDistance*chunkSize) {
-
-							bool inFrustum = false;
-							if (!alwaysInFrustum) {
-
-								Vector2 toPoint = { point.x - viewPort.camera.position.x, point.y - viewPort.camera.position.z };
-
-								float alongForward = toPoint.x * forward.x + toPoint.y * forward.y;
-								float alongRight = toPoint.x * right.x + toPoint.y * right.y;
-
-								float halfWidth = alongForward * halfAngle;
-
-								if (fabsf(alongRight) <= halfWidth) {
-									inFrustum = true;
-								}
-							}
-
-
-							if (inFrustum || alwaysInFrustum) {
-
-								if (!world.array[x][z]) {
-									if (lastDistance > dd*chunkSize || chunkX == -1) {
-										lastDistance = dd * chunkSize;
-										chunkX = x;
-										chunkZ = z;
-									}
-								}
-							}
+						
+						if (!world.array[x][z] && generateCount<10) {
+							world.array[x][z] = true;
+							generateArrayId[generateCount++] = { x,z };
 						}
 					}
 				}
-				if (chunkX != -1) {
-					int nz = chunkZ;
-					int nx = chunkX;
-					if (nz < 0 || nx < 0 || nx >= wx || nz >= wz) continue;
-
-					if (!world.array[nx][nz]) {
-						world.array[nx][nz] = true;
-						generateArrayId[generateCount++] = { nx,nz };
-					}
-				}
+					
 			}
-			std::cout << "total meshlet count: "<<totalMeshletCount << "\n";
+			
 			for (int i = 0; i < generateCount; i++) {
 				int nx = generateArrayId[i].x;
 				int nz = generateArrayId[i].y;
-
+				std::cout << " nx: " << nx << " nz: " << nz << "\n";
 				int lod = 1;
 				float dist = Vector2Distance({ (float)nx * chunkSize + chunkSize / 2,(float)nz * chunkSize+chunkSize/2 }, { float(viewPort.camera.position.x),float(viewPort.camera.position.z) });
 				bool grass = false;
@@ -1653,27 +1617,31 @@ public:
 				if (dist > 960) lod = 2;
 				if (dist > 960 * 2) lod = 4;
 				if (dist > 960 * 4) lod = 8;
-				//so I care at most about 4 points, which turns into overhead from meshlets
-				if (dist > 960 * 8) { continue; lod = 16; }
-				if (dist > 960 * 12) { continue; lod = 32; }
+				if (dist > 960 * 8) { lod = 16; }
+				if (dist > 960 * 12) { lod = 32; }
 				world.setLod[nx][nz] = lod;
 				
 				GenerationData gen;
 				gen.GenerateMountains(nx, nz);
 				gen.highestChunkY += 2;
 
-				for (int y = 0; y < gen.highestChunkY && y < wy; y++) {
+				for (int y = gen.lowestChunkY; y < gen.highestChunkY && y < wy; y++) {
 					chunks[y * (wx * wz) + nz * wx + nx].GeneratePerType(selectedType, &world.chunkData[y * (wx * wz) + nz * wx + nx], gen, nx, y, nz, lod, grass);
 				//	RecalculateParticles(nx,y,nz);
 				};
-				for (int y = 0; y < gen.highestChunkY && y < wy; y++) {
+				for (int y = gen.lowestChunkY; y < gen.highestChunkY && y < wy; y++) {
 					if (!world.chunkData[y * (wx * wz) + nz * wx + nx].skipped) {
 						chunks[y * (wx * wz) + nz * wx + nx].GenerateLod(&world.chunkData[y * (wx * wz) + nz * wx + nx], nx, y, nz);
 						chunks[y * (wx * wz) + nz * wx + nx].Compress(&world.chunkData[y * (wx * wz) + nz * wx + nx]);
 					}
+					else {
+						world.handle.handle[y * (wx * wz) + nz * wx + nx].lod = 32;
+						world.handle.handle[y * (wx * wz) + nz * wx + nx].filled = 32;
+					}
 				};
 				free(gen.heightMap);
 			}
+
 			for (int i = 0; i < generateCount; i++) {
 				int nx = generateArrayId[i].x;
 				int nz = generateArrayId[i].y;
@@ -1684,12 +1652,18 @@ public:
 					int neighbourId = ny * (wx * wz) + nz * wx + nx;
 					if (nx < 0 || ny < 0 || nz < 0 || nx >= wx || ny >= wy || nz >= wz) continue;
 					if (chunks[neighbourId].lod == 0) continue;
+
 					if (chunks[neighbourId].voxelCount == 0) {
 
 						world.handle.handle[neighbourId].lod = 0;
 						uploadChunkSSBO(neighbourId);
 					}
 					int size = chunkSize / chunks[neighbourId].lod;
+					if (world.chunkData[neighbourId].skipped) {
+						world.handle.handle[neighbourId].lod = 32;
+						world.handle.handle[neighbourId].filled = 1;
+						uploadChunkSSBO(neighbourId);
+					}
 					if (world.chunkData[neighbourId].voxelCount != 0 && !world.chunkData[neighbourId].skipped)
 					{
 
@@ -1713,6 +1687,7 @@ public:
 					}
 				}
 			}
+			
 			for (int i = 0; i < 2; i++) {
 				for (int x = 0; x < wx; x++) {
 					for (int z = 0; z < wz; z++) {
@@ -1947,8 +1922,6 @@ public:
 			ImGui::Text("Frame: %.2f ms", 1000.0f / ImGui::GetIO().Framerate);
 
 			ImGui::End();
-			std::cout << viewPort.camera.GetForward().x << " " << viewPort.camera.GetForward().y << " " << viewPort.camera.GetForward().z << "\n";
-			std::cout << window.getFPS() << "\n";
 			ImGui::Render();
 			ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 			window.UpdateBuffer();

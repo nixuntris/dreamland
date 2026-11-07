@@ -248,17 +248,12 @@ bool sunRayOccluded(vec3 ro, vec3 rd, int maxSteps)
 {
     vec3 cell  = floor(ro);
 
-    vec3 nextB  = vec3(cell) + vec3(greaterThan(rd, vec3(0.0)));
-
     for (int i = 0; i < maxSteps; i++)
     {
         cell += rd;
         if (outOfBounds(cell)) return false;
         
         int lod;        
-        if (lod==0) {
-            skipChunkFloat(cell,rd,i,ivec3(32));
-        }
         if (readVoxelData(ivec3(cell),lod) != 0u) return true;
     }
     return false;
@@ -276,38 +271,43 @@ void main()
     vec3 origin = pos[idx];
     ivec3 chunk = ivec3(origin/chunkSize);
     int lod = handles[chunk.y * (wx * wz) + chunk.z * wx + chunk.x].lod;
-    uimage3D probeMap = uimage3D(handles[chunk.y * (wx * wz) + chunk.z * wx + chunk.x].probeHandle);
-    uint val = imageLoad(probeMap,ivec3(mod(origin,32)/lod)).r;
-    if (val==0) {
-        float radiance = 0.0;
+    uint val = 1;
+    if (lod!=0 && lod!=32) {
+        uimage3D probeMap = uimage3D(handles[chunk.y * (wx * wz) + chunk.z * wx + chunk.x].probeHandle);
+        if (handles[chunk.y * (wx * wz) + chunk.z * wx + chunk.x].probeHandle==uvec2(0)) return;
+        val = imageLoad(probeMap,ivec3(mod(origin,32)/lod)).r;
+        if (val==0) {
+            float radiance = 0.0;
 
-        vec3 ro = origin;
-        vec3 rd = normalize(sunDir);
-        vec3  invD      = 1.0 / (rd + vec3(equal(rd, vec3(0.0))) * 1e-8);
+            vec3 ro = origin;
+            vec3 rd = normalize(sunDir);
+            vec3  invD      = 1.0 / (rd + vec3(equal(rd, vec3(0.0))) * 1e-8);
     
-        float T = 1.0;
+            float T = 1.0;
 
-        float t = 0;
-        float jitter = hash3(vec3(gid, frameIndex));
-        float shadow = cloudShadow(ro, rd, time, jitter);
-        shadow = mix(1.0, shadow, 0.3);
-        T *= shadow;   
+            float t = 0;
+            float jitter = hash3(vec3(gid, frameIndex));
+            float shadow = cloudShadow(ro, rd, time, jitter);
+            shadow = mix(1.0, shadow, 0.3);
+            T *= shadow;   
 
         
-        radiance += T;
+            radiance += T;
     
-        uint hitValue = 0;
-        for (int i = 0; i < sampleCount; i++) {
-            vec3 offsetDir = normalize(sunDir+offsets[i]);
-            if (sunRayOccluded(origin+offsetDir*2, offsetDir, 100)) {
-                hitValue+=1;
+            uint hitValue = 0;
+            for (int i = 0; i < sampleCount; i++) {
+                vec3 offsetDir = normalize(sunDir+offsets[i]);
+                if (sunRayOccluded(origin+offsetDir*2, offsetDir, 100)) {
+                    hitValue+=1;
+                }
             }
-        }
     
-        val = hitValue;
-        imageStore(probeMap,ivec3(mod(origin,32)/lod), uvec4(hitValue));
+            val = hitValue;
+            imageStore(probeMap,ivec3(mod(origin,32)/lod), uvec4(hitValue));
 
+        }
     }
+    else return;
     
     /*
     uvec2 handle = handles[chunk.y * (wx * wz) + chunk.z * wx + chunk.x].handle;
