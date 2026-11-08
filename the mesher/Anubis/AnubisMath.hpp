@@ -43,37 +43,37 @@ namespace Math {
             struct { double width, height, depth, time; };
         };
     };
-    inline static double dot(Vector3 vec1, Vector3 vec2) {
+    const inline static double dot(Vector3 vec1, Vector3 vec2) {
         return vec1.x * vec2.x + vec1.y * vec2.y + vec1.z * vec2.z;
     }
-    inline static Vector3 scale(Vector3 vec1, float scale) {
+    const inline static Vector3 scale(Vector3 vec1, float scale) {
         return { vec1.x * scale, vec1.y * scale, vec1.z * scale };
     }
-    inline static Vector2 DivideVector2(Vector2 vec1, Vector2 vec2) {
+    const inline static Vector2 DivideVector2(Vector2 vec1, Vector2 vec2) {
         return Vector2{ vec1.x / vec2.x,vec1.y / vec2.y };
     }
-    inline static  Vector2 MultiplyVector2(Vector2 vec1, Vector2 vec2) {
+    const inline static  Vector2 MultiplyVector2(Vector2 vec1, Vector2 vec2) {
         return Vector2{ vec1.x * vec2.x,vec1.y * vec2.y };
     }
-    inline static  Vector2 AddVector2(Vector2 vec1, Vector2 vec2) {
+    const inline static  Vector2 AddVector2(Vector2 vec1, Vector2 vec2) {
         return Vector2{ vec1.x + vec2.x,vec1.y + vec2.y };
     }
-    inline static Vector2 SubtractVector2(Vector2 vec1, Vector2 vec2) {
+    const inline static Vector2 SubtractVector2(Vector2 vec1, Vector2 vec2) {
         return Vector2{ vec1.x - vec2.x,vec1.y - vec2.y };
     }
-    inline static  Vector3 DivideVector3(Vector3 vec1, Vector3 vec2) {
+    const inline static  Vector3 DivideVector3(Vector3 vec1, Vector3 vec2) {
         return Vector3{ vec1.x / vec2.x,vec1.y / vec2.y, vec1.z / vec2.z };
     }
-    inline static  Vector3 MultiplyVector3(Vector3 vec1, Vector3 vec2) {
+    const inline static  Vector3 MultiplyVector3(Vector3 vec1, Vector3 vec2) {
         return Vector3{ vec1.x * vec2.x,vec1.y * vec2.y, vec1.z * vec2.z };
     }
-    inline static Vector3 AddVector3(Vector3 vec1, Vector3 vec2) {
+    const inline static Vector3 AddVector3(Vector3 vec1, Vector3 vec2) {
         return Vector3{ vec1.x + vec2.x,vec1.y + vec2.y , vec1.z + vec2.z };
     }
-    inline static  Vector3 SubtractVector3(Vector3 vec1, Vector3 vec2) {
+    const inline static  Vector3 SubtractVector3(Vector3 vec1, Vector3 vec2) {
         return Vector3{ vec1.x - vec2.x,vec1.y - vec2.y, vec1.z - vec2.z };
     }
-    inline static Vector3 CrossVector3(Vector3 vector1, Vector3 vector2) {
+    const inline static Vector3 CrossVector3(Vector3 vector1, Vector3 vector2) {
         return Vector3{
             vector1.y * vector2.z - vector1.z * vector2.y,
             vector1.z * vector2.x - vector1.x * vector2.z,

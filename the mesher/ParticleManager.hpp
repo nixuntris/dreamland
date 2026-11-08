@@ -59,7 +59,7 @@ public:
 		particles[renderQueue++] = particle;
 	}
 
-	void Render(ShaderManager* shaders, Matrix matView, Matrix matProj, Vector3 forward, Vector3 pos, int wWidth, int wHeight, int frameIndex) {
+	void Render(ShaderManager* shaders, Matrix matView, Matrix matProj, Vector3 forward, Vector3 pos, Math::IVector2 resolution, int frameIndex) {
 		Math::Vector3 billboardPoses[1024];
 		int renderPassAmount = 0;
 		for (int i = 0; i < renderQueue; i++) {
@@ -75,8 +75,8 @@ public:
 				shaders->bilboards.SetInt(wx, "wx");
 				shaders->bilboards.SetInt(wy, "wy");
 				shaders->bilboards.SetInt(wz, "wz");
-				shaders->bilboards.SetInt(wWidth, "renderWidth");
-				shaders->bilboards.SetInt(wHeight, "renderHeight");
+				shaders->bilboards.SetInt(resolution.width, "renderWidth");
+				shaders->bilboards.SetInt(resolution.height , "renderHeight");
 				shaders->bilboards.SetVector3Array(billboardPoses, renderPassAmount, "billboards");
 				shaders->bilboards.SetInt(frameIndex, "frameIndex");
 				shaders->bilboards.SetFloat(1, "billboardSize");
@@ -97,8 +97,8 @@ public:
 			shaders->bilboards.SetInt(wx, "wx");
 			shaders->bilboards.SetInt(wy, "wy");
 			shaders->bilboards.SetInt(wz, "wz");
-			shaders->bilboards.SetInt(wWidth, "renderWidth");
-			shaders->bilboards.SetInt(wHeight, "renderHeight");
+			shaders->bilboards.SetInt(resolution.width , "renderWidth");
+			shaders->bilboards.SetInt(resolution.height, "renderHeight");
 			shaders->bilboards.SetVector3Array(billboardPoses, renderPassAmount, "billboards");
 			shaders->bilboards.SetInt(frameIndex, "frameIndex");
 			shaders->bilboards.SetInt(0, "billboardColor");

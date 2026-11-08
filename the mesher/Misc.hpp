@@ -53,7 +53,7 @@ struct ShaderManager {
 	}
 
 };
-inline Matrix GetStaticMVPMatrix(Vector3 position, Matrix matView) {
+const inline Matrix GetStaticMVPMatrix(Vector3 position, Matrix matView) {
 	const float aspect = (float)3840 / (float)2160;
 	Matrix matModel = MatrixTranslate(position.x, position.y, position.z);
 	Matrix matViewProj = MatrixMultiply(matView, matProj);

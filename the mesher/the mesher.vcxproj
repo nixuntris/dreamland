@@ -146,6 +146,7 @@
     <ClInclude Include="ParticleManager.hpp" />
     <ClInclude Include="SoftwareRasterizer.h" />
     <ClInclude Include="Structure.hpp" />
+    <ClInclude Include="Viewport.hpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include="..\readme.md" />

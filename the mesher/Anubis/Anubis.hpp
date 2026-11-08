@@ -449,15 +449,15 @@ namespace Anubis {
         Math::Vector3 position;
         Math::Vector3 target;
         bool taggedIn = false;
-        inline Math::Vector3 GetTarget() {
+        const inline Math::Vector3 GetTarget() {
             return Math::SubtractVector3(target, position);
         }
-        inline Math::Vector3 GetRight() {
+        const inline Math::Vector3 GetRight() {
             Math::Vector3 forward = GetForward();
             Math::Vector3 right = Math::NormalizeVector3(Math::CrossVector3(forward, up)); // Reverse the order
             return right;
         }
-        inline Math::Vector3 GetForward() {
+        const inline Math::Vector3 GetForward() {
             return Math::NormalizeVector3(Math::SubtractVector3(target, position));
         }
         inline void Pitch(float angle) {
@@ -519,7 +519,7 @@ namespace Anubis {
     }
 
     //need vulkan alternative and renaming
-    void DebugMode() {
+    const void DebugMode() {
         glEnable(GL_DEBUG_OUTPUT);
         glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS);
         glDebugMessageCallback(GLDebugCallback, nullptr);
