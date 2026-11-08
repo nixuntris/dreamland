@@ -117,7 +117,7 @@ public:
 			break;	
 		}
 	}
-	inline void GenerateDesert(ChunkData* chunkData, GenerationData generationData, int gx, int gy, int gz, int lod = 1, bool grass = false) {
+	inline void GenerateSavanna(ChunkData* chunkData, GenerationData generationData, int gx, int gy, int gz, int lod = 1, bool grass = false) {
 		this->gx = gx;
 		this->gy = gy;
 		this->gz = gz;
@@ -127,19 +127,14 @@ public:
 
 		const int maxSavannaY = 250;
 		if (gy * chunkSize > maxSavannaY) {
-			//chunkData->skipped = true;
-			//return;
+			chunkData->skipped = true;
+			return;
 		}
 
 		const int baseWX = gx * chunkSize;
 		const int baseWY = gy * chunkSize;
 		const int baseWZ = gz * chunkSize;
 
-		auto setVoxel = [&](int wxp, int wyp, int wzp, uint16_t v) {
-			int lx = wxp - baseWX, ly = wyp - baseWY, lz = wzp - baseWZ;
-			if (lx < 0 || ly < 0 || lz < 0 || lx >= chunkSize || ly >= chunkSize || lz >= chunkSize) return;
-			chunkData->terrain[IDX(lx, ly, lz, chunkSize)] = v;
-		};
 		for (int x = 0; x < chunkSize; x++) {
 			for (int z = 0; z < chunkSize; z++) {
 				float wxf = (float)(baseWX + x);
@@ -190,18 +185,18 @@ public:
 			
 		
 	}
-	inline void GenerateSavanna(ChunkData* chunkData, GenerationData generationData, int gx, int gy, int gz, int lod = 1, bool grass = false) {
+	inline void GenerateDesert(ChunkData* chunkData, GenerationData generationData, int gx, int gy, int gz, int lod = 1, bool grass = false) {
 		this->gx = gx;
 		this->gy = gy;
 		this->gz = gz;
 		START_TIMER(total)
-			this->size = chunkSize / lod;
+		this->size = chunkSize / lod;
 		chunkData->terrain = (uint16_t*)MemAlloc(chunkSize * chunkSize * chunkSize * sizeof(uint16_t));
 		this->lod = lod;
 		START_TIMER(voxel_fill)
 		if ((gy  + 1< generationData.lowestChunkY)/5 || (gy > generationData.highestChunkY)/5) {
-		//	chunkData->skipped = true;
-		//	return;
+			chunkData->skipped = true;
+			return;
 		}
 		for (uint8_t x = 0; x < chunkSize; x += 1) {
 			for (uint8_t z = 0; z < chunkSize; z += 1) {

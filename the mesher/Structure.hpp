@@ -6,6 +6,7 @@ struct StructureDataHolder {
 	uint8_t* positions;
 	uint8_t width, height, depth;
 	int voxelCount;
+	Anubis::GPUONLYShortMap map;
 	inline void Create(uint16_t* values, uint8_t* positions, int voxelCount, uint8_t width, uint8_t height, uint8_t depth) {
 		this->values = values;
 		this->positions = positions;
@@ -13,6 +14,21 @@ struct StructureDataHolder {
 		this->width = width;
 		this->height = height;
 		this->depth = depth;
+		
+		map.Clear({ this->width,this->height,this->depth });
+		map.Upload();
+		map.GetBindlessHandle();
+
+		for (int i = 0; i < voxelCount; i++) {
+			
+			
+			uint16_t val = values[i];
+
+			int x = (uint8_t)(positions[i * 3 + 0]);
+			int y = (uint8_t)(positions[i * 3 + 1]);
+			int z = (uint8_t)(positions[i * 3 + 2]);
+			map.ChangePixel(x, y, z, val);
+		}
 	}
 };
 
@@ -35,6 +51,7 @@ struct Structure {
 		StructureDataHolder* variant = new StructureDataHolder;
 		variant->Create(values, positions, voxelCount, width, height, depth);
 		this->variants.push_back(variant);
+		variantCount++;
 	}
 	~Structure() {
 		for (auto t : variants) {
@@ -207,7 +224,70 @@ auto addRockVariants = [&](Structure* structure, int minSize, int maxSize) {
 	}
 
 	structure->variantCount = structure->variants.size();
-	};
+};
+auto addSphereVariants = [&](Structure* structure) {
+	const int minRadius = 0;
+	const int maxRadius = 16;
+
+	const int variantCount = maxRadius - minRadius + 1;
+	for (int v = 0; v < variantCount; v++) {
+		std::vector<uint16_t> rawValues;
+		std::vector<int> rawPositions;
+
+		int minX = 0, minY = 0, minZ = 0;
+		int maxX = 0, maxY = 0, maxZ = 0;
+
+		auto addVoxel = [&](int x, int y, int z, uint16_t type) {
+			rawValues.push_back(type);
+			rawPositions.push_back(x);
+			rawPositions.push_back(y);
+			rawPositions.push_back(z);
+			if (x < minX) minX = x;
+			if (y < minY) minY = y;
+			if (z < minZ) minZ = z;
+			if (x > maxX) maxX = x;
+			if (y > maxY) maxY = y;
+			if (z > maxZ) maxZ = z;
+			};
+
+		int radius = minRadius + v;
+
+		if (radius == 0) {
+			addVoxel(0, 0, 0, 20);
+		}
+		else {
+			int r2 = radius * radius;
+			for (int x = -radius; x <= radius; x++) {
+				for (int y = -radius; y <= radius; y++) {
+					for (int z = -radius; z <= radius; z++) {
+						if (x * x + y * y + z * z <= r2) {
+							bool isShell = (x * x + y * y + z * z) > (radius - 1) * (radius - 1);
+							addVoxel(x, y, z, isShell ? 0 : 7);
+						}
+					}
+				}
+			}
+		}
+
+		int voxelCount = (int)rawValues.size();
+		uint16_t* valArray = new uint16_t[voxelCount];
+		uint8_t* posArray = new uint8_t[voxelCount * 3];
+
+		for (int i = 0; i < voxelCount; i++) {
+			valArray[i] = rawValues[i];
+			posArray[i * 3 + 0] = (uint8_t)(rawPositions[i * 3 + 0] - minX);
+			posArray[i * 3 + 1] = (uint8_t)(rawPositions[i * 3 + 1] - minY);
+			posArray[i * 3 + 2] = (uint8_t)(rawPositions[i * 3 + 2] - minZ);
+		}
+
+		structure->AddVariant(valArray, posArray, voxelCount,
+			(uint8_t)(maxX - minX + 1),
+			(uint8_t)(maxY - minY + 1),
+			(uint8_t)(maxZ - minZ + 1));
+	}
+
+	structure->variantCount = structure->variants.size();
+};
 class StructureManager {
 public:
 	int selectedStructure = 0;
@@ -219,6 +299,8 @@ public:
 		addTreeVariants(&structureList[0], 24, 48);
 		structureList[1].Create("rock");
 		addRockVariants(&structureList[1], 3, 5);
+		structureList[0].Create("Sphere");
+		addSphereVariants(&structureList[2]);
 		ImGui::SetNextWindowPos(ImVec2(40, 40), ImGuiCond_FirstUseEver);
 		ImGui::SetNextWindowSize(ImVec2(520, 480), ImGuiCond_FirstUseEver);
 		structureCount = 2;

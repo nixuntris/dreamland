@@ -258,6 +258,8 @@ bool sunRayOccluded(vec3 ro, vec3 rd, int maxSteps)
     }
     return false;
 }
+
+
 void main()
 {
     ivec2 gid = ivec2(gl_GlobalInvocationID.xy);
@@ -272,6 +274,19 @@ void main()
     ivec3 chunk = ivec3(origin/chunkSize);
     int lod = handles[chunk.y * (wx * wz) + chunk.z * wx + chunk.x].lod;
     uint val = 1;
+    float cloudRadiance = 0.0;
+
+    vec3 ro = origin;
+    vec3 rd = normalize(sunDir);
+    vec3  invD      = 1.0 / (rd + vec3(equal(rd, vec3(0.0))) * 1e-8);
+    
+    float T = 1.0;
+
+    float t = 0;
+    float jitter = hash3(vec3(gid, frameIndex));
+    float shadow = cloudShadow(ro, rd, time, jitter);
+        
+    cloudRadiance += shadow/4;
     if (lod!=0 && lod!=32) {
         uimage3D probeMap = uimage3D(handles[chunk.y * (wx * wz) + chunk.z * wx + chunk.x].probeHandle);
         if (handles[chunk.y * (wx * wz) + chunk.z * wx + chunk.x].probeHandle==uvec2(0)) return;
@@ -309,32 +324,9 @@ void main()
     }
     else return;
     
-    /*
-    uvec2 handle = handles[chunk.y * (wx * wz) + chunk.z * wx + chunk.x].handle;
-    vec3 accumLightAdditional = vec3(0.0);
-    for (int i = 0; i < 16; i++) {
-        if (handles[chunk.y * (wx * wz) + chunk.z * wx + chunk.x].lightIds[i]==-1) break;
-        int id = handles[chunk.y * (wx * wz) + chunk.z * wx + chunk.x].lightIds[i];
-
-        float dist = distance(origin,lightPositions[id]);
-        vec3 lightToDir = normalize(origin-lightPositions[id]);
-        vec3 beginPos = lightPositions[id];
-        float radius = float(lightRadiusList[id]);
-        for (int d = 0; d < int(radius); d++) {
-            beginPos += lightToDir;
-            if (readVoxelData(ivec3(beginPos))!=0) break;
-            if (distance(beginPos,origin)<1) {
-                accumLightAdditional += vec3(1-(dist/radius))*lightValues[id];
-                
-            }   
-        }
-    } 
-    
-    */
     vec4 prev = unpackUnorm4x8(frame[idx]);
     float mean = 1.0-(((float(val)/2)) / float(sampleCount));
-    vec3 col = prev.rgb * (mean*calculateLightStrength(frameIndex));
-    // vec3 col = prev.rgb * (mean);
+    vec3 col = prev.rgb * (mean*calculateLightStrength(frameIndex)-cloudRadiance);
     
     uint pp = packUnorm4x8(vec4(col, 1.0));
     frame[ gid.y * 3840 + gid.x] = pp;

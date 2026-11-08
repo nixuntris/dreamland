@@ -129,6 +129,7 @@ struct ViewPort {
 
 			shaders->rasterizer.Use(floor(triangleCount), 1, 1);
 		}
+
 	}
 	void RenderGrass(Matrix matView, Vector3 pos, Vector3 forward, int frame, Math::IVector2 resolution, int grass) {
 

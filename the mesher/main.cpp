@@ -19,7 +19,6 @@
 #include "ParticleManager.hpp"
 #include "Viewport.hpp"
 const bool gpuMeshing = true;
-
 const int maxGPUBatch = 1024 * 1024;
 const int maxGrassCount = 1449303 * 2;
 
@@ -586,7 +585,6 @@ public:
 			window.UpdateBuffer();
 		}
 	}
-	
 	void RecalculateParticlesFullDebug() {
 
 		grass = 0;
@@ -862,6 +860,8 @@ public:
 		bool releasedMouseButton = false;
 		Math::IVector3 chunksUpdatedThisFrame[100];
 		int chunkCount = 0;
+		int currentAnimationFrame = 0;
+		
 		while (window.IsOpen()) {
 			double frameStart = glfwGetTime();
 			int zero = 0;
@@ -914,13 +914,44 @@ public:
 			viewPort.RasterizeMeshes(matView, pos, forward, ColorPallete, frame, triangleCount, resolution);
 			trianglesRendered = triangleCount;
 			rasterTimeMs = raster.Stop();
-
+			if (frame % 5 ==0) {
+				currentAnimationFrame++;
+				
+			}
+			
+			Anubis::SwitchShaderStage(shaders.rasterizeAnimatedObjects.programID);
+			shaders.rasterizeAnimatedObjects.SetVector3({ pos.x,pos.y,pos.z }, "camPos");
+			shaders.rasterizeAnimatedObjects.SetVector3({ forward.x,forward.y,forward.z }, "camForward");
+			shaders.rasterizeAnimatedObjects.SetMatrix({ matView.m0,matView.m1,matView.m2,matView.m3,matView.m4,matView.m5,matView.m6,matView.m7,matView.m8,matView.m9,matView.m10,matView.m11,matView.m12,matView.m13,matView.m14,matView.m15 }, "matView");
+			shaders.rasterizeAnimatedObjects.SetMatrix({ matProj.m0,matProj.m1,matProj.m2,matProj.m3,matProj.m4,matProj.m5,matProj.m6,matProj.m7,matProj.m8,matProj.m9,matProj.m10,matProj.m11,matProj.m12,matProj.m13,matProj.m14,matProj.m15 }, "matProj");
+			shaders.rasterizeAnimatedObjects.SetInt(wx, "wx");
+			shaders.rasterizeAnimatedObjects.SetInt(wy, "wy");
+			shaders.rasterizeAnimatedObjects.SetInt(wz, "wz");
+			shaders.rasterizeAnimatedObjects.SetUIntArray(ColorPallete.data(), ColorPallete.size(), "packedColors");
+			shaders.rasterizeAnimatedObjects.SetInt(resolution.width* viewPort.renderPercentage, "renderWidth");
+			shaders.rasterizeAnimatedObjects.SetInt(resolution.height* viewPort.renderPercentage, "renderHeight");
+			shaders.rasterizeAnimatedObjects.SetInt(frame, "frameIndex");
+			shaders.rasterizeAnimatedObjects.SetInt(0, "offset");
+			if (currentAnimationFrame >= structureManager.structureList[2].variants.size()) currentAnimationFrame = 0;
+			StructureDataHolder* data = structureManager.structureList[2].GetSpecificVariant(currentAnimationFrame);
+			shaders.rasterizeAnimatedObjects.SetUVec2(data->map.handle, "handle");
+			shaders.rasterizeAnimatedObjects.SetVector3({ wx * 16.0f-data->map.size.x/2,250.0f - data->map.size.y / 2,wz * 16.0f - data->map.size.z / 2 }, "renderPosition");
+			shaders.rasterizeAnimatedObjects.Use(ceil(float(data->map.size.x)/4.0f), ceil(float(data->map.size.y)/4.0f), ceil(float(data->map.size.z)/4.0f));
 			Anubis::GpuTimer grassT;
 			grassT.Start();
 			if (graphicsSettings.grassRender && grass > 0) {
 				viewPort.RenderGrass(matView, pos, forward, frame, resolution, grass);
 			}
 
+			if (graphicsSettings.secondaryRays) {
+
+				secondaryRays.Start();
+				viewPort.SecondaryRays(sampleCount, matView, pos, forward, ColorPallete, frame, timeSpeed, resolution, &world);
+			}
+			auto secondaryRaysMs = secondaryRays.Stop();
+			if (graphicsSettings.renderClouds) {
+				viewPort.RenderClouds(matView, frame, pos, forward, resolution, timeSpeed);
+			}
 			auto grassTimeMs = grassT.Stop();
 			START_TIMER(physicsAllocator)
 			
@@ -1380,7 +1411,6 @@ public:
 					}
 				}
 			}
-
 			if (drd > 0 && !viewPort.raytracePrimaryRays) {
 				shaders.display.UpdateSSBO(10, softwareRaster, drd * sizeof(Math::IVector3), 0);
 
@@ -1432,15 +1462,6 @@ public:
 			}
 			offfr++;
 			
-			if (graphicsSettings.secondaryRays) {
-
-				secondaryRays.Start();
-				viewPort.SecondaryRays(sampleCount,matView, pos, forward, ColorPallete, frame, timeSpeed, resolution, &world);
-			}
-			auto secondaryRaysMs = secondaryRays.Stop();
-			if (graphicsSettings.renderClouds) {
-				viewPort.RenderClouds(matView, frame, pos, forward, resolution,timeSpeed);
-			}
 			viewPort.Display(frame,resolution.height);
 			Anubis::Quad quad;
 			quad.Create();
@@ -1612,7 +1633,6 @@ public:
 			if (remaining > 0.0) {
 				std::this_thread::sleep_for(std::chrono::duration<double>(remaining));
 			}
-			frame = (frame % 6);
 			frame++;
 		}
 	}

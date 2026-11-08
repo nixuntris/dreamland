@@ -163,6 +163,9 @@
     <None Include="PrePassPrimary.glsl">
       <Filter>Source Files\Shaders\Raytracing\Primary Rays</Filter>
     </None>
+    <None Include="RasterizeAnimatedObjects.glsl">
+      <Filter>Source Files\Shaders\Rasterizer\Meshlets</Filter>
+    </None>
   </ItemGroup>
   <ItemGroup>
     <Text Include="caves.txt">

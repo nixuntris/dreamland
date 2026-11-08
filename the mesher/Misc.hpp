@@ -20,6 +20,7 @@ struct ShaderManager {
 	Anubis::ComputeShader bilboards;
 	Anubis::ComputeShader primaryRays;
 	Anubis::ComputeShader prepassPrimaryRays;
+	Anubis::ComputeShader rasterizeAnimatedObjects;
 	void Load() {
 
 		std::string shaderDir = "";
@@ -50,6 +51,7 @@ struct ShaderManager {
 		clouds.Setup(path("Clouds.glsl").c_str());
 		bilboards.Setup(path("bilboard.glsl").c_str());
 		prepassPrimaryRays.Setup(path("PrePassPrimary.glsl").c_str());
+		rasterizeAnimatedObjects.Setup("RasterizeAnimatedObjects.glsl");
 	}
 
 };

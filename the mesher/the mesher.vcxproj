@@ -164,6 +164,7 @@
     <None Include="GenerateMesh.glsl" />
     <None Include="grassParticle.glsl" />
     <None Include="Rasterize.glsl" />
+    <None Include="RasterizeAnimatedObjects.glsl" />
     <None Include="renderAABB.glsl" />
     <None Include="HizBuilder.glsl" />
     <None Include="SecondaryRays.glsl" />
