@@ -21,10 +21,10 @@ namespace Anubis {
         GLuint textureID = 0;
         GLuint64 handle = 0;
 
-        void Clear(Math::IVector3 s) {
+        inline void Clear(Math::IVector3 s) {
             size = s;
         }
-        void ChangePixel(int x, int y, int z, uint16_t value) {
+        inline void ChangePixel(int x, int y, int z, uint16_t value) {
             if (textureID == 0) {
                 return;
             }
@@ -39,7 +39,7 @@ namespace Anubis {
                 GL_RED_INTEGER, GL_UNSIGNED_SHORT, &value);
         }
 
-        void Upload(uint16_t* data = nullptr) {
+        inline void Upload(uint16_t* data = nullptr) {
             if (textureID != 0) {
                 if (handle != 0) {
                     glMakeImageHandleNonResidentARB(handle);
@@ -56,14 +56,14 @@ namespace Anubis {
                 glTextureSubImage3D(textureID,0,0, 0, 0,size.x, size.y, size.z,GL_RED_INTEGER,GL_UNSIGNED_SHORT,data);
             }
         }
-        void UpdateContents(uint16_t* data) {
+        inline void UpdateContents(uint16_t* data) {
             if (textureID == 0) {
                 Upload(data);
                 return;
             }
             glTextureSubImage3D(textureID,0,0, 0, 0,size.x, size.y, size.z,GL_RED_INTEGER,GL_UNSIGNED_SHORT,data);
         }
-        GLuint64 GetBindlessHandle(GLenum access = GL_READ_WRITE) {
+        inline GLuint64 GetBindlessHandle(GLenum access = GL_READ_WRITE) {
             if (textureID == 0) {
                 Upload();
             }
@@ -74,7 +74,7 @@ namespace Anubis {
 
             return handle;
         }
-        void Delete() {
+        inline void Delete() {
             if (handle != 0) {
                 glMakeImageHandleNonResidentARB(handle);
                 handle = 0;
@@ -93,10 +93,10 @@ namespace Anubis {
         GLuint64 handle = 0;
         GLuint pboID = 0;
 
-        void Clear(Math::IVector3 s) {
+        inline void Clear(Math::IVector3 s) {
             size = s;
         }
-        void Upload(uint8_t* data = nullptr) {
+        inline void Upload(uint8_t* data = nullptr) {
 
             glCreateTextures(GL_TEXTURE_3D, 1, &textureID);
             glTextureStorage3D(textureID, 1, GL_R8UI, size.x, size.y, size.z);
@@ -107,7 +107,7 @@ namespace Anubis {
                     GL_RED_INTEGER, GL_UNSIGNED_BYTE, data);
             }
         }
-        void ChangePixel(int x, int y, int z, uint8_t value) {
+        inline void ChangePixel(int x, int y, int z, uint8_t value) {
             if (textureID == 0) {
                 return;
             }
@@ -121,13 +121,13 @@ namespace Anubis {
                 1, 1, 1,
                 GL_RED_INTEGER, GL_UNSIGNED_BYTE, &value);
         }
-        void ReuploadContents(uint8_t* data) {
+        inline void ReuploadContents(uint8_t* data) {
             if (textureID == 0) { Upload(data); return; }
             glTextureSubImage3D(textureID, 0, 0, 0, 0,
                 size.x, size.y, size.z,
                 GL_RED_INTEGER, GL_UNSIGNED_BYTE, data);
         }
-        GLuint64 GetBindlessHandle(GLenum access = GL_READ_WRITE) {
+        inline GLuint64 GetBindlessHandle(GLenum access = GL_READ_WRITE) {
             if (textureID == 0) Upload();
             if (handle == 0) {
                 handle = glGetImageHandleARB(textureID, 0, GL_TRUE, 0, GL_R8UI);
@@ -135,7 +135,7 @@ namespace Anubis {
             }
             return handle;
         }
-        void Delete() {
+        inline void Delete() {
             if (handle != 0) {
                 glMakeImageHandleNonResidentARB(handle);
                 handle = 0;
@@ -147,7 +147,7 @@ namespace Anubis {
             }
         }
     };
-    void UploadByteMaps(GPUONLYByteMap** maps, uint8_t** data, Math::IVector3* sizes, int count) {
+    inline void UploadByteMaps(GPUONLYByteMap** maps, uint8_t** data, Math::IVector3* sizes, int count) {
         GLuint* textureIDs = new GLuint[count];
         glCreateTextures(GL_TEXTURE_3D, count, textureIDs);
 
@@ -190,7 +190,7 @@ namespace Anubis {
         glDeleteBuffers(1, &pbo);
         delete[] textureIDs;
     }
-    void UploadShortMaps(GPUONLYShortMap** maps, uint16_t** data, Math::IVector3* sizes, int count) {
+    inline void UploadShortMaps(GPUONLYShortMap** maps, uint16_t** data, Math::IVector3* sizes, int count) {
         GLuint* textureIDs = new GLuint[count];
         glCreateTextures(GL_TEXTURE_3D, count, textureIDs);
 

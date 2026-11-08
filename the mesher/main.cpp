@@ -308,6 +308,146 @@ struct ViewPort {
 		shaders->grassRenderer.Use(grass / 64, 1, 1);
 	}
 };
+
+struct StructureDataHolder {
+	uint16_t* values;
+	uint8_t* positions;
+	uint8_t width, height, depth;
+	int voxelCount;
+	void Create(uint16_t* values, uint8_t* positions, int voxelCount, uint8_t width, uint8_t height, uint8_t depth) {
+		this->values = values;
+		this->positions = positions;
+		this->voxelCount = voxelCount;
+		this->width = width;
+		this->height = height;
+		this->depth = depth;
+	}
+};
+
+struct Structure {
+	int variantCount;
+	std::vector<StructureDataHolder*> variants;
+	std::string name;
+	void Create(std::string name) {
+		this->name = name;
+	}
+	StructureDataHolder* GetRandomVariant() {
+		int variant = Math::GetRandomValueStreamlinedFast(0, variantCount - 1);
+		return this->variants[variant];
+	}
+	StructureDataHolder* GetSpecificVariant(int variant) {
+		if (variant < 0 || variant >= variantCount) return nullptr;
+		return this->variants[variant];
+	}
+	void AddVariant(uint16_t* values, uint8_t* positions, int voxelCount, uint8_t width, uint8_t height, uint8_t depth) {
+		StructureDataHolder* variant = new StructureDataHolder;
+		variant->Create(values, positions, voxelCount, width, height, depth);
+		this->variants.push_back(variant);
+	}
+	~Structure() {
+		for (auto t : variants) {
+			delete[] t->values;
+			delete[] t->positions;
+			delete t;
+		}
+		variants.resize(0);
+		variantCount = 0;
+		name = "";
+	}
+};
+auto addTreeVariants = [&](Structure* structure, int minTrunkHeight, int maxTrunkHeight) {
+	const int firstTierHeight = 6;
+	const int tierSpacing = 4;
+
+	const int straight[4][2] = { {1,0}, {-1,0}, {0,1}, {0,-1} };
+	const int diagonal[4][2] = { {1,1}, {-1,1}, {1,-1}, {-1,-1} };
+
+	const int variantCount = 3;
+	for (int v = 0; v < variantCount; v++) {
+		std::vector<uint16_t> rawValues;
+		std::vector<int> rawPositions;
+
+		int minX = 0, minY = 0, minZ = 0;
+		int maxX = 0, maxY = 0, maxZ = 0;
+
+		auto addVoxel = [&](int x, int y, int z, uint16_t type) {
+			rawValues.push_back(type);
+			rawPositions.push_back(x);
+			rawPositions.push_back(y);
+			rawPositions.push_back(z);
+			if (x < minX) minX = x;
+			if (y < minY) minY = y;
+			if (z < minZ) minZ = z;
+			if (x > maxX) maxX = x;
+			if (y > maxY) maxY = y;
+			if (z > maxZ) maxZ = z;
+			};
+
+		int trunkHeight = minTrunkHeight + (maxTrunkHeight - minTrunkHeight) * v / (variantCount - 1);
+		int variation = v * 2;
+
+		for (int y = 0; y < trunkHeight; y++)
+			addVoxel(0, y, 0, WOOD);
+
+		for (int tier = 0, h = firstTierHeight; h < trunkHeight - 1; h += tierSpacing, tier++) {
+			const int (*dirs)[2] = (tier % 2 == 0) ? straight : diagonal;
+
+			int length = 1 + (trunkHeight - h) * 6 / (trunkHeight - firstTierHeight) + (variation % 3) - 1;
+			if (length < 1) length = 1;
+
+			for (int i = 0; i < 4; i++) {
+				int dirX = dirs[i][0], dirZ = dirs[i][1];
+				int sideX = -dirZ, sideZ = dirX;
+
+				for (int step = 1; step <= length; step++) {
+					int x = dirX * step;
+					int z = dirZ * step;
+					int y = h - step / 4;
+
+					if (step <= length - 3) {
+						addVoxel(x, y, z, WOOD);
+					}
+					else {
+						addVoxel(x, y, z, LEAVES);
+						addVoxel(x + sideX, y, z + sideZ, LEAVES);
+						addVoxel(x - sideX, y, z - sideZ, LEAVES);
+						addVoxel(x, y + 1, z, LEAVES);
+					}
+				}
+
+				addVoxel(dirX * length, h - length / 4 - 1, dirZ * length, LEAVES);
+			}
+
+			for (int i = 0; i < 4; i++)
+				addVoxel(straight[i][0], h + 1, straight[i][1], LEAVES);
+		}
+
+		for (int i = 0; i < 4; i++) {
+			addVoxel(straight[i][0], trunkHeight - 2, straight[i][1], LEAVES);
+			addVoxel(straight[i][0], trunkHeight - 1, straight[i][1], LEAVES);
+		}
+		addVoxel(0, trunkHeight, 0, LEAVES);
+		addVoxel(0, trunkHeight + 1 + (variation % 2), 0, LEAVES);
+
+		int voxelCount = (int)rawValues.size();
+		uint16_t* valArray = new uint16_t[voxelCount];
+		uint8_t* posArray = new uint8_t[voxelCount * 3];
+
+		for (int i = 0; i < voxelCount; i++) {
+			valArray[i] = rawValues[i];
+			posArray[i * 3 + 0] = (uint8_t)(rawPositions[i * 3 + 0] - minX);
+			posArray[i * 3 + 1] = (uint8_t)(rawPositions[i * 3 + 1] - minY);
+			posArray[i * 3 + 2] = (uint8_t)(rawPositions[i * 3 + 2] - minZ);
+		}
+
+		structure->AddVariant(valArray, posArray, voxelCount,
+			(uint8_t)(maxX - minX + 1),
+			(uint8_t)(maxY - minY + 1),
+			(uint8_t)(maxZ - minZ + 1));
+	}
+
+	structure->variantCount = structure->variants.size();
+	};
 class App {
 	Anubis::Window window;
 	Chunk* chunks;
@@ -333,6 +473,7 @@ class App {
 	ViewPort viewPort;
 	ParticleRender particleRenderer;
 	CHUNKTYPE selectedType = MOUNTAIN;
+	Structure* treeStructure ;
 public:
 	App() {
 		//Implement HiZ for meshlets
@@ -381,6 +522,9 @@ public:
 		ImGui_ImplGlfw_InitForOpenGL(window.GetWindowHandle(), true);
 		ImGui_ImplOpenGL3_Init("#version 460");
 		viewPort.shaders = &shaders;
+		treeStructure = new Structure;
+		treeStructure->Create("tree");
+		addTreeVariants(treeStructure,24,48);
 	}
 	inline void GenerateTerrain() {
 		chunks = (Chunk*)MemAlloc(wx * wz * wy * sizeof(Chunk));
@@ -956,90 +1100,28 @@ public:
 					} \
 				} while (0)
 
-				auto spawnTree = [&](int dx, int dy, int dz, int trunkHeight) {
-					//trunk height should be at least 24
-					const int firstTierHeight = 6;
-					const int tierSpacing = 4;
+				auto spawnTree = [&](int dx, int dy, int dz) {
+					StructureDataHolder* tree = treeStructure->GetRandomVariant();
+					
+					uint8_t* positions = tree->positions;
+					uint16_t* values = tree->values;
+					for (int i = 0; i < tree->voxelCount; i++) {
 
-					const int straight[4][2] = { {1,0}, {-1,0}, {0,1}, {0,-1} };
-					const int diagonal[4][2] = { {1,1}, {-1,1}, {1,-1}, {-1,-1} };
-
-					for (int y = 0; y < trunkHeight; y++)
-						SET_VOXEL(dx, dy + y, dz, WOOD);
-
-					for (int tier = 0, h = firstTierHeight; h < trunkHeight - 1; h += tierSpacing, tier++) {
-						const int (*dirs)[2] = (tier % 2 == 0) ? straight : diagonal;
-
-						int length = 1 + (trunkHeight - h) * 6 / (trunkHeight - firstTierHeight);
-
-						for (int i = 0; i < 4; i++) {
-							int dirX = dirs[i][0], dirZ = dirs[i][1];
-							int sideX = -dirZ, sideZ = dirX;
-
-							for (int step = 1; step <= length; step++) {
-								int x = dx + dirX * step;
-								int z = dz + dirZ * step;
-								int y = dy + h - step / 4;
-
-								if (step <= length - 3) {
-									SET_VOXEL(x, y, z, WOOD);
-								}
-								else {
-									SET_VOXEL(x, y, z, LEAVES);
-									SET_VOXEL(x + sideX, y, z + sideZ, LEAVES);
-									SET_VOXEL(x - sideX, y, z - sideZ, LEAVES);
-									SET_VOXEL(x, y + 1, z, LEAVES);
-								}
-							}
-
-							SET_VOXEL(dx + dirX * length, dy + h - length / 4 - 1, dz + dirZ * length, LEAVES);
-						}
-
-						for (int i = 0; i < 4; i++)
-							SET_VOXEL(dx + straight[i][0], dy + h + 1, dz + straight[i][1], LEAVES);
+						int x = positions[i * 3 + 0];
+						int y = positions[i * 3 + 1];
+						int z = positions[i * 3 + 2];
+						uint16_t type = values[i];
+						SET_VOXEL(dx + x, dy + y, dz + z, type);
 					}
-
-					for (int i = 0; i < 4; i++) {
-						SET_VOXEL(dx + straight[i][0], dy + trunkHeight - 2, dz + straight[i][1], LEAVES);
-						SET_VOXEL(dx + straight[i][0], dy + trunkHeight - 1, dz + straight[i][1], LEAVES);
-					}
-					SET_VOXEL(dx, dy + trunkHeight, dz, LEAVES);
-					SET_VOXEL(dx, dy + trunkHeight + 1, dz, LEAVES);
-					};
-
-				auto spawnRock = [&](int cx, int cy, int cz, int size) {
-					float rx = size + Math::GetRandomValueStreamlinedFast(0, size / 2);
-					float rz = size + Math::GetRandomValueStreamlinedFast(0, size / 2);
-					float ry = size * 0.6f;
-					cy -= (int)(ry * 0.4f);
-
-					for (int y = -(int)ry; y <= (int)ry; y++) {
-						for (int x = -(int)rx; x <= (int)rx; x++) {
-							for (int z = -(int)rz; z <= (int)rz; z++) {
-								float d = (x * x) / (rx * rx) + (y * y) / (ry * ry) + (z * z) / (rz * rz);
-								float jitter = Math::GetRandomValueStreamlinedFast(-25, 25) / 100.0f;
-								if (d <= 0.75f || d <= 1.0f + jitter)
-									SET_VOXEL(cx + x, cy + y, cz + z, STONE);
-							}
-						}
-					}
-					};
-				if (GetRandomValue(0, 10) == 5 && selectedType == MOUNTAIN) {
-					for (int i = 0; i < 3; i++) {
-						int rx = Math::GetRandomValueStreamlinedFast(8, 23);
-						int rz = Math::GetRandomValueStreamlinedFast(8, 23);
-						int groundY = gen.heightMap[rx + rz * chunkSize];
-						spawnRock(rx, groundY, rz, Math::GetRandomValueStreamlinedFast(2, 5));
-					}
-
-				}
+				};
 				if (selectedType == MOUNTAIN) {
 					for (int i = 0; i < Math::GetRandomValueStreamlinedFast(0, 4); i++) {
 						int dx = Math::GetRandomValueStreamlinedFast(10, 20);
 						int dz = Math::GetRandomValueStreamlinedFast(10, 20);
 						int baseY = gen.heightMap[dx + dz * chunkSize];
 						if (baseY > 250) continue;
-						spawnTree(dx, baseY, dz, Math::GetRandomValueStreamlinedFast(24, 48));
+						
+						spawnTree(dx, baseY, dz);
 
 					}
 
