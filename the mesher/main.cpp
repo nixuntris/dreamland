@@ -1067,23 +1067,28 @@ public:
 		Anubis::GPUONLYByteMap** byteMapBatch = new Anubis::GPUONLYByteMap * [maxCount];
 		uint8_t** byteMapData = new uint8_t * [maxCount];
 		Math::IVector3* byteMapSizes = new Math::IVector3[maxCount];
+		int* byteMapChunkIds = new int[maxCount]; 
 		int byteMapCount = 0;
 
 		Anubis::GPUONLYShortMap** shortMapBatch = new Anubis::GPUONLYShortMap * [maxCount];
 		uint16_t** shortMapData = new uint16_t * [maxCount];
 		Math::IVector3* shortMapSizes = new Math::IVector3[maxCount];
+		int* shortMapChunkIds = new int[maxCount]; 
 		int shortMapCount = 0;
+
 		for (int nx = 0; nx < wx; nx++) {
 			for (int nz = 0; nz < wz; nz++) {
 				for (int ny = 0; ny < wy; ny++) {
 
 					int neighbourId = ny * (wx * wz) + nz * wx + nx;
-					if (chunks[neighbourId].lod == 0 || chunks[neighbourId].lod==3000) continue;
+					if (chunks[neighbourId].lod == 0 || chunks[neighbourId].lod == 3000 || chunks[neighbourId].lod == 32) continue;
 
 					int size = chunkSize / chunks[neighbourId].lod;
-					
+
 					if (world.chunkData[neighbourId].voxelCount != 0 &&
-						!world.chunkData[neighbourId].skipped && !(world.chunkData[neighbourId].voxelCount >= chunkSize * chunkSize * chunkSize)) {
+						!world.chunkData[neighbourId].skipped &&
+						!(world.chunkData[neighbourId].voxelCount >= chunkSize * chunkSize * chunkSize)) {
+
 						world.chunkData[neighbourId].probeMap.Clear({ size,size,size });
 						world.chunkData[neighbourId].probeMap.Upload(0);
 						world.chunkData[neighbourId].probeMap.GetBindlessHandle();
@@ -1091,26 +1096,22 @@ public:
 
 						if (chunks[neighbourId].shortenedData) {
 							auto& map = world.chunkData[neighbourId].fluidByteMap;
-
 							map.Clear({ size, size, size });
 
 							byteMapBatch[byteMapCount] = &map;
 							byteMapData[byteMapCount] = world.chunkData[neighbourId].compressedTerrain;
 							byteMapSizes[byteMapCount] = { size, size, size };
-
+							byteMapChunkIds[byteMapCount] = neighbourId;
 							byteMapCount++;
 						}
 						else {
 							auto& map = world.chunkData[neighbourId].fluidShortMap;
-
 							map.Clear({ size, size, size });
 
 							shortMapBatch[shortMapCount] = &map;
-							shortMapData[shortMapCount] = chunks[neighbourId].DecompressChunk(
-								&world.chunkData[neighbourId]
-							);
+							shortMapData[shortMapCount] = chunks[neighbourId].DecompressChunk(&world.chunkData[neighbourId]);
 							shortMapSizes[shortMapCount] = { size, size, size };
-
+							shortMapChunkIds[shortMapCount] = neighbourId; 
 							shortMapCount++;
 						}
 					}
@@ -1124,17 +1125,9 @@ public:
 			for (int i = 0; i < byteMapCount; i++) {
 				byteMapBatch[i]->GetBindlessHandle();
 
-				for (int nx = 0; nx < wx; nx++) {
-					for (int nz = 0; nz < wz; nz++) {
-						for (int ny = 0; ny < wy; ny++) {
-							int id = ny * (wx * wz) + nz * wx + nx;
-							if (&world.chunkData[id].fluidByteMap == byteMapBatch[i]) {
-								world.handle.handle[id].handle = byteMapBatch[i]->handle;
-								world.handle.handle[id].lod = world.chunkData[id].lod;
-							}
-						}
-					}
-				}
+				int id = byteMapChunkIds[i];
+				world.handle.handle[id].handle = byteMapBatch[i]->handle;
+				world.handle.handle[id].lod = world.chunkData[id].lod;
 			}
 		}
 
@@ -1144,21 +1137,16 @@ public:
 			for (int i = 0; i < shortMapCount; i++) {
 				shortMapBatch[i]->GetBindlessHandle();
 
-				for (int nx = 0; nx < wx; nx++) {
-					for (int nz = 0; nz < wz; nz++) {
-						for (int ny = 0; ny < wy; ny++) {
-							int id = ny * (wx * wz) + nz * wx + nx;
-							if (&world.chunkData[id].fluidShortMap == shortMapBatch[i]) {
-								world.handle.handle[id].handle = shortMapBatch[i]->handle;
-								world.handle.handle[id].lod = world.chunkData[id].lod;
-							}
-						}
-					}
-				}
+				int id = shortMapChunkIds[i];
+				world.handle.handle[id].handle = shortMapBatch[i]->handle;
+				world.handle.handle[id].lod = world.chunkData[id].lod;
 
 				free(shortMapData[i]);
 			}
 		}
+
+		delete[] byteMapChunkIds;
+		delete[] shortMapChunkIds;
 		delete[] byteMapBatch;
 		delete[] shortMapBatch;
 		delete[] shortMapSizes;
