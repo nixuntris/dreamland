@@ -5,9 +5,10 @@ The general idea is that it's an engine to learn and experiment with different t
 Currently there are 2 primary renderers, raytracing and rasterization. The rasterizer is much more complete and more optimized. While the raytracer is much earlier in development.
 
 # Installation
-On the release tab there is a list of builds, they are prepared bi-weekly(Unless a major change happens which might cause more releases).
-Just download the compressed folder, and there is a pre-compiled binary to launch(it's for windows).
 
+On the release tab there is a list of builds, they are prepared bi-weekly(Unless a major change happens which might cause more releases).
+Just download the compressed folder, and there is a pre-compiled binary to launch.
+All the executables are for windows.
 
 # Usage
 First screen will be a small menu that allows you to choose different options for world size from 10x10 to 300x300, they are in chunks not voxel size so (32^3)
