@@ -74,6 +74,11 @@ namespace Anubis {
 
             return handle;
         }
+        inline void ClearTexture(uint16_t value = 0) {
+            if (textureID == 0) return;
+
+            glClearTexImage(textureID, 0, GL_RED_INTEGER, GL_UNSIGNED_SHORT, &value);
+        }
         inline void Delete() {
             if (handle != 0) {
                 glMakeImageHandleNonResidentARB(handle);
@@ -106,6 +111,11 @@ namespace Anubis {
                     size.x, size.y, size.z,
                     GL_RED_INTEGER, GL_UNSIGNED_BYTE, data);
             }
+        }
+        inline void ClearTexture(uint8_t value = 0) {
+            if (textureID == 0) return;
+
+            glClearTexImage(textureID, 0, GL_RED_INTEGER, GL_UNSIGNED_BYTE, &value);
         }
         inline void ChangePixel(int x, int y, int z, uint8_t value) {
             if (textureID == 0) {

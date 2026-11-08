@@ -1507,9 +1507,28 @@ public:
 				CustomToggle("Render grass", &graphicsSettings.grassRender);
 				CustomToggle("Hardware/Software rendering", &graphicsSettings.hardwareSoftwareRendering);
 				CustomToggle("Secondary rays", &graphicsSettings.secondaryRays);
-
+				int oldSampleCount = sampleCount;
 				ImGui::SliderInt("Sample Count", &sampleCount, 1, 9);
+				if (oldSampleCount != sampleCount) {
+					for (int x = 0; x < wx; x++) {
+						for (int y = 0; y < wy; y++) {
+							for (int z = 0; z < wz; z++) {
+								int neighbourId = y * (wx * wz) + z * wx + x;
+								if (chunks[neighbourId].lod == 0 || chunks[neighbourId].lod == 3000 || chunks[neighbourId].lod == 32) continue;
 
+								int size = chunkSize / chunks[neighbourId].lod;
+
+								if (world.chunkData[neighbourId].voxelCount != 0 &&
+									!world.chunkData[neighbourId].skipped &&
+									!(world.chunkData[neighbourId].voxelCount >= chunkSize * chunkSize * chunkSize)) {
+
+									world.chunkData[neighbourId].probeMap.ClearTexture(0);
+								}
+
+							}
+						}
+					}
+				}
 				if (ImGui::Button("Recompile shaders")) {
 					shaders.Load();
 				}
