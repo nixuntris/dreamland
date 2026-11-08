@@ -5,10 +5,6 @@
       <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
       <Extensions>cpp;c;cc;cxx;c++;cppm;ixx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
     </Filter>
-    <Filter Include="Header Files">
-      <UniqueIdentifier>{93995380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
-      <Extensions>h;hh;hpp;hxx;h++;hm;inl;inc;ipp;xsd</Extensions>
-    </Filter>
     <Filter Include="Resource Files">
       <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
       <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
@@ -58,6 +54,10 @@
     <Filter Include="Source Files\terrain\example terrain">
       <UniqueIdentifier>{84d25c7b-74a7-4e39-b3fb-7896cacd12b3}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Header Files">
+      <UniqueIdentifier>{93995380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
+      <Extensions>h;hh;hpp;hxx;h++;hm;inl;inc;ipp;xsd</Extensions>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="PerlinAVX2.hpp">
@@ -90,6 +90,12 @@
       <Filter>Source Files\CPU Code</Filter>
     </ClInclude>
     <ClInclude Include="Misc.hpp">
+      <Filter>Source Files\CPU Code</Filter>
+    </ClInclude>
+    <ClInclude Include="Structure.hpp">
+      <Filter>Source Files\CPU Code</Filter>
+    </ClInclude>
+    <ClInclude Include="ParticleManager.hpp">
       <Filter>Source Files\CPU Code</Filter>
     </ClInclude>
   </ItemGroup>

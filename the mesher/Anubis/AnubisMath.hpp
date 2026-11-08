@@ -11,28 +11,37 @@ namespace Math {
     } Matrix;
 
     struct IVector2 {
-        int x;
-        int y;
+        union {
+            struct { int x, y; };
+            struct { int width, height;  };
+
+        };
     };
     struct IVector3 {
-        int x;
-        int y;
-        int z;
+        union {
+            struct { int x, y, z; };
+            struct { int width, height, depth; };
+        };
     };
     struct Vector2 {
-        double x;
-        double y;
+        union {
+            struct { double x, y; };
+            struct { double width, height; };
+        };
+
     };
     struct Vector3 {
-        double x;
-        double y;
-        double z;
+        union {
+            struct { double x, y, z; };
+            struct { double width, height, depth; };
+        };
+        
     };
     struct Vector4 {
-        double x;
-        double y;
-        double z;
-        double w;
+        union {
+            struct { double x, y, z, w; };
+            struct { double width, height, depth, time; };
+        };
     };
     inline static double dot(Vector3 vec1, Vector3 vec2) {
         return vec1.x * vec2.x + vec1.y * vec2.y + vec1.z * vec2.z;

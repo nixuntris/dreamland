@@ -15,124 +15,10 @@
 #include "Misc.hpp"
 #include <thread>
 #include <chrono>
+#include "Structure.hpp"
+#include "ParticleManager.hpp"
 const bool gpuMeshing = true;
-struct Particle {
-	Math::Vector3 position;
-	uint32_t color;
-	Math::Vector3 targetPosition;
-	void (*update)(Particle&);
-};
-Math::Vector3 Vector3MoveTowards(Math::Vector3 v, Math::Vector3 target, float maxDistance)
-{
-	Math::Vector3 result = { 0 };
-	float dx = target.x - v.x;
-	float dy = target.y - v.y;
-	float dz = target.z - v.z;
-	float sqrDist = dx * dx + dy * dy + dz * dz;
-	if ((maxDistance < 0.0f) || (sqrDist > (maxDistance * maxDistance)))
-	{
-		float dist = sqrtf(sqrDist);
-		float inv = maxDistance / dist;
 
-		result.x = v.x + dx * inv;
-		result.y = v.y + dy * inv;
-		result.z = v.z + dz * inv;
-	}
-	else
-	{
-		result = target;
-	}
-
-	return result;
-}
-void ExampleUpdate(Particle& p) {
-	p.position = Vector3MoveTowards(p.position, p.targetPosition, 3);
-	if (Vector3Distance({ (float)p.position.x, (float)p.position.y,(float)p.position.z }, { (float)p.targetPosition.x,(float)p.targetPosition.y,(float)p.targetPosition.z }) < 1) {
-		p.targetPosition.x = GetRandomValue(0, wx * 32);
-		p.targetPosition.y = GetRandomValue(150, 250);
-		p.targetPosition.z = GetRandomValue(0, wz * 32);
-	}
-}
-const int MAX_PARTICLES = 1000000;
-const bool DEBUG_FEATURES_ON = true;
-class ParticleRender {
-public:
-	Particle *particles;
-	int renderQueue;
-	
-	void Create() {
-		renderQueue = 0;
-		particles = new Particle[MAX_PARTICLES];
-	}
-	
-	void PushRenderParticle(Math::Vector3 position, Color color, void (*update)(Particle&)) {
-		Particle particle;
-		particle.position = position;
-		particle.color = 0;
-		particle.update = update;
-		particles[renderQueue++] = particle;
-	}
-	
-	void Render(ShaderManager *shaders, Matrix matView, Matrix matProj, Vector3 forward, Vector3 pos, int wWidth, int wHeight, int frameIndex) {
-		Math::Vector3 billboardPoses[1024];
-		int renderPassAmount = 0;
-		for (int i = 0; i <renderQueue; i++) {
-			billboardPoses[renderPassAmount] = particles[i].position;
-			renderPassAmount++;
-			if (renderPassAmount == 1024-1) {
-
-				Anubis::SwitchShaderStage(shaders->bilboards.programID);
-				shaders->bilboards.SetVector3({ pos.x,pos.y,pos.z }, "camPos");
-				shaders->bilboards.SetVector3({ forward.x,forward.y,forward.z }, "camForward");
-				shaders->bilboards.SetMatrix({ matView.m0,matView.m1,matView.m2,matView.m3,matView.m4,matView.m5,matView.m6,matView.m7,matView.m8,matView.m9,matView.m10,matView.m11,matView.m12,matView.m13,matView.m14,matView.m15 }, "matView");
-				shaders->bilboards.SetMatrix({ matProj.m0,matProj.m1,matProj.m2,matProj.m3,matProj.m4,matProj.m5,matProj.m6,matProj.m7,matProj.m8,matProj.m9,matProj.m10,matProj.m11,matProj.m12,matProj.m13,matProj.m14,matProj.m15 }, "matProj");
-				shaders->bilboards.SetInt(wx, "wx");
-				shaders->bilboards.SetInt(wy, "wy");
-				shaders->bilboards.SetInt(wz, "wz");
-				shaders->bilboards.SetInt(wWidth, "renderWidth");
-				shaders->bilboards.SetInt(wHeight, "renderHeight");
-				shaders->bilboards.SetVector3Array(billboardPoses, renderPassAmount, "billboards");
-				shaders->bilboards.SetInt(frameIndex, "frameIndex");
-				shaders->bilboards.SetFloat(1, "billboardSize");
-				shaders->bilboards.SetInt(0, "billboardColor");
-				shaders->bilboards.Use(renderQueue / 64, 1, 1);
-				renderPassAmount = 0;
-				//dispatch
-			}
-		}
-		if (renderPassAmount > 0) {
-			//dispatch
-
-			Anubis::SwitchShaderStage(shaders->bilboards.programID);
-			shaders->bilboards.SetVector3({ pos.x,pos.y,pos.z }, "camPos");
-			shaders->bilboards.SetVector3({ forward.x,forward.y,forward.z }, "camForward");
-			shaders->bilboards.SetMatrix({ matView.m0,matView.m1,matView.m2,matView.m3,matView.m4,matView.m5,matView.m6,matView.m7,matView.m8,matView.m9,matView.m10,matView.m11,matView.m12,matView.m13,matView.m14,matView.m15 }, "matView");
-			shaders->bilboards.SetMatrix({ matProj.m0,matProj.m1,matProj.m2,matProj.m3,matProj.m4,matProj.m5,matProj.m6,matProj.m7,matProj.m8,matProj.m9,matProj.m10,matProj.m11,matProj.m12,matProj.m13,matProj.m14,matProj.m15 }, "matProj");
-			shaders->bilboards.SetInt(wx, "wx");
-			shaders->bilboards.SetInt(wy, "wy");
-			shaders->bilboards.SetInt(wz, "wz");
-			shaders->bilboards.SetInt(wWidth, "renderWidth");
-			shaders->bilboards.SetInt(wHeight, "renderHeight");
-			shaders->bilboards.SetVector3Array(billboardPoses, renderPassAmount, "billboards");
-			shaders->bilboards.SetInt(frameIndex, "frameIndex");
-			shaders->bilboards.SetInt(0, "billboardColor");
-			shaders->bilboards.SetFloat(1, "billboardSize");;
-
-			shaders->bilboards.Use(renderQueue/64, 1, 1);
-		}
-	}
-	
-	void Update() {
-		for (int i = 0; i < renderQueue; i++) {
-			particles[i].update(particles[i]);
-		}
-	}
-	
-	~ParticleRender() {
-		delete[] particles;
-	}
-	
-};
 const int maxGPUBatch = 1024 * 1024;
 const int maxGrassCount = 1449303 * 2;
 struct ViewPort {
@@ -198,10 +84,6 @@ struct ViewPort {
 		shaders->secondaryRaysRender.SetInt(wx, "wx");
 		shaders->secondaryRaysRender.SetInt(wy, "wy");
 		shaders->secondaryRaysRender.SetInt(wz, "wz");
-		shaders->secondaryRaysRender.SetInt(world->lightCount, "lightCount");
-		shaders->secondaryRaysRender.SetVector3Array(world->lightPositions, 16, "lightPositions");
-		shaders->secondaryRaysRender.SetVector3Array(world->lightValues, 16, "lightValues");
-		shaders->secondaryRaysRender.SetIntArray(world->lightRadiusList, 16, "lightRadiusList");
 
 		shaders->secondaryRaysRender.SetFloat(timeSpeed, "timeSpeed");
 		shaders->secondaryRaysRender.SetInt(wWidth * renderPercentage, "renderWidth");
@@ -212,31 +94,6 @@ struct ViewPort {
 		
 		shaders->secondaryRaysRender.SetUIntArray(palette.data(), palette.size(), "packedColors");
 	}
-	void RenderPhysicsObject(ShaderManager* shaders, Anubis::Camera camera, Matrix matView, Anubis::HWVIrGeomMesh& renderSphere, Vector3 vv, int frame, int voxelType, int size, uint32_t* pack, int packCount, GLuint handle, Vector3 rotation, int wHeight) {
-		Anubis::SwitchShaderStage(shaders->hwRenderForObjects.shaderId);
-
-		Matrix m = GetStaticMVPMatrix(vv, matView);
-		shaders->hwRenderForObjects.SetVector3(camera.position, "camPos");
-		Math::Vector3 camFwd = Math::NormalizeVector3(
-			Math::SubtractVector3(camera.target, camera.position)
-		);
-		shaders->hwRenderForObjects.SetVector3({ rotation.x,rotation.y,rotation.z }, "objectRotation");
-		shaders->hwRenderForObjects.SetVector3({ vv.x,vv.y,vv.z }, "objectPos");
-		shaders->hwRenderForObjects.SetVector3(camFwd, "camForward");
-		shaders->hwRenderForObjects.SetUIntArray(pack, packCount, "packedColors");
-		shaders->hwRenderForObjects.SetFloat(size, "size");
-		shaders->hwRenderForObjects.SetInt(frame, "frame");
-		shaders->hwRenderForObjects.SetInt(wHeight, "vHeight");
-		shaders->hwRenderForObjects.SetInt(voxelType, "voxelType");
-		shaders->hwRenderForObjects.SetUVec2(handle, "handle");
-
-		shaders->hwRenderForObjects.SetVector3({ 1,0,1 }, "colorr");
-		shaders->hwRenderForObjects.SetMatrix({ m.m0 ,m.m1,m.m2,m.m3,m.m4,m.m5,m.m6,m.m7,m.m8,m.m9,m.m10,m.m11,m.m12,m.m13,m.m14,m.m15 }, "MVP");
-
-		shaders->hwRenderForObjects.Use();
-
-		renderSphere.Draw();
-	};
 	void RasterizeMeshes(Matrix matView, Vector3 pos, Vector3 forward, const std::vector<uint32_t> palette, int frame, int triangleCount, int wWidth, int wHeight) {
 		if (raytracePrimaryRays) {
 
@@ -309,145 +166,6 @@ struct ViewPort {
 	}
 };
 
-struct StructureDataHolder {
-	uint16_t* values;
-	uint8_t* positions;
-	uint8_t width, height, depth;
-	int voxelCount;
-	void Create(uint16_t* values, uint8_t* positions, int voxelCount, uint8_t width, uint8_t height, uint8_t depth) {
-		this->values = values;
-		this->positions = positions;
-		this->voxelCount = voxelCount;
-		this->width = width;
-		this->height = height;
-		this->depth = depth;
-	}
-};
-
-struct Structure {
-	int variantCount;
-	std::vector<StructureDataHolder*> variants;
-	std::string name;
-	void Create(std::string name) {
-		this->name = name;
-	}
-	StructureDataHolder* GetRandomVariant() {
-		int variant = Math::GetRandomValueStreamlinedFast(0, variantCount - 1);
-		return this->variants[variant];
-	}
-	StructureDataHolder* GetSpecificVariant(int variant) {
-		if (variant < 0 || variant >= variantCount) return nullptr;
-		return this->variants[variant];
-	}
-	void AddVariant(uint16_t* values, uint8_t* positions, int voxelCount, uint8_t width, uint8_t height, uint8_t depth) {
-		StructureDataHolder* variant = new StructureDataHolder;
-		variant->Create(values, positions, voxelCount, width, height, depth);
-		this->variants.push_back(variant);
-	}
-	~Structure() {
-		for (auto t : variants) {
-			delete[] t->values;
-			delete[] t->positions;
-			delete t;
-		}
-		variants.resize(0);
-		variantCount = 0;
-		name = "";
-	}
-};
-auto addTreeVariants = [&](Structure* structure, int minTrunkHeight, int maxTrunkHeight) {
-	const int firstTierHeight = 6;
-	const int tierSpacing = 4;
-
-	const int straight[4][2] = { {1,0}, {-1,0}, {0,1}, {0,-1} };
-	const int diagonal[4][2] = { {1,1}, {-1,1}, {1,-1}, {-1,-1} };
-
-	const int variantCount = 3;
-	for (int v = 0; v < variantCount; v++) {
-		std::vector<uint16_t> rawValues;
-		std::vector<int> rawPositions;
-
-		int minX = 0, minY = 0, minZ = 0;
-		int maxX = 0, maxY = 0, maxZ = 0;
-
-		auto addVoxel = [&](int x, int y, int z, uint16_t type) {
-			rawValues.push_back(type);
-			rawPositions.push_back(x);
-			rawPositions.push_back(y);
-			rawPositions.push_back(z);
-			if (x < minX) minX = x;
-			if (y < minY) minY = y;
-			if (z < minZ) minZ = z;
-			if (x > maxX) maxX = x;
-			if (y > maxY) maxY = y;
-			if (z > maxZ) maxZ = z;
-			};
-
-		int trunkHeight = minTrunkHeight + (maxTrunkHeight - minTrunkHeight) * v / (variantCount - 1);
-		int variation = v * 2;
-
-		for (int y = 0; y < trunkHeight; y++)
-			addVoxel(0, y, 0, WOOD);
-
-		for (int tier = 0, h = firstTierHeight; h < trunkHeight - 1; h += tierSpacing, tier++) {
-			const int (*dirs)[2] = (tier % 2 == 0) ? straight : diagonal;
-
-			int length = 1 + (trunkHeight - h) * 6 / (trunkHeight - firstTierHeight) + (variation % 3) - 1;
-			if (length < 1) length = 1;
-
-			for (int i = 0; i < 4; i++) {
-				int dirX = dirs[i][0], dirZ = dirs[i][1];
-				int sideX = -dirZ, sideZ = dirX;
-
-				for (int step = 1; step <= length; step++) {
-					int x = dirX * step;
-					int z = dirZ * step;
-					int y = h - step / 4;
-
-					if (step <= length - 3) {
-						addVoxel(x, y, z, WOOD);
-					}
-					else {
-						addVoxel(x, y, z, LEAVES);
-						addVoxel(x + sideX, y, z + sideZ, LEAVES);
-						addVoxel(x - sideX, y, z - sideZ, LEAVES);
-						addVoxel(x, y + 1, z, LEAVES);
-					}
-				}
-
-				addVoxel(dirX * length, h - length / 4 - 1, dirZ * length, LEAVES);
-			}
-
-			for (int i = 0; i < 4; i++)
-				addVoxel(straight[i][0], h + 1, straight[i][1], LEAVES);
-		}
-
-		for (int i = 0; i < 4; i++) {
-			addVoxel(straight[i][0], trunkHeight - 2, straight[i][1], LEAVES);
-			addVoxel(straight[i][0], trunkHeight - 1, straight[i][1], LEAVES);
-		}
-		addVoxel(0, trunkHeight, 0, LEAVES);
-		addVoxel(0, trunkHeight + 1 + (variation % 2), 0, LEAVES);
-
-		int voxelCount = (int)rawValues.size();
-		uint16_t* valArray = new uint16_t[voxelCount];
-		uint8_t* posArray = new uint8_t[voxelCount * 3];
-
-		for (int i = 0; i < voxelCount; i++) {
-			valArray[i] = rawValues[i];
-			posArray[i * 3 + 0] = (uint8_t)(rawPositions[i * 3 + 0] - minX);
-			posArray[i * 3 + 1] = (uint8_t)(rawPositions[i * 3 + 1] - minY);
-			posArray[i * 3 + 2] = (uint8_t)(rawPositions[i * 3 + 2] - minZ);
-		}
-
-		structure->AddVariant(valArray, posArray, voxelCount,
-			(uint8_t)(maxX - minX + 1),
-			(uint8_t)(maxY - minY + 1),
-			(uint8_t)(maxZ - minZ + 1));
-	}
-
-	structure->variantCount = structure->variants.size();
-	};
 class App {
 	Anubis::Window window;
 	Chunk* chunks;
@@ -457,13 +175,15 @@ class App {
 	bool firstGen = true;
 	int totalTriangleCount;
 	int renderDistance = 500;
+	
 	int wWidth = 3840;
 	int wHeight = 2160;
 	int currentResolutionWindow = 3;
 	int grass = 0;
 	int totalMeshletCount = 0;
 	int editSize = 5;
-	Math::IVector3* vv;
+	Math::IVector3* softwareRaster;
+	Math::IVector3* hardwareRaster;
 	Settings graphicsSettings;
 	std::vector<std::string> worlds = { "Mountains", "Desert", "Caves", "Sky" };
 	float timeSpeed = 0.0004;
@@ -473,7 +193,8 @@ class App {
 	ViewPort viewPort;
 	ParticleRender particleRenderer;
 	CHUNKTYPE selectedType = MOUNTAIN;
-	Structure* treeStructure ;
+	StructureManager structureManager;
+	int maxMeshUpdate = 40;
 public:
 	App() {
 		//Implement HiZ for meshlets
@@ -500,7 +221,7 @@ public:
 		if (gpuMeshing) {
 			shaders.display.CreatePersistentSSBO(9, sizeof(int) * 2+1024*1024*2*sizeof(int));
 			shaders.display.CreateSSBO(10, maxGPUBatch * sizeof(Math::IVector3));
-			vv = (Math::IVector3*)(MemAlloc(1024 * 1024 * sizeof(Math::IVector3)));
+			softwareRaster = (Math::IVector3*)(MemAlloc(1024 * 1024 * sizeof(Math::IVector3)));
 		}
 		IMGUI_CHECKVERSION();
 		ImGui::CreateContext();
@@ -522,9 +243,7 @@ public:
 		ImGui_ImplGlfw_InitForOpenGL(window.GetWindowHandle(), true);
 		ImGui_ImplOpenGL3_Init("#version 460");
 		viewPort.shaders = &shaders;
-		treeStructure = new Structure;
-		treeStructure->Create("tree");
-		addTreeVariants(treeStructure,24,48);
+		structureManager.Init();
 	}
 	inline void GenerateTerrain() {
 		chunks = (Chunk*)MemAlloc(wx * wz * wy * sizeof(Chunk));
@@ -674,7 +393,7 @@ public:
 			for (int ny = 0; ny < wy; ny++) {
 				int neighbourId = ny * (wx * wz) + nz * wx + nx;
 				ChunkDeleteMeshData(nx, ny, nz);
-				vv[drd] = { nx,ny,nz };
+				softwareRaster[drd] = { nx,ny,nz };
 				drd++;
 				if (clearChunkData) {
 					chunks[neighbourId].ClearChunkData(&world.chunkData[neighbourId]);
@@ -685,7 +404,7 @@ public:
 		}
 
 		if (drd > 0) {
-			shaders.display.UpdateSSBO(10, vv, drd * sizeof(Math::IVector3), 0);
+			shaders.display.UpdateSSBO(10, softwareRaster, drd * sizeof(Math::IVector3), 0);
 
 			auto batchUploadEnd = std::chrono::high_resolution_clock::now();
 			Anubis::GpuTimer mesh;
@@ -721,7 +440,7 @@ public:
 			for (int i = 0; i < drd; i++) {
 
 
-				int id = vv[i].y * (wx * wz) + vv[i].z * wx + vv[i].x;
+				int id = softwareRaster[i].y * (wx * wz) + softwareRaster[i].z * wx + softwareRaster[i].x;
 				chunks[id].beginningTri = begin[i];
 				chunks[id].endTri = end[i];
 			}
@@ -906,10 +625,10 @@ public:
 			if (ImGui::CollapsingHeader("Advanced")) {
 				ImGui::Indent();
 
-//				ImGui::Checkbox("Pregenerate World", &pregenerate);
-				//if (ImGui::IsItemHovered()) {
-//					ImGui::SetTooltip("Generate all chunks during loading before the game starts.\n");
-	//			}
+				ImGui::Checkbox("Pregenerate World", &pregenerate);
+				if (ImGui::IsItemHovered()) {
+					ImGui::SetTooltip("Generate all chunks during loading before the game starts.\n");
+				}
 				ImGui::Checkbox("Spawn Critters", &spawnCritters);
 				if (ImGui::IsItemHovered()) {
 					ImGui::SetTooltip("Currently it's just debug flies.\n");
@@ -1101,7 +820,7 @@ public:
 				} while (0)
 
 				auto spawnTree = [&](int dx, int dy, int dz) {
-					StructureDataHolder* tree = treeStructure->GetRandomVariant();
+					StructureDataHolder* tree = structureManager.structureList[0].GetRandomVariant();
 					
 					uint8_t* positions = tree->positions;
 					uint16_t* values = tree->values;
@@ -1144,7 +863,7 @@ public:
 		}
 		END_TIMER(data_gen)
 		START_TIMER(upload)
-		int maxCount = wx * wy * wz*2;
+		int maxCount = wx * wy * wz;
 
 		Anubis::GPUONLYByteMap** byteMapBatch = new Anubis::GPUONLYByteMap * [maxCount];
 		uint8_t** byteMapData = new uint8_t * [maxCount];
@@ -1350,7 +1069,7 @@ public:
 			Anubis::GpuTimer grassT;
 			grassT.Start();
 			if (graphicsSettings.grassRender && grass > 0) {
-				//viewPort.RenderGrass(matView, pos, forward, frame, wWidth, wHeight, grass);
+				viewPort.RenderGrass(matView, pos, forward, frame, wWidth, wHeight, grass);
 			}
 
 			auto grassTimeMs = grassT.Stop();
@@ -1455,6 +1174,10 @@ public:
 									world.chunkData[id].terrain[blockid] = selectedColorIndex;
 									int size = chunkSize / chunks[id].lod;
 									chunks[id].Compress(&world.chunkData[id]);
+									world.chunkData[id].probeMap.Clear({ size,size,size });
+									world.chunkData[id].probeMap.Upload(0);
+									world.chunkData[id].probeMap.GetBindlessHandle();
+									world.handle.handle[id].lightStorageHandle = world.chunkData[id].probeMap.handle;
 
 									if (chunks[id].shortenedData) {
 										world.chunkData[id].fluidByteMap.Clear({ size,size,size });
@@ -1528,9 +1251,9 @@ public:
 							int dy = chunksUpdatedThisFrame[i].y;
 							int dz = chunksUpdatedThisFrame[i].z;
 							int id = dy * (wx * wz) + dz * wx + dx;
-							if (chunks[id].lod != 0) {
+							if (chunks[id].lod != 0 && !chunks[id].hardwareRasterize) {
 								ChunkDeleteMeshData(dx, dy, dz);
-								vv[drd] = { dx,dy,dz };
+								softwareRaster[drd] = { dx,dy,dz };
 								drd++;
 								uploadChunkSSBO(id);
 
@@ -1713,7 +1436,7 @@ public:
 
 				for (int y = gen.lowestChunkY; y < gen.highestChunkY && y < wy; y++) {
 					chunks[y * (wx * wz) + nz * wx + nx].GeneratePerType(selectedType, &world.chunkData[y * (wx * wz) + nz * wx + nx], gen, nx, y, nz, lod, grass);
-				//	RecalculateParticles(nx,y,nz);
+					RecalculateParticles(nx,y,nz);
 				};
 				for (int y = gen.lowestChunkY; y < gen.highestChunkY && y < wy; y++) {
 					if (!world.chunkData[y * (wx * wz) + nz * wx + nx].skipped) {
@@ -1722,7 +1445,7 @@ public:
 					}
 					else {
 						world.handle.handle[y * (wx * wz) + nz * wx + nx].lod = 32;
-						world.handle.handle[y * (wx * wz) + nz * wx + nx].filled = 32;
+						world.handle.handle[y * (wx * wz) + nz * wx + nx].filled = 1;
 					}
 				};
 				free(gen.heightMap);
@@ -1752,6 +1475,10 @@ public:
 					}
 					if (world.chunkData[neighbourId].voxelCount != 0 && !world.chunkData[neighbourId].skipped)
 					{
+						world.chunkData[neighbourId].probeMap.Clear({ size,size,size });
+						world.chunkData[neighbourId].probeMap.Upload(0);
+						world.chunkData[neighbourId].probeMap.GetBindlessHandle();
+						world.handle.handle[neighbourId].lightStorageHandle = world.chunkData[neighbourId].probeMap.handle;
 
 						if (chunks[neighbourId].shortenedData) {
 							world.chunkData[neighbourId].fluidByteMap.Clear({ size,size,size });
@@ -1773,27 +1500,32 @@ public:
 					}
 				}
 			}
-			
-			for (int i = 0; i < 2; i++) {
-				for (int x = 0; x < wx; x++) {
-					for (int z = 0; z < wz; z++) {
+			for (int i = 0; i < maxMeshUpdate; i++) {
+				bool keepRunning = true;
+				for (int x = 0; x < wx && keepRunning; x++) {
+					for (int z = 0; z < wz && keepRunning; z++) {
 						if (world.array[x][z]) {
 							bool neighborsLoaded =
 								x > 0 && x < wx - 1 && z > 0 && z < wz - 1 &&
 								world.array[x - 1][z] && world.array[x + 1][z] && world.array[x][z - 1] && world.array[x][z + 1];
-							if (neighborsLoaded) {
+							
+							if (neighborsLoaded && IsBoxInFrustum({float(x)*32,0,float(z)*32},{32,float(wy)*32,32},viewPort.planes)) {
 
-								for (int ny = 0; ny < wy; ny++) {
+								for (int ny = 0; ny < wy && keepRunning; ny++) {
 									int id = ny * (wx * wz) + z * wx + x;
 									if (!world.chunkData[id].updated && world.chunkData[id].voxelCount != 0) {
-
-										vv[drd].x = chunks[id].gx;
-										vv[drd].y = chunks[id].gy;
-										vv[drd].z = chunks[id].gz;
-
-										if (world.chunkData[id].voxelCount != 0 && !world.chunkData[id].skipped) {
+										if (world.chunkData[id].voxelCount != 0 && !world.chunkData[id].skipped && !chunks[id].hardwareRasterize) {
 											world.chunkData[id].updated = true;
+											float dist = Vector2Distance({ (float)x * chunkSize + chunkSize / 2,(float)z * chunkSize + chunkSize / 2 }, { float(viewPort.camera.position.x),float(viewPort.camera.position.z) });
+											bool grass = false;
+
+
+											int lod = 1;
+											softwareRaster[drd].x = chunks[id].gx;
+											softwareRaster[drd].y = chunks[id].gy;
+											softwareRaster[drd].z = chunks[id].gz;
 											drd++;
+											keepRunning = false;
 										}
 									}
 								}
@@ -1805,7 +1537,7 @@ public:
 			}
 
 			if (drd > 0 && !viewPort.raytracePrimaryRays) {
-				shaders.display.UpdateSSBO(10, vv, drd * sizeof(Math::IVector3), 0);
+				shaders.display.UpdateSSBO(10, softwareRaster, drd * sizeof(Math::IVector3), 0);
 
 				auto batchUploadEnd = std::chrono::high_resolution_clock::now();
 				Anubis::GpuTimer mesh;
@@ -1848,7 +1580,7 @@ public:
 				for (int i = 0; i < drd; i++) {
 					
 
-					int id = vv[i].y * (wx * wz) + vv[i].z * wx + vv[i].x;
+					int id = softwareRaster[i].y * (wx * wz) + softwareRaster[i].z * wx + softwareRaster[i].x;
 					chunks[id].beginningTri = begin[i];
 					chunks[id].endTri = end[i];
 				}
@@ -1883,6 +1615,7 @@ public:
 			}
 			if (menuOpen) {
 				window.EnableCursor();
+				structureManager.EditorView();
 
 				float padding = 10.0f;
 
@@ -1925,6 +1658,7 @@ public:
 				ImGui::SliderInt("Edit Size", &editSize, 1, 300);
 				ImGui::SliderInt("Render Distance", &renderDistance, 1, 1000);
 				ImGui::SliderFloat("Render Percentage", &viewPort.renderPercentage, 0.1f, 1.0f);
+				ImGui::SliderInt("Max Mesh Gen Per Frame", &maxMeshUpdate, 0.1f, 1.0f);
 				CustomToggle("Render grass", &graphicsSettings.grassRender);
 				CustomToggle("Hardware/Software rendering", &graphicsSettings.hardwareSoftwareRendering);
 				CustomToggle("Secondary rays", &graphicsSettings.secondaryRays);

@@ -143,7 +143,9 @@
     <ClInclude Include="Chunk.hpp" />
     <ClInclude Include="Misc.hpp" />
     <ClInclude Include="NoiseGen.hpp" />
+    <ClInclude Include="ParticleManager.hpp" />
     <ClInclude Include="SoftwareRasterizer.h" />
+    <ClInclude Include="Structure.hpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include="..\readme.md" />

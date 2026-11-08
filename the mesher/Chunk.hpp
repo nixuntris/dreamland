@@ -64,10 +64,6 @@ struct World {
 	};
 	GlobalHandle handle;
 	std::vector<ChunkData> chunkData;
-	int lightCount = 0;
-	Math::Vector3 lightPositions[16];
-	Math::Vector3 lightValues[16];
-	int lightRadiusList[16];
 	void Setup() {
 		chunkData.resize(wx * wz * wy);
 		memset(handle.handle, 0, wx * wy * wz * sizeof(GLuint64));
@@ -100,6 +96,7 @@ public:
 	int oldTri;
 	bool updated = false;
 	int allocatedTriSize = 0;
+	bool hardwareRasterize = false;
 	int size;
 	int lod;
 	int voxelCount = 0;

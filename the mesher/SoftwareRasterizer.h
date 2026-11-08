@@ -44,3 +44,25 @@ void ExtractFrustumPlanes(Matrix view, Plane *planes)
 		planes[i].d /= len;
 	}
 }
+bool IsBoxInFrustum(Vector3 pos, Vector3 size, Plane* planes)
+{
+    for (int i = 0; i < 6; i++)
+    {
+        Vector3 positive = {
+            planes[i].normal.x >= 0 ? pos.x + size.x : pos.x,
+            planes[i].normal.y >= 0 ? pos.y + size.y : pos.y,
+            planes[i].normal.z >= 0 ? pos.z + size.z : pos.z
+        };
+
+        float distance =
+            planes[i].normal.x * positive.x +
+            planes[i].normal.y * positive.y +
+            planes[i].normal.z * positive.z +
+            planes[i].d;
+
+        if (distance < 0)
+            return false;
+    }
+
+    return true;
+}
