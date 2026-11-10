@@ -37,7 +37,6 @@ class App {
 	int editSize = 5;
 	Math::IVector3* softwareRaster;
 	Settings graphicsSettings;
-	std::vector<std::string> worlds = { "Mountains", "Desert", "Caves", "Sky" };
 	float timeSpeed = 0.0004;
 	bool mainMenu = false;
 	int alreadySpawnedGrass = 0;
@@ -432,7 +431,7 @@ public:
 
 			ImGui::Text("World Size");
 			const char* worldSizes[] = { "10x10", "50x50", "100x100", "200x200", "300x300" };
-			for (int i = 0; i < 5; ++i) {
+			for (int i = 0; i < 4; ++i) {
 				bool selected = (worldSize == i);
 				char label[128];
 				snprintf(label, sizeof(label), "%s",
@@ -494,8 +493,8 @@ public:
 
 			ImGui::Spacing();
 			ImGui::Text("World Type");
-			const char* typeNames[] = { "Mountains", "Savanna", "Desert"};
-			for (int i = 0; i < 3; ++i) {
+			const char* typeNames[] = { "Mountains", "Savanna", "Desert","Caves"};
+			for (int i = 0; i < 4; ++i) {
 				bool selected = (worldTypeIndex == i);
 				
 				if (selected) ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.2f, 0.55f, 0.9f, 1.0f));
@@ -511,6 +510,10 @@ public:
 						case 2:
 							selectedType = DESERT;
 							break;
+						case 3:
+							selectedType = CAVES;
+							break;
+
 					}
 
 				}
@@ -639,7 +642,6 @@ public:
 				float dist = Vector2Distance({ (float)nx * chunkSize + chunkSize / 2,(float)nz * chunkSize + chunkSize / 2 }, { float(viewPort.camera.position.x),float(viewPort.camera.position.z) });
 				bool grass = false;
 
-				
 				int lod = 1;
 				if (dist > 960) lod = 2;
 				if (dist > 960 * 2) lod = 4;
@@ -651,13 +653,15 @@ public:
 				GenerationData gen;
 				gen.GenerateMountains(nx, nz);
 				gen.highestChunkY += 2;
-
 				for (int y = 0; y < wy; y++) {
 					world.chunkData[y * (wx * wz) + nz * wx + nx].lod = 0;
 				}
 				for (int y = gen.lowestChunkY; y < gen.highestChunkY && y < wy; y++) {
 					chunks[y * (wx * wz) + nz * wx + nx].GeneratePerType(selectedType,&world.chunkData[y * (wx * wz) + nz * wx + nx], gen, nx, y, nz, lod, grass);
 				};
+				for (int y = 0; y < gen.lowestChunkY; y++) {
+					chunks[y * (wx * wz) + nz * wx + nx].GeneratePerType(CAVES, &world.chunkData[y * (wx * wz) + nz * wx + nx], gen, nx, y, nz, lod, false);
+				}
 				int base = 0;
 				int cy = gen.highestChunkY - 2;
 				#define SET_VOXEL(x, y, z, block) do { \
@@ -698,7 +702,7 @@ public:
 					world.handle.handle[y * (wx * wz) + nz * wx + nx].lod = 32;
 					world.handle.handle[y * (wx * wz) + nz * wx + nx].filled = 1;
 				}
-				for (int y = gen.lowestChunkY; y < gen.highestChunkY && y < wy; y++) {
+				for (int y = 0; y < gen.highestChunkY && y < wy; y++) {
 					if (!world.chunkData[y * (wx * wz) + nz * wx + nx].skipped) {
 						chunks[y * (wx * wz) + nz * wx + nx].GenerateLod(&world.chunkData[y * (wx * wz) + nz * wx + nx], nx, y, nz);
 						chunks[y * (wx * wz) + nz * wx + nx].Compress(&world.chunkData[y * (wx * wz) + nz * wx + nx]);
@@ -1360,21 +1364,31 @@ public:
 			}
 			Math::IVector2 generateArrayId[1024];
 			int generateCount = 0;
+			bool leftToGenerate = false;
+			for (int x = 0; x < wx; x++) {
+				for (int z = 0; z < wz; z++) {
 
-			for (int i = 0; i < maxMeshUpdate; i++) {
-				float lastDistance = renderDistance*chunkSize*2;
-				int chunkX = -1;
-				int chunkZ = -1;
-				for (int x = 0; x < wx; x++) {
-					for (int z = 0; z < wz; z++) {
-						
-						if (!world.array[x][z] && generateCount<10) {
-							world.array[x][z] = true;
-							generateArrayId[generateCount++] = { x,z };
-						}
+					if (!world.array[x][z]) {
+						leftToGenerate = true;
 					}
 				}
-					
+			}
+			if (leftToGenerate) {
+				for (int i = 0; i < maxMeshUpdate; i++) {
+					float lastDistance = renderDistance * chunkSize * 2;
+					int chunkX = -1;
+					int chunkZ = -1;
+					for (int x = 0; x < wx; x++) {
+						for (int z = 0; z < wz; z++) {
+
+							if (!world.array[x][z] && generateCount < 10) {
+								world.array[x][z] = true;
+								generateArrayId[generateCount++] = { x,z };
+							}
+						}
+					}
+
+				}
 			}
 			#pragma omp parallel for schedule(dynamic)
 			for (int i = 0; i < generateCount; i++) {
@@ -1469,38 +1483,62 @@ public:
 					}
 				}
 			}
-			for (int i = 0; i < maxMeshUpdate; i++) {
-				bool keepRunning = true;
-				for (int x = 0; x < wx && keepRunning; x++) {
-					for (int z = 0; z < wz && keepRunning; z++) {
-						if (world.array[x][z]) {
-							bool neighborsLoaded =
-								x > 0 && x < wx - 1 && z > 0 && z < wz - 1 &&
-								world.array[x - 1][z] && world.array[x + 1][z] && world.array[x][z - 1] && world.array[x][z + 1];
-							
-							if (neighborsLoaded && IsBoxInFrustum({float(x)*32,0,float(z)*32},{32,float(wy)*32,32},viewPort.planes)) {
+			bool leftTomesh = false;
+			bool keepRunning = true;
+			for (int x = 0; x < wx && keepRunning; x++) {
+				for (int z = 0; z < wz && keepRunning; z++) {
+					for (int ny = 0; ny < wy && keepRunning; ny++) {
+						bool neighborsLoaded =
+							x > 0 && x < wx - 1 && z > 0 && z < wz - 1 &&
+							world.array[x - 1][z] && world.array[x + 1][z] && world.array[x][z - 1] && world.array[x][z + 1];
+						int id = ny * (wx * wz) + z * wx + x;
 
-								for (int ny = 0; ny < wy && keepRunning; ny++) {
-									int id = ny * (wx * wz) + z * wx + x;
-									if (!world.chunkData[id].updated && world.chunkData[id].voxelCount != 0) {
-										if (world.chunkData[id].voxelCount != 0 && !world.chunkData[id].skipped && !chunks[id].hardwareRasterize) {
-											world.chunkData[id].updated = true;
-											float dist = Vector2Distance({ (float)x * chunkSize + chunkSize / 2,(float)z * chunkSize + chunkSize / 2 }, { float(viewPort.camera.position.x),float(viewPort.camera.position.z) });
-											bool grass = false;
+						if (neighborsLoaded && IsBoxInFrustum({ float(x) * 32,0,float(z) * 32 }, { 32,float(wy) * 32,32 }, viewPort.planes)) {
+							if (!world.chunkData[id].updated && world.chunkData[id].voxelCount != 0) {
+								if (world.chunkData[id].voxelCount != 0 && !world.chunkData[id].skipped && !chunks[id].hardwareRasterize) {
+									leftTomesh = true;
+									keepRunning = false;
+								}
+							}
+						}
+					}
+				}
+			}
+			if (leftTomesh) {
+
+				for (int i = 0; i < maxMeshUpdate; i++) {
+					bool keepRunning = true;
+					for (int x = 0; x < wx && keepRunning; x++) {
+						for (int z = 0; z < wz && keepRunning; z++) {
+							if (world.array[x][z]) {
+								bool neighborsLoaded =
+									x > 0 && x < wx - 1 && z > 0 && z < wz - 1 &&
+									world.array[x - 1][z] && world.array[x + 1][z] && world.array[x][z - 1] && world.array[x][z + 1];
+
+								if (neighborsLoaded && IsBoxInFrustum({ float(x) * 32,0,float(z) * 32 }, { 32,float(wy) * 32,32 }, viewPort.planes)) {
+
+									for (int ny = 0; ny < wy && keepRunning; ny++) {
+										int id = ny * (wx * wz) + z * wx + x;
+										if (!world.chunkData[id].updated && world.chunkData[id].voxelCount != 0) {
+											if (world.chunkData[id].voxelCount != 0 && !world.chunkData[id].skipped && !chunks[id].hardwareRasterize) {
+												world.chunkData[id].updated = true;
+												float dist = Vector2Distance({ (float)x * chunkSize + chunkSize / 2,(float)z * chunkSize + chunkSize / 2 }, { float(viewPort.camera.position.x),float(viewPort.camera.position.z) });
+												bool grass = false;
 
 
-											int lod = 1;
-											softwareRaster[drd].x = chunks[id].gx;
-											softwareRaster[drd].y = chunks[id].gy;
-											softwareRaster[drd].z = chunks[id].gz;
-											drd++;
-											keepRunning = false;
+												int lod = 1;
+												softwareRaster[drd].x = chunks[id].gx;
+												softwareRaster[drd].y = chunks[id].gy;
+												softwareRaster[drd].z = chunks[id].gz;
+												drd++;
+												keepRunning = false;
+											}
 										}
 									}
 								}
 							}
-						}
 
+						}
 					}
 				}
 			}

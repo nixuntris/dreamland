@@ -85,8 +85,14 @@ enum CHUNKTYPE {
 	DESERT = 0,
 	SAVANNA = 1,
 	BEACH = 2,
-	MOUNTAIN = 3
-};
+	MOUNTAIN = 3,
+	CAVES = 4
+};	
+float caveScale = 0.025f;
+float detailRatio = 2.1428f;
+
+const float caveDetailScale = caveScale * detailRatio;
+
 class Chunk {
 	int tallestY = 0;
 public:
@@ -115,6 +121,9 @@ public:
 		case MOUNTAIN:
 			GenerateMountains(chunkData, generationData, gx, gy, gz,lod, grass); //the problem is grass, specifically if it's set to true, it makes the program randomly hang after generation
 			break;	
+		case CAVES:
+			GenerateCaves(chunkData, gx, gy, gz, lod); 
+			break;
 		}
 	}
 	inline void GenerateSavanna(ChunkData* chunkData, GenerationData generationData, int gx, int gy, int gz, int lod = 1, bool grass = false) {
@@ -185,6 +194,48 @@ public:
 			
 		
 	}
+
+	inline void GenerateCaves(ChunkData* chunkData, int gx, int gy, int gz, int lod = 1) {
+		this->gx = gx;
+		this->gy = gy;
+		this->gz = gz;
+		this->size = chunkSize / lod;
+		this->lod = lod;
+		chunkData->terrain = (uint16_t*)MemAlloc(chunkSize * chunkSize * chunkSize * sizeof(uint16_t));
+
+		const int baseWX = gx * chunkSize;
+		const int baseWY = gy * chunkSize;
+		const int baseWZ = gz * chunkSize;
+
+		for (int x = 0; x < chunkSize; x += lod) {
+			for (int y = 0; y < chunkSize; y += lod) {
+				int worldY = baseWY + y;
+				for (int z = 0; z < chunkSize; z += lod) {
+					int worldX = baseWX + x;
+					int worldZ = baseWZ + z;
+
+					float wx = (float)worldX;
+					float wy = (float)worldY;
+					float wz = (float)worldZ;
+
+					float broad = perlin_noise_3d(
+						wx * caveScale,
+						wy * caveScale,
+						wz * caveScale
+					);
+					float detail = perlin_noise_3d(
+						wx * caveDetailScale,
+						wy * caveDetailScale,
+						wz * caveDetailScale
+					);
+					float cave = broad * 0.75f + detail * 0.25f;
+
+					chunkData->terrain[IDX(x, y, z, chunkSize)] = (cave > 0.32f)*STONE;
+				}
+			}
+		}
+	}
+
 	inline void GenerateDesert(ChunkData* chunkData, GenerationData generationData, int gx, int gy, int gz, int lod = 1, bool grass = false) {
 		this->gx = gx;
 		this->gy = gy;
@@ -271,6 +322,50 @@ public:
 
 
 						}
+					}
+				}
+			}
+		}
+
+		CarveCaves(chunkData, gx, gy, gz, lod);
+	}
+	inline void CarveCaves(ChunkData* chunkData, int gx, int gy, int gz, int lod = 1) {
+		const int baseWX = gx * chunkSize;
+		const int baseWY = gy * chunkSize;
+		const int baseWZ = gz * chunkSize;
+
+		const float surfaceThreshold = 0.45f; 
+		const float deepThreshold = 0.28f;
+		const int   surfaceWorldY = 220;
+		const int   deepWorldY = 40; 
+
+		for (int x = 0; x < chunkSize; x += lod) {
+			for (int y = 0; y < chunkSize; y += lod) {
+				int worldY = baseWY + y;
+				for (int z = 0; z < chunkSize; z += lod) {
+					uint16_t& cell = chunkData->terrain[IDX(x, y, z, chunkSize)];
+
+					if (cell != 2 && cell != 5) continue;
+
+					int worldX = baseWX + x;
+					int worldZ = baseWZ + z;
+
+					float wx = (float)worldX;
+					float wy = (float)worldY;
+					float wz = (float)worldZ;
+
+					float broad = perlin_noise_3d(
+						wx * caveScale, wy * caveScale, wz * caveScale);
+					float detail = perlin_noise_3d(
+						wx * caveDetailScale, wy * caveDetailScale, wz * caveDetailScale);
+
+					float cave = broad * 0.75f + detail * 0.25f;
+					float t = Math::Clamp((float)(surfaceWorldY - worldY) /
+						(float)(surfaceWorldY - deepWorldY), 0.f, 1.f);
+					float threshold = Lerp(surfaceThreshold, deepThreshold, t);
+
+					if (cave > threshold) {
+						cell = 0;
 					}
 				}
 			}
