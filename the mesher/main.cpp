@@ -48,6 +48,7 @@ class App {
 	StructureManager structureManager;
 	int maxMeshUpdate = 2;
 	int renderDistance = 500;
+	int drd = 0;
 public:
 	App() {
 		//Implement HiZ for meshlets
@@ -227,7 +228,7 @@ public:
 		}
 	}
 	inline void ChunkColumnRegenerate(int nx, int nz, bool clearChunkData = true, bool uploadData=true) {
-		int drd = 0;
+		drd = 0;
 		
 
 		int lod = 1;
@@ -803,6 +804,98 @@ public:
 		END_TIMER(upload)
 		shaders.display.UpdateSSBO(3, &world.handle, sizeof(world.handle), 0);
 		RecalculateParticlesFullDebug();
+		PreCalculateMesh();
+	}
+	void CallGPUMesh() {
+
+		if (drd > 0 && !viewPort.raytracePrimaryRays) {
+			shaders.display.UpdateSSBO(10, softwareRaster, drd * sizeof(Math::IVector3), 0);
+
+			auto batchUploadEnd = std::chrono::high_resolution_clock::now();
+			Anubis::GpuTimer mesh;
+			mesh.Start();
+			Anubis::SwitchShaderStage(shaders.generateMesh.programID);
+			shaders.generateMesh.SetInt(wx, "wx");
+			shaders.generateMesh.SetInt(wy, "wy");
+			shaders.generateMesh.SetInt(wz, "wz");
+			shaders.generateMesh.SetFloat(timeSpeed, "timeSpeed");
+			shaders.generateMesh.SetInt(resolution.width, "renderWidth");
+			shaders.generateMesh.SetInt(resolution.height, "renderHeight");
+			shaders.generateMesh.Use(drd, 1, 1);
+			glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT | GL_BUFFER_UPDATE_BARRIER_BIT);
+
+			constexpr GLintptr N = 1024 * 1024;
+			const GLintptr endOffset = sizeof(int) + N * sizeof(int);
+
+			glBindBuffer(GL_SHADER_STORAGE_BUFFER, shaders.display.ssboIds[9]);
+
+			glGetBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, sizeof(int), &totalMeshletCount);
+
+			std::vector<int> begin(drd), end(drd);
+			glGetBufferSubData(GL_SHADER_STORAGE_BUFFER, sizeof(int),
+				drd * sizeof(int), begin.data());
+			glGetBufferSubData(GL_SHADER_STORAGE_BUFFER, endOffset,
+				drd * sizeof(int), end.data());
+
+			glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
+			if (totalMeshletCount * 64 > 59259259) {
+				std::cout << "Buffer overflow \n";
+			}
+
+			totalTriangleCount = totalMeshletCount * 64 + 64;
+
+			for (int i = 0; i < drd; i++) {
+
+
+				int id = softwareRaster[i].y * (wx * wz) + softwareRaster[i].z * wx + softwareRaster[i].x;
+				chunks[id].beginningTri = begin[i];
+				chunks[id].endTri = end[i];
+			}
+		}
+	}
+	void PreCalculateMesh() {
+		drd = 0;
+		Math::IVector3 *queue = (Math::IVector3*)MemAlloc(wx * wz * wy*sizeof(Math::IVector3));
+		int queueCounter = 0;
+		for (int i = 0; i < maxMeshUpdate; i++) {
+			for (int x = 0; x < wx; x++) {
+				for (int z = 0; z < wz; z++) {
+					if (world.array[x][z]) {
+						bool neighborsLoaded =
+							x > 0 && x < wx - 1 && z > 0 && z < wz - 1 &&
+							world.array[x - 1][z] && world.array[x + 1][z] && world.array[x][z - 1] && world.array[x][z + 1];
+
+						if (neighborsLoaded) {
+
+							for (int ny = 0; ny < wy; ny++) {
+								int id = ny * (wx * wz) + z * wx + x;
+								if (!world.chunkData[id].updated && world.chunkData[id].voxelCount != 0) {
+									if (world.chunkData[id].voxelCount != 0 && !world.chunkData[id].skipped && !chunks[id].hardwareRasterize) {
+										queue[queueCounter] = { chunks[id].gx,chunks[id].gy,chunks[id].gz };
+										queueCounter++;
+									}
+								}
+							}
+						}
+					}
+
+				}
+			}
+		}
+		drd = 0;
+		for (int i = 0; i < queueCounter; i++) {
+			softwareRaster[drd] = queue[drd];
+			drd++;
+			if (drd == 1024 * 1024-1) {
+				CallGPUMesh();
+				drd = 0;
+			}
+		}
+		if (drd > 0) {
+			CallGPUMesh();
+			drd = 0;
+		}
+		free(queue);
 	}
 	void Run(bool pregenerate=false) {
 		const std::vector<Color> palette = {
@@ -987,7 +1080,7 @@ public:
 
 			}
 			oldChunkPos = currentChunkPos;
-			int drd = 0;
+			drd = 0;
 			Vector3 rayCastPos = pos;
 			bool hitDeadEnd = false;
 			for (int i = 0; i < 100; i++) {
@@ -1412,53 +1505,7 @@ public:
 				}
 			}
 			if (drd > 0 && !viewPort.raytracePrimaryRays) {
-				shaders.display.UpdateSSBO(10, softwareRaster, drd * sizeof(Math::IVector3), 0);
-
-				auto batchUploadEnd = std::chrono::high_resolution_clock::now();
-				Anubis::GpuTimer mesh;
-				mesh.Start();
-				Anubis::SwitchShaderStage(shaders.generateMesh.programID);
-				shaders.generateMesh.SetVector3({ pos.x,pos.y,pos.z }, "camPos");
-				shaders.generateMesh.SetVector3({ forward.x,forward.y,forward.z }, "camForward");
-				shaders.generateMesh.SetMatrix({ matView.m0,matView.m1,matView.m2,matView.m3,matView.m4,matView.m5,matView.m6,matView.m7,matView.m8,matView.m9,matView.m10,matView.m11,matView.m12,matView.m13,matView.m14,matView.m15 }, "matView");
-				shaders.generateMesh.SetMatrix({ matProj.m0,matProj.m1,matProj.m2,matProj.m3,matProj.m4,matProj.m5,matProj.m6,matProj.m7,matProj.m8,matProj.m9,matProj.m10,matProj.m11,matProj.m12,matProj.m13,matProj.m14,matProj.m15 }, "matProj");
-				shaders.generateMesh.SetInt(wx, "wx");
-				shaders.generateMesh.SetInt(wy, "wy");
-				shaders.generateMesh.SetInt(wz, "wz");
-				shaders.generateMesh.SetFloat(timeSpeed, "timeSpeed");
-				shaders.generateMesh.SetInt(resolution.width, "renderWidth");
-				shaders.generateMesh.SetInt(resolution.height, "renderHeight");
-				shaders.generateMesh.SetInt(frame, "frameIndex");
-				shaders.generateMesh.Use(drd, 1, 1);
-				glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT | GL_BUFFER_UPDATE_BARRIER_BIT);
-
-				constexpr GLintptr N = 1024 * 1024;
-				const GLintptr endOffset = sizeof(int) + N * sizeof(int);
-
-				glBindBuffer(GL_SHADER_STORAGE_BUFFER, shaders.display.ssboIds[9]);
-
-				glGetBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, sizeof(int), &totalMeshletCount);
-
-				std::vector<int> begin(drd), end(drd);
-				glGetBufferSubData(GL_SHADER_STORAGE_BUFFER, sizeof(int),
-					drd * sizeof(int), begin.data());
-				glGetBufferSubData(GL_SHADER_STORAGE_BUFFER, endOffset,
-					drd * sizeof(int), end.data());
-
-				glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
-				if (totalMeshletCount * 64 > 59259259) {
-					std::cout << "Buffer overflow \n";
-				}
-				
-				totalTriangleCount = totalMeshletCount * 64 + 64;
-
-				for (int i = 0; i < drd; i++) {
-					
-
-					int id = softwareRaster[i].y * (wx * wz) + softwareRaster[i].z * wx + softwareRaster[i].x;
-					chunks[id].beginningTri = begin[i];
-					chunks[id].endTri = end[i];
-				}
+				CallGPUMesh();
 			}
 			offfr++;
 			

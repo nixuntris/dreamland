@@ -51,7 +51,7 @@ struct ShaderManager {
 		clouds.Setup(path("Clouds.glsl").c_str());
 		bilboards.Setup(path("bilboard.glsl").c_str());
 		prepassPrimaryRays.Setup(path("PrePassPrimary.glsl").c_str());
-		rasterizeAnimatedObjects.Setup("RasterizeAnimatedObjects.glsl");
+		rasterizeAnimatedObjects.Setup(path("RasterizeAnimatedObjects.glsl"));
 	}
 
 };
