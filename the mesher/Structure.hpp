@@ -1,5 +1,14 @@
 #pragma once
-#include "Chunk.hpp"
+#include <cinttypes>
+#include "Anubis/AnubisShaders.hpp"
+#include "Anubis/Anubis.hpp"
+#include "Misc.hpp"
+#include <algorithm>
+#include <unordered_map>
+#include <vector>
+#include <chrono>
+#include <iostream>
+#include <omp.h>
 
 struct StructureDataHolder {
 	uint16_t* values;
@@ -288,7 +297,7 @@ auto addSphereVariants = [&](Structure* structure) {
 
 	structure->variantCount = structure->variants.size();
 };
-class StructureManager {
+class StructureManager { //should store all the data but also handle the structure editor and viewer, which it currently doesn't 
 public:
 	int selectedStructure = 0;
 	Anubis::Window* windowHandle;
@@ -299,7 +308,7 @@ public:
 		addTreeVariants(&structureList[0], 24, 48);
 		structureList[1].Create("rock");
 		addRockVariants(&structureList[1], 3, 5);
-		structureList[0].Create("Sphere");
+		structureList[2].Create("Sphere");
 		addSphereVariants(&structureList[2]);
 		ImGui::SetNextWindowPos(ImVec2(40, 40), ImGuiCond_FirstUseEver);
 		ImGui::SetNextWindowSize(ImVec2(520, 480), ImGuiCond_FirstUseEver);
@@ -348,4 +357,25 @@ public:
 		ImGui::End();
 	}
 	
+};
+
+struct AnimatedObject {
+	int animationFrameTick; //how many frames need to happen for the animation tick to update
+	int currentAnimationTick;
+	Math::Vector3 position;
+	int objectType;
+	AnimatedObject(Math::Vector3 position, int animationFrameTick, int object) {
+		this->position = position;
+		this->animationFrameTick = animationFrameTick;
+		this->currentAnimationTick = 2;
+		this->objectType = object;
+	}
+	void Update(int frame, StructureManager *structureManager) {
+		if (frame % this->animationFrameTick == 0) {
+		//	this->currentAnimationTick++;
+		}//
+
+		if (currentAnimationTick >= structureManager->structureList[objectType].variants.size()) currentAnimationTick = 0;
+
+	}
 };

@@ -5,6 +5,17 @@
 #include "Anubis/AnubisMath.hpp"
 #include <sys/stat.h> 
 
+enum VOXEL_ENUM_NAMES {
+	GRASS = 1,   // palette[0]
+	STONE = 2,   // palette[1]
+	DIRT = 3,   // palette[2]
+	WOOD = 4,   // palette[3]
+	LEAVES = 5,   // palette[4]
+	SNOW = 6,   // palette[5]
+	WATER = 7,   // palette[6]
+	SAND = 9,   // palette[8]
+	OLIVE = 10   // palette[9]
+};
 struct ShaderManager {
 	Anubis::DisplayShader display;
 	Anubis::DisplayShader hwRender;

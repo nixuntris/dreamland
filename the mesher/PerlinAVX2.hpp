@@ -38,7 +38,7 @@ static const int perm[512] = {
     222,114,67,29,24,72,243,141,128,195,78,66,215,61,156,180
 };
 
-static inline __m256 fade(__m256 t) {
+const static inline __m256 fade(__m256 t) {
     // 6t^5 - 15t^4 + 10t^3
     __m256 t3 = _mm256_mul_ps(t, _mm256_mul_ps(t, t));
     __m256 six = _mm256_set1_ps(6.0f);
@@ -49,12 +49,12 @@ static inline __m256 fade(__m256 t) {
     return _mm256_mul_ps(t3, b);                      // t^3 * b
 }
 
-static inline __m256 lerp(__m256 t, __m256 a, __m256 b) {
+const static inline __m256 lerp(__m256 t, __m256 a, __m256 b) {
     return _mm256_fmadd_ps(t, _mm256_sub_ps(b, a), a);
 }
 
 // Gradient function for 8 lanes at once, using integer hash + lookup gather
-static inline __m256 grad8(__m256i hash, __m256 x, __m256 y) {
+const static inline __m256 grad8(__m256i hash, __m256 x, __m256 y) {
     // h & 7 gives one of 8 gradient directions
     __m256i h = _mm256_and_si256(hash, _mm256_set1_epi32(7));
 
@@ -76,7 +76,7 @@ static inline __m256 grad8(__m256i hash, __m256 x, __m256 y) {
 }
 
 // Gather permutation values for 8 integer indices (scalar fallback, since perm table is tiny and cache-resident)
-static inline __m256i perm_lookup8(__m256i idx) {
+const static inline __m256i perm_lookup8(__m256i idx) {
     int32_t tmp[8], out[8];
     _mm256_storeu_si256((__m256i*)tmp, idx);
     for (int i = 0; i < 8; i++) out[i] = perm[tmp[i] & 511];
@@ -84,7 +84,7 @@ static inline __m256i perm_lookup8(__m256i idx) {
 }
 
 // Compute 2D Perlin noise for 8 (x,y) points packed in AVX registers
-inline __m256 perlin2d_avx2(__m256 x, __m256 y) {
+const inline __m256 perlin2d_avx2(__m256 x, __m256 y) {
     __m256 floorx = _mm256_floor_ps(x);
     __m256 floory = _mm256_floor_ps(y);
 
@@ -124,7 +124,7 @@ inline __m256 perlin2d_avx2(__m256 x, __m256 y) {
     return lerp(v, x1, x2); // result in [-1, 1]
 }
 
-inline void perlin2d_array_avx2(const float* xs, const float* ys, float* out, int n) {
+const inline void perlin2d_array_avx2(const float* xs, const float* ys, float* out, int n) {
     int i = 0;
     for (; i + 8 <= n; i += 8) {
         __m256 x = _mm256_loadu_ps(xs + i);
@@ -133,15 +133,15 @@ inline void perlin2d_array_avx2(const float* xs, const float* ys, float* out, in
         _mm256_storeu_ps(out + i, r);
     }
 }
-static inline float fade_scalar(float t) {
+const static inline float fade_scalar(float t) {
     return t * t * t * (t * (t * 6.0f - 15.0f) + 10.0f);
 }
 
-static inline float lerp_scalar(float t, float a, float b) {
+const static inline float lerp_scalar(float t, float a, float b) {
     return a + t * (b - a);
 }
 
-static inline float grad_scalar(int hash, float x, float y) {
+const static inline float grad_scalar(int hash, float x, float y) {
     int h = hash & 7;
     float u = (h < 4) ? x : y;
     float v = (h < 4) ? y : x;
@@ -150,7 +150,7 @@ static inline float grad_scalar(int hash, float x, float y) {
     return su + sv;
 }
 
-inline float perlin_noise_2d(float x, float y) {
+const inline float perlin_noise_2d(float x, float y) {
     float floorx = floorf(x);
     float floory = floorf(y);
 
@@ -188,14 +188,14 @@ inline float perlin_noise_2d(float x, float y) {
     return lerp_scalar(v, x1, x2);
 }
 // 3D gradient hash
-inline static float grad3d(int hash, float x, float y, float z) {
+const inline static float grad3d(int hash, float x, float y, float z) {
     int h = hash & 15;
     float u = h < 8 ? x : y;
     float v = h < 4 ? y : h == 12 || h == 14 ? x : z;
     return ((h & 1) == 0 ? u : -u) + ((h & 2) == 0 ? v : -v);
 }
 
-inline float perlin_noise_3d(float x, float y, float z) {
+const inline float perlin_noise_3d(float x, float y, float z) {
     int X = (int)floorf(x) & 255;
     int Y = (int)floorf(y) & 255;
     int Z = (int)floorf(z) & 255;

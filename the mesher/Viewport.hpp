@@ -21,7 +21,7 @@ struct ViewPort {
 		shaders->display.SetVector4({ 1.0f, 1.0f, 1.0f, 1.0f }, "color");
 
 	}
-	void FrustumCull(Matrix matView, Vector3 pos, Vector3 forward, int totalMeshletCount) {
+	inline void FrustumCull(Matrix matView, Vector3 pos, Vector3 forward, int totalMeshletCount) {
 
 		ExtractFrustumPlanes(matView, planes);
 
@@ -42,7 +42,7 @@ struct ViewPort {
 
 		shaders->frustumCull.Use(totalMeshletCount / 32, 1, 1);
 	}
-	void RenderClouds(Matrix matView, int frame, Vector3 pos, Vector3 forward, Math::IVector2 resolution, float timeSpeed) {
+	inline void RenderClouds(Matrix matView, int frame, Vector3 pos, Vector3 forward, Math::IVector2 resolution, float timeSpeed) {
 		Anubis::SwitchShaderStage(shaders->clouds.programID);
 		shaders->clouds.SetVector3({ pos.x,pos.y,pos.z }, "camPos");
 		shaders->clouds.SetVector3({ forward.x,forward.y,forward.z }, "camForward");
@@ -57,7 +57,7 @@ struct ViewPort {
 		shaders->clouds.SetInt(frame, "frameIndex");
 		shaders->clouds.Use(resolution.width / 32, resolution.height / 32, 1);
 	}
-	void SecondaryRays(int sampleCount, Matrix matView, Vector3 pos, Vector3 forward, const std::vector<uint32_t> palette, int frame, float timeSpeed, Math::IVector2 resolution, World* world) {
+	inline void SecondaryRays(int sampleCount, Matrix matView, Vector3 pos, Vector3 forward, const std::vector<uint32_t> palette, int frame, float timeSpeed, Math::IVector2 resolution, World* world) {
 
 		Anubis::SwitchShaderStage(shaders->secondaryRaysRender.programID);
 		shaders->secondaryRaysRender.SetVector3({ pos.x,pos.y,pos.z }, "camPos");
@@ -77,7 +77,7 @@ struct ViewPort {
 
 		shaders->secondaryRaysRender.SetUIntArray(palette.data(), palette.size(), "packedColors");
 	}
-	void RasterizeMeshes(Matrix matView, Vector3 pos, Vector3 forward, const std::vector<uint32_t> palette, int frame, int triangleCount, Math::IVector2 resolution) {
+	inline void RasterizeMeshes(Matrix matView, Vector3 pos, Vector3 forward, const std::vector<uint32_t> palette, int frame, int triangleCount, Math::IVector2 resolution) {
 		if (raytracePrimaryRays) {
 
 			Anubis::SwitchShaderStage(shaders->prepassPrimaryRays.programID);
@@ -131,7 +131,7 @@ struct ViewPort {
 		}
 
 	}
-	void RenderGrass(Matrix matView, Vector3 pos, Vector3 forward, int frame, Math::IVector2 resolution, int grass) {
+	inline void RenderGrass(Matrix matView, Vector3 pos, Vector3 forward, int frame, Math::IVector2 resolution, int grass) {
 
 		Anubis::SwitchShaderStage(shaders->grassRenderer.programID);
 		shaders->grassRenderer.SetVector3({ pos.x,pos.y,pos.z }, "camPos");
@@ -147,5 +147,24 @@ struct ViewPort {
 		shaders->grassRenderer.SetFloatArray(planeDs, 6, "planeDs");
 		shaders->grassRenderer.SetInt(frame, "frameIndex");
 		shaders->grassRenderer.Use(grass / 64, 1, 1);
+	}
+	inline void RenderAnimatedObject(Matrix matView, AnimatedObject *object, Vector3 pos, Vector3 forward, int frame, const std::vector<uint32_t> palette, Math::IVector2 resolution, StructureManager *structureManager) {
+		Anubis::SwitchShaderStage(shaders->rasterizeAnimatedObjects.programID);
+		shaders->rasterizeAnimatedObjects.SetVector3({ pos.x,pos.y,pos.z }, "camPos");
+		shaders->rasterizeAnimatedObjects.SetVector3({ forward.x,forward.y,forward.z }, "camForward");
+		shaders->rasterizeAnimatedObjects.SetMatrix({ matView.m0,matView.m1,matView.m2,matView.m3,matView.m4,matView.m5,matView.m6,matView.m7,matView.m8,matView.m9,matView.m10,matView.m11,matView.m12,matView.m13,matView.m14,matView.m15 }, "matView");
+		shaders->rasterizeAnimatedObjects.SetMatrix({ matProj.m0,matProj.m1,matProj.m2,matProj.m3,matProj.m4,matProj.m5,matProj.m6,matProj.m7,matProj.m8,matProj.m9,matProj.m10,matProj.m11,matProj.m12,matProj.m13,matProj.m14,matProj.m15 }, "matProj");
+		shaders->rasterizeAnimatedObjects.SetInt(wx, "wx");
+		shaders->rasterizeAnimatedObjects.SetInt(wy, "wy");
+		shaders->rasterizeAnimatedObjects.SetInt(wz, "wz");
+		shaders->rasterizeAnimatedObjects.SetUIntArray(palette.data(), palette.size(), "packedColors");
+		shaders->rasterizeAnimatedObjects.SetInt(resolution.width * renderPercentage, "renderWidth");
+		shaders->rasterizeAnimatedObjects.SetInt(resolution.height * renderPercentage, "renderHeight");
+		shaders->rasterizeAnimatedObjects.SetInt(frame, "frameIndex");
+		shaders->rasterizeAnimatedObjects.SetInt(0, "offset");
+		StructureDataHolder* data = structureManager->structureList[object->objectType].GetSpecificVariant(object->currentAnimationTick);
+		shaders->rasterizeAnimatedObjects.SetUVec2(data->map.handle, "handle");
+		shaders->rasterizeAnimatedObjects.SetVector3({ object->position.x - data->map.size.x / 2,object->position.y - data->map.size.y / 2,object->position.z - data->map.size.z / 2 }, "renderPosition");
+		shaders->rasterizeAnimatedObjects.Use(data->map.size.x/4, data->map.size.y/4, data->map.size.z/4);
 	}
 };

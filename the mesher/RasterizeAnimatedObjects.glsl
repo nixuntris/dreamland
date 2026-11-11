@@ -104,7 +104,6 @@ uint hashVec3(vec3 v) {
     h = (h ^ (h >> 13)) * 1274126177u;
     return h ^ (h >> 16);
 }
-uniform int offset;
 
 void DrawQuadSoftwareCS(
     vec2 v0,
@@ -172,13 +171,13 @@ void DrawQuadSoftwareCS(
         }
     }
 }
-const vec3 faceN[6] = vec3[6](
-    vec3( 0, 0,-1),
-    vec3( 0, 0, 1),
-    vec3(-1, 0, 0),
-    vec3( 1, 0, 0),
-    vec3( 0, 1, 0),
-    vec3( 0,-1, 0) 
+const ivec3 faceN[6] = ivec3[6](
+    ivec3( 0, 0,-1),
+    ivec3( 0, 0, 1),
+    ivec3(-1, 0, 0),
+    ivec3( 1, 0, 0),
+    ivec3( 0, 1, 0),
+    ivec3( 0,-1, 0) 
 );
 uniform vec3 renderPosition;
 void main()
@@ -209,6 +208,7 @@ void main()
         color = packRGBA8(hr);
     }
     for (int i = 0; i < 6; i++) {
+        if (imageLoad(fluidMap,voxelId+faceN[i])[0]!=0) continue;
         
         vec3 v1 = baseP+verticesr[tris[i][0]];
         vec3 v2 = baseP+verticesr[tris[i][1]];

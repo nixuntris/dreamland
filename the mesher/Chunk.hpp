@@ -10,6 +10,9 @@
 #include <chrono>
 #include <iostream>
 #include <omp.h>
+#include "Structure.hpp"
+
+#include "Misc.hpp"
 #define IDX(x,y,z,size) ((x) + (y) * size + (z) * size * size)
 #define INDEX(x, y, z, width, height) ((x) + (y) * (width) + (z) * (width) * (height))
 #define FACE_FRONT  (1 << 0)
@@ -20,17 +23,6 @@
 #define FACE_BOTTOM (1 << 5)
 const int FACES[6] = { FACE_FRONT,FACE_BACK,FACE_LEFT,FACE_RIGHT,FACE_TOP,FACE_BOTTOM };
 
-enum VOXEL_ENUM_NAMES {
-	GRASS = 1,   // palette[0]
-	STONE = 2,   // palette[1]
-	DIRT = 3,   // palette[2]
-	WOOD = 4,   // palette[3]
-	LEAVES = 5,   // palette[4]
-	SNOW = 6,   // palette[5]
-	WATER = 7,   // palette[6]
-	SAND = 9,   // palette[8]
-	OLIVE = 10   // palette[9]
-};
 struct ChunkData {
 	bool skipped = false;
 	int lod;
@@ -50,7 +42,7 @@ const int mwy = 32;
 const int mwz = 300;
 
 struct World {
-
+	std::vector<AnimatedObject> animatedObjects;
 	bool array[mwx][mwz];
 	uint8_t setLod[mwx][mwz];
 	struct GlobalHandle {
@@ -121,9 +113,6 @@ public:
 		case MOUNTAIN:
 			GenerateMountains(chunkData, generationData, gx, gy, gz,lod, grass); //the problem is grass, specifically if it's set to true, it makes the program randomly hang after generation
 			break;	
-		case CAVES:
-			GenerateCaves(chunkData, gx, gy, gz, lod); 
-			break;
 		}
 	}
 	inline void GenerateSavanna(ChunkData* chunkData, GenerationData generationData, int gx, int gy, int gz, int lod = 1, bool grass = false) {
@@ -206,29 +195,38 @@ public:
 		const int baseWX = gx * chunkSize;
 		const int baseWY = gy * chunkSize;
 		const int baseWZ = gz * chunkSize;
+		float noiseValues[chunkSize/4][chunkSize/4][chunkSize / 4];
+		for (int x = 0; x < chunkSize / 4; x ++) {
 
-		for (int x = 0; x < chunkSize; x += lod) {
-			for (int y = 0; y < chunkSize; y += lod) {
+			int worldX = baseWX + x * 4;
+			for (int y = 0; y < chunkSize/4; y++) {
+				int worldY = baseWY + y * 4;
+				for (int z = 0; z < chunkSize / 4; z++) {
+
+					int worldZ = baseWZ + z * 4;
+
+					float broad = perlin_noise_3d(
+						worldX * caveScale,
+						worldY * caveScale,
+						worldZ * caveScale
+					);
+					float detail = perlin_noise_3d(
+						worldX * caveDetailScale,
+						worldY * caveDetailScale,
+						worldZ * caveDetailScale
+					);
+					noiseValues[x][y][z] = broad * 0.75f + detail * 0.25f;
+				}
+			}
+		}
+		for (int x = 0; x < chunkSize; x ++) {
+			for (int y = 0; y < chunkSize; y ++) {
 				int worldY = baseWY + y;
-				for (int z = 0; z < chunkSize; z += lod) {
+				for (int z = 0; z < chunkSize; z ++) {
 					int worldX = baseWX + x;
 					int worldZ = baseWZ + z;
 
-					float wx = (float)worldX;
-					float wy = (float)worldY;
-					float wz = (float)worldZ;
-
-					float broad = perlin_noise_3d(
-						wx * caveScale,
-						wy * caveScale,
-						wz * caveScale
-					);
-					float detail = perlin_noise_3d(
-						wx * caveDetailScale,
-						wy * caveDetailScale,
-						wz * caveDetailScale
-					);
-					float cave = broad * 0.75f + detail * 0.25f;
+					float cave = noiseValues[x/4][y/4][z/4];
 
 					chunkData->terrain[IDX(x, y, z, chunkSize)] = (cave > 0.32f)*STONE;
 				}
@@ -327,7 +325,7 @@ public:
 			}
 		}
 
-		CarveCaves(chunkData, gx, gy, gz, lod);
+//		CarveCaves(chunkData, gx, gy, gz, lod);
 	}
 	inline void CarveCaves(ChunkData* chunkData, int gx, int gy, int gz, int lod = 1) {
 		const int baseWX = gx * chunkSize;
@@ -339,10 +337,34 @@ public:
 		const int   surfaceWorldY = 220;
 		const int   deepWorldY = 40; 
 
-		for (int x = 0; x < chunkSize; x += lod) {
-			for (int y = 0; y < chunkSize; y += lod) {
+		float noiseValues[chunkSize / 4][chunkSize / 4][chunkSize / 4];
+		for (int x = 0; x < chunkSize / 4; x++) {
+
+			int worldX = baseWX + x * 4;
+			for (int y = 0; y < chunkSize / 4; y++) {
+				int worldY = baseWY + y * 4;
+				for (int z = 0; z < chunkSize / 4; z++) {
+
+					int worldZ = baseWZ + z * 4;
+
+					float broad = perlin_noise_3d(
+						worldX * caveScale,
+						worldY * caveScale,
+						worldZ * caveScale
+					);
+					float detail = perlin_noise_3d(
+						worldX * caveDetailScale,
+						worldY * caveDetailScale,
+						worldZ * caveDetailScale
+					);
+					noiseValues[x][y][z] = broad * 0.75f + detail * 0.25f;
+				}
+			}
+		}
+		for (int x = 0; x < chunkSize; x += 1) {
+			for (int y = 0; y < chunkSize; y += 1) {
 				int worldY = baseWY + y;
-				for (int z = 0; z < chunkSize; z += lod) {
+				for (int z = 0; z < chunkSize; z += 1) {
 					uint16_t& cell = chunkData->terrain[IDX(x, y, z, chunkSize)];
 
 					if (cell != 2 && cell != 5) continue;
@@ -354,12 +376,7 @@ public:
 					float wy = (float)worldY;
 					float wz = (float)worldZ;
 
-					float broad = perlin_noise_3d(
-						wx * caveScale, wy * caveScale, wz * caveScale);
-					float detail = perlin_noise_3d(
-						wx * caveDetailScale, wy * caveDetailScale, wz * caveDetailScale);
-
-					float cave = broad * 0.75f + detail * 0.25f;
+					float cave = noiseValues[x/4][y/4][z/4];
 					float t = Math::Clamp((float)(surfaceWorldY - worldY) /
 						(float)(surfaceWorldY - deepWorldY), 0.f, 1.f);
 					float threshold = Lerp(surfaceThreshold, deepThreshold, t);

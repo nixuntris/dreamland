@@ -493,8 +493,8 @@ public:
 
 			ImGui::Spacing();
 			ImGui::Text("World Type");
-			const char* typeNames[] = { "Mountains", "Savanna", "Desert","Caves"};
-			for (int i = 0; i < 4; ++i) {
+			const char* typeNames[] = { "Mountains", "Savanna", "Desert"};
+			for (int i = 0; i < 3; ++i) {
 				bool selected = (worldTypeIndex == i);
 				
 				if (selected) ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.2f, 0.55f, 0.9f, 1.0f));
@@ -510,10 +510,6 @@ public:
 						case 2:
 							selectedType = DESERT;
 							break;
-						case 3:
-							selectedType = CAVES;
-							break;
-
 					}
 
 				}
@@ -659,9 +655,9 @@ public:
 				for (int y = gen.lowestChunkY; y < gen.highestChunkY && y < wy; y++) {
 					chunks[y * (wx * wz) + nz * wx + nx].GeneratePerType(selectedType,&world.chunkData[y * (wx * wz) + nz * wx + nx], gen, nx, y, nz, lod, grass);
 				};
-				for (int y = 0; y < gen.lowestChunkY; y++) {
-					chunks[y * (wx * wz) + nz * wx + nx].GeneratePerType(CAVES, &world.chunkData[y * (wx * wz) + nz * wx + nx], gen, nx, y, nz, lod, false);
-				}
+	//			for (int y = 0; y < gen.lowestChunkY; y++) {
+		//			chunks[y * (wx * wz) + nz * wx + nx].GeneratePerType(CAVES, &world.chunkData[y * (wx * wz) + nz * wx + nx], gen, nx, y, nz, lod, false);
+			//	}
 				int base = 0;
 				int cy = gen.highestChunkY - 2;
 				#define SET_VOXEL(x, y, z, block) do { \
@@ -674,8 +670,10 @@ public:
 
 				auto spawnTree = [&](int dx, int dy, int dz) {
 					StructureDataHolder* tree = structureManager.structureList[0].GetRandomVariant();
+					AnimatedObject ao({ (float)dx+nx*32,(float)dy,(float)dz+nz*32}, 5, 0);
+					world.animatedObjects.push_back(ao);
 					
-					uint8_t* positions = tree->positions;
+					/*uint8_t* positions = tree->positions;
 					uint16_t* values = tree->values;
 					for (int i = 0; i < tree->voxelCount; i++) {
 
@@ -684,7 +682,7 @@ public:
 						int z = positions[i * 3 + 2];
 						uint16_t type = values[i];
 						SET_VOXEL(dx + x, dy + y, dz + z, type);
-					}
+					}*/
 				};
 				if (selectedType == MOUNTAIN) {
 					for (int i = 0; i < Math::GetRandomValueStreamlinedFast(0, 4); i++) {
@@ -693,7 +691,7 @@ public:
 						int baseY = gen.heightMap[dx + dz * chunkSize];
 						if (baseY > 250) continue;
 						
-						spawnTree(dx, baseY, dz);
+						spawnTree(dx, baseY+32, dz);
 
 					}
 
@@ -702,7 +700,7 @@ public:
 					world.handle.handle[y * (wx * wz) + nz * wx + nx].lod = 32;
 					world.handle.handle[y * (wx * wz) + nz * wx + nx].filled = 1;
 				}
-				for (int y = 0; y < gen.highestChunkY && y < wy; y++) {
+				for (int y = gen.lowestChunkY; y < gen.highestChunkY && y < wy; y++) {
 					if (!world.chunkData[y * (wx * wz) + nz * wx + nx].skipped) {
 						chunks[y * (wx * wz) + nz * wx + nx].GenerateLod(&world.chunkData[y * (wx * wz) + nz * wx + nx], nx, y, nz);
 						chunks[y * (wx * wz) + nz * wx + nx].Compress(&world.chunkData[y * (wx * wz) + nz * wx + nx]);
@@ -861,7 +859,6 @@ public:
 		drd = 0;
 		Math::IVector3 *queue = (Math::IVector3*)MemAlloc(wx * wz * wy*sizeof(Math::IVector3));
 		int queueCounter = 0;
-		for (int i = 0; i < maxMeshUpdate; i++) {
 			for (int x = 0; x < wx; x++) {
 				for (int z = 0; z < wz; z++) {
 					if (world.array[x][z]) {
@@ -869,7 +866,7 @@ public:
 							x > 0 && x < wx - 1 && z > 0 && z < wz - 1 &&
 							world.array[x - 1][z] && world.array[x + 1][z] && world.array[x][z - 1] && world.array[x][z + 1];
 
-						if (neighborsLoaded) {
+						if (neighborsLoaded || x<=0|| z <=0 || z>=wz || x>=wx) {
 
 							for (int ny = 0; ny < wy; ny++) {
 								int id = ny * (wx * wz) + z * wx + x;
@@ -885,7 +882,6 @@ public:
 
 				}
 			}
-		}
 		drd = 0;
 		for (int i = 0; i < queueCounter; i++) {
 			softwareRaster[drd] = queue[drd];
@@ -957,7 +953,6 @@ public:
 		bool releasedMouseButton = false;
 		Math::IVector3 chunksUpdatedThisFrame[100];
 		int chunkCount = 0;
-		int currentAnimationFrame = 0;
 		
 		while (window.IsOpen()) {
 			double frameStart = glfwGetTime();
@@ -1011,29 +1006,13 @@ public:
 			viewPort.RasterizeMeshes(matView, pos, forward, ColorPallete, frame, triangleCount, resolution);
 			trianglesRendered = triangleCount;
 			rasterTimeMs = raster.Stop();
-			if (frame % 5 ==0) {
-				currentAnimationFrame++;
-				
+			for (auto &t : world.animatedObjects) {
+
+				viewPort.RenderAnimatedObject(matView, &t, pos, forward, frame, ColorPallete, resolution, &structureManager);
 			}
-			
-			Anubis::SwitchShaderStage(shaders.rasterizeAnimatedObjects.programID);
-			shaders.rasterizeAnimatedObjects.SetVector3({ pos.x,pos.y,pos.z }, "camPos");
-			shaders.rasterizeAnimatedObjects.SetVector3({ forward.x,forward.y,forward.z }, "camForward");
-			shaders.rasterizeAnimatedObjects.SetMatrix({ matView.m0,matView.m1,matView.m2,matView.m3,matView.m4,matView.m5,matView.m6,matView.m7,matView.m8,matView.m9,matView.m10,matView.m11,matView.m12,matView.m13,matView.m14,matView.m15 }, "matView");
-			shaders.rasterizeAnimatedObjects.SetMatrix({ matProj.m0,matProj.m1,matProj.m2,matProj.m3,matProj.m4,matProj.m5,matProj.m6,matProj.m7,matProj.m8,matProj.m9,matProj.m10,matProj.m11,matProj.m12,matProj.m13,matProj.m14,matProj.m15 }, "matProj");
-			shaders.rasterizeAnimatedObjects.SetInt(wx, "wx");
-			shaders.rasterizeAnimatedObjects.SetInt(wy, "wy");
-			shaders.rasterizeAnimatedObjects.SetInt(wz, "wz");
-			shaders.rasterizeAnimatedObjects.SetUIntArray(ColorPallete.data(), ColorPallete.size(), "packedColors");
-			shaders.rasterizeAnimatedObjects.SetInt(resolution.width* viewPort.renderPercentage, "renderWidth");
-			shaders.rasterizeAnimatedObjects.SetInt(resolution.height* viewPort.renderPercentage, "renderHeight");
-			shaders.rasterizeAnimatedObjects.SetInt(frame, "frameIndex");
-			shaders.rasterizeAnimatedObjects.SetInt(0, "offset");
-			if (currentAnimationFrame >= structureManager.structureList[2].variants.size()) currentAnimationFrame = 0;
-			StructureDataHolder* data = structureManager.structureList[2].GetSpecificVariant(currentAnimationFrame);
-			shaders.rasterizeAnimatedObjects.SetUVec2(data->map.handle, "handle");
-			shaders.rasterizeAnimatedObjects.SetVector3({ wx * 16.0f-data->map.size.x/2,250.0f - data->map.size.y / 2,wz * 16.0f - data->map.size.z / 2 }, "renderPosition");
-			shaders.rasterizeAnimatedObjects.Use(ceil(float(data->map.size.x)/4.0f), ceil(float(data->map.size.y)/4.0f), ceil(float(data->map.size.z)/4.0f));
+			for (auto& t : world.animatedObjects) {
+				t.Update(frame, &structureManager);
+			}
 			Anubis::GpuTimer grassT;
 			grassT.Start();
 			if (graphicsSettings.grassRender && grass > 0) {
