@@ -1624,7 +1624,6 @@ public:
 				ImGui::SliderFloat("Render Percentage", &viewPort.renderPercentage, 0.1f, 1.0f);
 				ImGui::SliderInt("Max Mesh Gen Per Frame", &maxMeshUpdate, 1, 40);
 				CustomToggle("Render grass", &graphicsSettings.grassRender);
-				CustomToggle("Hardware/Software rendering", &graphicsSettings.hardwareSoftwareRendering);
 				CustomToggle("Secondary rays", &graphicsSettings.secondaryRays);
 				int oldSampleCount = sampleCount;
 				ImGui::SliderInt("Sample Count", &sampleCount, 1, 9);
@@ -1651,14 +1650,8 @@ public:
 				if (ImGui::Button("Recompile shaders")) {
 					shaders.Load();
 				}
-				CustomToggle("God mode", &graphicsSettings.godMode);
-				CustomToggle("Simulate Physics", &graphicsSettings.simulatePhysics);
-				CustomToggle("Render Fluids", &graphicsSettings.renderFluids);
 				CustomToggle("Render Clouds", &graphicsSettings.renderClouds);
 				CustomToggle("Raytrace/Rasterize", &viewPort.raytracePrimaryRays);
-
-				CustomToggle("Low Res/High res", &graphicsSettings.renderResolution);
-				CustomToggle("FXAA/No FXAA", &graphicsSettings.FXAA);
 
 				ImGui::Separator();
 				ImGui::TextColored(ImVec4(1, 1, 0, 1), "Performance Metrics:");
