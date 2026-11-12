@@ -73,8 +73,21 @@ void main()
     
     ivec3 voxelId = ivec3(gl_GlobalInvocationID.xyz);
     uimage3D fluidMap = uimage3D(handle);
-    uint r = imageLoad(fluidMap, voxelId).x;
-      
+   
+    uint r = 0;
+    if (handle != uvec2(0)) {
+        uimage3D fluidMap = uimage3D(handle);
+        bool pending = true;
+        while (anyInvocationARB(pending)) {
+            if (pending) {
+                uvec2 cur = uvec2(readFirstInvocationARB(handle.x), readFirstInvocationARB(handle.y));
+                if (handle == cur) {
+                    r = imageLoad(uimage3D(cur), voxelId).x;
+                    pending = false;
+                }
+            }
+        }
+    }  
     vec3 baseP = renderPosition+voxelId;
     if (r==255) {
         setVoxelData(ivec3(baseP),0);

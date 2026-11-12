@@ -4,7 +4,7 @@
 #include "Anubis/AnubisShaders.hpp"
 #include "Anubis/AnubisMath.hpp"
 #include <sys/stat.h> 
-
+const int maxAnimationBatch = 128;
 enum VOXEL_ENUM_NAMES {
 	GRASS = 1,   // palette[0]
 	STONE = 2,   // palette[1]

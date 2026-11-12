@@ -1009,13 +1009,24 @@ public:
 			viewPort.RasterizeMeshes(matView, pos, forward, ColorPallete, frame, triangleCount, resolution);
 			trianglesRendered = triangleCount;
 			rasterTimeMs = raster.Stop();
+			AnimatedObject objects[maxAnimationBatch];
+			int objectQueue = 0;
+			for (int t = 0; t < world.animatedObjects.size(); t++) {
+				objects[objectQueue] = world.animatedObjects[t];
+				objectQueue++;
+				if (objectQueue >= maxAnimationBatch) {
+					viewPort.RenderAnimatedObject(matView, objects, objectQueue, pos, forward, frame, ColorPallete, resolution, &structureManager);
 
-			for (auto &t : world.animatedObjects) { 
-
-				viewPort.RenderAnimatedObject(matView, &t, pos, forward, frame, ColorPallete, resolution, &structureManager);
+					objectQueue = 0;
+				}
 			}
+			if (objectQueue >= maxAnimationBatch) {
+				viewPort.RenderAnimatedObject(matView, objects, objectQueue, pos, forward, frame, ColorPallete, resolution, &structureManager);
+
+				objectQueue = 0;
+			}
+
 			if (frame % treeAnimationUpdate==0) {
-				std::cout << "Animation frame tick\n";
 				for (auto& t : world.animatedObjects) {
 					t.Update(frame, &structureManager);
 				}

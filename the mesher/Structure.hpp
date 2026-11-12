@@ -367,6 +367,11 @@ struct AnimatedObject {
 	int objectType;
 	int oldAnimationTick;
 	bool animationFrameUpdated;
+	AnimatedObject()
+		: animationFrameTick(0), currentAnimationTick(0),
+		objectType(0), oldAnimationTick(0),
+		animationFrameUpdated(false) {
+	}
 	AnimatedObject(Math::Vector3 position, int animationFrameTick, int object) {
 		this->position = position;
 		this->animationFrameTick = animationFrameTick;

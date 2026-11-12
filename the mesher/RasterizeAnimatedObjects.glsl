@@ -179,7 +179,11 @@ const ivec3 faceN[6] = ivec3[6](
     ivec3( 0, 1, 0),
     ivec3( 0,-1, 0) 
 );
-uniform vec3 renderPosition;
+uniform int batchChangeGetter;
+uniform int variantWorkSize; //data->map.size.x / 4, data->map.size.y / 4,data->map.size.z / 4
+const int batchSize = 128;
+uniform vec3 renderPosition[batchSize];
+//assuming each one is the same model, ideally it should take a uniform of ivec3 positions to render multiple models at once instead of only one per draw call
 void main()
 {
     
@@ -187,11 +191,25 @@ void main()
     vec2 SCREEN_MAX = vec2(float(renderWidth), float(renderHeight));
     
     ivec3 voxelId = ivec3(gl_GlobalInvocationID.xyz);
+    int batchId = int(gl_GlobalInvocationID.x) / variantWorkSize;
+    voxelId.x = int(gl_GlobalInvocationID.x) % variantWorkSize;
     uimage3D fluidMap = uimage3D(handle);
-    uint r = imageLoad(fluidMap, voxelId).x;
-      
+    uint r = 0;
+    if (handle != uvec2(0)) {
+        uimage3D fluidMap = uimage3D(handle);
+        bool pending = true;
+        while (anyInvocationARB(pending)) {
+            if (pending) {
+                uvec2 cur = uvec2(readFirstInvocationARB(handle.x), readFirstInvocationARB(handle.y));
+                if (handle == cur) {
+                    r = imageLoad(uimage3D(cur), voxelId).x;
+                    pending = false;
+                }
+            }
+        }
+    } 
     float m15reproc = 1.0 / matView[3][3];
-    vec3 baseP = renderPosition+voxelId;
+    vec3 baseP = renderPosition[batchId]+voxelId;
     int distance = int(dot(baseP-camPos, camForward));
 
     uint hash = hashVec3(baseP);
