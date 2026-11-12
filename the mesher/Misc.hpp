@@ -14,7 +14,8 @@ enum VOXEL_ENUM_NAMES {
 	SNOW = 6,   // palette[5]
 	WATER = 7,   // palette[6]
 	SAND = 9,   // palette[8]
-	OLIVE = 10   // palette[9]
+	OLIVE = 10,   // palette[9]
+	LIGHT_BARRIER = 255
 };
 struct ShaderManager {
 	Anubis::DisplayShader display;
@@ -32,6 +33,8 @@ struct ShaderManager {
 	Anubis::ComputeShader primaryRays;
 	Anubis::ComputeShader prepassPrimaryRays;
 	Anubis::ComputeShader rasterizeAnimatedObjects;
+	Anubis::ComputeShader setAnimatedObjects;
+	Anubis::ComputeShader clearAnimatedObjects;
 	void Load() {
 
 		std::string shaderDir = "";
@@ -63,6 +66,8 @@ struct ShaderManager {
 		bilboards.Setup(path("bilboard.glsl").c_str());
 		prepassPrimaryRays.Setup(path("PrePassPrimary.glsl").c_str());
 		rasterizeAnimatedObjects.Setup(path("RasterizeAnimatedObjects.glsl"));
+		setAnimatedObjects.Setup(path("SetAnimatedData.glsl"));
+		clearAnimatedObjects.Setup(path("ClearAnimatedData.glsl"));
 	}
 
 };

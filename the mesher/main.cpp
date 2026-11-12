@@ -18,7 +18,7 @@
 #include "Structure.hpp"
 #include "ParticleManager.hpp"
 #include "Viewport.hpp"
-const bool gpuMeshing = true;
+bool spawnAnimatedObjects = true;
 const int maxGPUBatch = 1024 * 1024;
 const int maxGrassCount = 1449303 * 2;
 
@@ -70,27 +70,22 @@ public:
 		shaders.display.CreateSSBO(0, sizeof(uint32_t) * 3840 * 2160 * 6);
 		int maxSSBOCount = 0;
 		glGetIntegerv(GL_MAX_SHADER_STORAGE_BUFFER_BINDINGS, &maxSSBOCount);
-		if (gpuMeshing) {
-			shaders.display.CreatePersistentSSBO(9, sizeof(int) * 2+1024*1024*2*sizeof(int));
-			shaders.display.CreateSSBO(10, maxGPUBatch * sizeof(Math::IVector3));
-			softwareRaster = (Math::IVector3*)(MemAlloc(1024 * 1024 * sizeof(Math::IVector3)));
-		}
+		shaders.display.CreatePersistentSSBO(9, sizeof(int) * 2+1024*1024*2*sizeof(int));
+		shaders.display.CreateSSBO(10, maxGPUBatch * sizeof(Math::IVector3));
+		softwareRaster = (Math::IVector3*)(MemAlloc(1024 * 1024 * sizeof(Math::IVector3)));
 		IMGUI_CHECKVERSION();
 		ImGui::CreateContext();
 		ImGuiIO& io = ImGui::GetIO();
 		io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
 		ImGui::StyleColorsDark();
 
-		if (firstGen && gpuMeshing) {
-			std::cout << "gpu meshing on\n";
-			totalTriangleCount = 59259259/2;
-			totalMeshletCount = totalTriangleCount/64;
-			shaders.display.CreatePersistentSSBO(5, (totalMeshletCount + 1) * sizeof(int) * 8);
-			shaders.display.CreatePersistentSSBO(2, totalTriangleCount * sizeof(uint32_t) * 8);
-			shaders.display.CreatePersistentSSBO(6, totalTriangleCount * sizeof(uint32_t) * 8);
-			shaders.display.CreatePersistentSSBO(7, totalMeshletCount * 6 * sizeof(float) * 8);
-			firstGen = false;
-		}
+		totalTriangleCount = 59259259/2;
+		totalMeshletCount = totalTriangleCount/64;
+		shaders.display.CreatePersistentSSBO(5, (totalMeshletCount + 1) * sizeof(int) * 8);
+		shaders.display.CreatePersistentSSBO(2, totalTriangleCount * sizeof(uint32_t) * 8);
+		shaders.display.CreatePersistentSSBO(6, totalTriangleCount * sizeof(uint32_t) * 8);
+		shaders.display.CreatePersistentSSBO(7, totalMeshletCount * 6 * sizeof(float) * 8);
+		firstGen = false;
 		shaders.display.CreateSSBO(20, maxGrassCount * 3 * sizeof(float));
 		ImGui_ImplGlfw_InitForOpenGL(window.GetWindowHandle(), true);
 		ImGui_ImplOpenGL3_Init("#version 460");
@@ -648,7 +643,7 @@ public:
 
 				GenerationData gen;
 				gen.GenerateMountains(nx, nz);
-				gen.highestChunkY += 2;
+				gen.highestChunkY += 3;
 				for (int y = 0; y < wy; y++) {
 					world.chunkData[y * (wx * wz) + nz * wx + nx].lod = 0;
 				}
@@ -669,20 +664,35 @@ public:
 				} while (0)
 
 				auto spawnTree = [&](int dx, int dy, int dz) {
-					StructureDataHolder* tree = structureManager.structureList[0].GetRandomVariant();
-					AnimatedObject ao({ (float)dx+nx*32,(float)dy,(float)dz+nz*32}, 5, 0);
-					world.animatedObjects.push_back(ao);
 					
-					/*uint8_t* positions = tree->positions;
-					uint16_t* values = tree->values;
-					for (int i = 0; i < tree->voxelCount; i++) {
+					if (lod != 1 || !spawnAnimatedObjects) {
+						StructureDataHolder* tree = structureManager.structureList[0].GetRandomVariant();
+						uint8_t* positions = tree->positions;
+						uint16_t* values = tree->values;
+						for (int i = 0; i < tree->voxelCount; i++) {
 
-						int x = positions[i * 3 + 0];
-						int y = positions[i * 3 + 1];
-						int z = positions[i * 3 + 2];
-						uint16_t type = values[i];
-						SET_VOXEL(dx + x, dy + y, dz + z, type);
-					}*/
+							int x = positions[i * 3 + 0];
+							int y = positions[i * 3 + 1];
+							int z = positions[i * 3 + 2];
+							uint16_t type = values[i];
+							SET_VOXEL(dx + x, dy + y, dz + z, type);
+						}
+					}
+					else {
+						StructureDataHolder* tree = structureManager.structureList[0].GetSpecificVariant(2);
+						uint8_t* positions = tree->positions;
+						uint16_t* values = tree->values;
+						for (int i = 0; i < tree->voxelCount; i++) {
+
+							int x = positions[i * 3 + 0];
+							int y = positions[i * 3 + 1];
+							int z = positions[i * 3 + 2];
+							uint16_t type = values[i];
+							SET_VOXEL(dx + x, dy + y, dz + z, 255);
+						}
+						AnimatedObject ao({ (float)dx + nx * 32,(float)dy + 32,(float)dz + nz * 32 }, 5, 0);
+						world.animatedObjects.push_back(ao);
+					}
 				};
 				if (selectedType == MOUNTAIN) {
 					for (int i = 0; i < Math::GetRandomValueStreamlinedFast(0, 4); i++) {
@@ -691,7 +701,7 @@ public:
 						int baseY = gen.heightMap[dx + dz * chunkSize];
 						if (baseY > 250) continue;
 						
-						spawnTree(dx, baseY+32, dz);
+						spawnTree(dx, baseY, dz);
 
 					}
 
@@ -1006,6 +1016,7 @@ public:
 			viewPort.RasterizeMeshes(matView, pos, forward, ColorPallete, frame, triangleCount, resolution);
 			trianglesRendered = triangleCount;
 			rasterTimeMs = raster.Stop();
+			std::cout << world.animatedObjects.size() << "\n";
 			for (auto &t : world.animatedObjects) {
 
 				viewPort.RenderAnimatedObject(matView, &t, pos, forward, frame, ColorPallete, resolution, &structureManager);
@@ -1019,6 +1030,10 @@ public:
 				viewPort.RenderGrass(matView, pos, forward, frame, resolution, grass);
 			}
 
+			for (auto& t : world.animatedObjects) {
+
+				viewPort.SetAnimatedObjectData(&t, &structureManager);
+			}
 			if (graphicsSettings.secondaryRays) {
 
 				secondaryRays.Start();
@@ -1027,6 +1042,11 @@ public:
 			auto secondaryRaysMs = secondaryRays.Stop();
 			if (graphicsSettings.renderClouds) {
 				viewPort.RenderClouds(matView, frame, pos, forward, resolution, timeSpeed);
+			}
+
+			for (auto& t : world.animatedObjects) {
+				
+				viewPort.ClearAnimatedObjectData(&t, &structureManager);
 			}
 			auto grassTimeMs = grassT.Stop();
 			START_TIMER(physicsAllocator)

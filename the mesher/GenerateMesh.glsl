@@ -84,6 +84,7 @@ uint readVoxelData(ivec3 pos) {
                 }
             }
         }
+        if (r==255) return 0;
         return r;
     }
     return 0u;

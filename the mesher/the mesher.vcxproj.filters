@@ -166,6 +166,12 @@
     <None Include="RasterizeAnimatedObjects.glsl">
       <Filter>Source Files\Shaders\Rasterizer\Meshlets</Filter>
     </None>
+    <None Include="SetAnimatedData.glsl">
+      <Filter>Source Files\Shaders\Raytracing\Illumination</Filter>
+    </None>
+    <None Include="ClearAnimatedData.glsl">
+      <Filter>Source Files\Shaders\Raytracing\Illumination</Filter>
+    </None>
   </ItemGroup>
   <ItemGroup>
     <Text Include="caves.txt">

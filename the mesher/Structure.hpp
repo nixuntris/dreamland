@@ -45,6 +45,7 @@ struct Structure {
 	int variantCount;
 	std::vector<StructureDataHolder*> variants;
 	std::string name;
+	
 	void Create(std::string name) {
 		this->name = name;
 	}

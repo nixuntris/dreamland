@@ -152,6 +152,7 @@
     <None Include="..\readme.md" />
     <None Include="Anubis\BaseShaders\quad_display_shader.vs" />
     <None Include="bilboard.glsl" />
+    <None Include="ClearAnimatedData.glsl" />
     <None Include="Clouds.glsl" />
     <None Include="desert.txt" />
     <None Include="fes.fs" />
@@ -168,6 +169,7 @@
     <None Include="renderAABB.glsl" />
     <None Include="HizBuilder.glsl" />
     <None Include="SecondaryRays.glsl" />
+    <None Include="SetAnimatedData.glsl" />
     <None Include="tree.voxobj" />
     <None Include="ver.vs" />
   </ItemGroup>

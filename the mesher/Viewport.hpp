@@ -148,7 +148,7 @@ struct ViewPort {
 		shaders->grassRenderer.SetInt(frame, "frameIndex");
 		shaders->grassRenderer.Use(grass / 64, 1, 1);
 	}
-	inline void RenderAnimatedObject(Matrix matView, AnimatedObject *object, Vector3 pos, Vector3 forward, int frame, const std::vector<uint32_t> palette, Math::IVector2 resolution, StructureManager *structureManager) {
+	const inline void RenderAnimatedObject(Matrix matView, AnimatedObject* object, Vector3 pos, Vector3 forward, int frame, const std::vector<uint32_t> palette, Math::IVector2 resolution, StructureManager* structureManager) {
 		Anubis::SwitchShaderStage(shaders->rasterizeAnimatedObjects.programID);
 		shaders->rasterizeAnimatedObjects.SetVector3({ pos.x,pos.y,pos.z }, "camPos");
 		shaders->rasterizeAnimatedObjects.SetVector3({ forward.x,forward.y,forward.z }, "camForward");
@@ -165,6 +165,26 @@ struct ViewPort {
 		StructureDataHolder* data = structureManager->structureList[object->objectType].GetSpecificVariant(object->currentAnimationTick);
 		shaders->rasterizeAnimatedObjects.SetUVec2(data->map.handle, "handle");
 		shaders->rasterizeAnimatedObjects.SetVector3({ object->position.x - data->map.size.x / 2,object->position.y - data->map.size.y / 2,object->position.z - data->map.size.z / 2 }, "renderPosition");
-		shaders->rasterizeAnimatedObjects.Use(data->map.size.x/4, data->map.size.y/4, data->map.size.z/4);
+		shaders->rasterizeAnimatedObjects.Use(data->map.size.x / 4, data->map.size.y / 4, data->map.size.z / 4);
+	}
+	const inline void ClearAnimatedObjectData(AnimatedObject* object, StructureManager* structureManager) {
+		Anubis::SwitchShaderStage(shaders->clearAnimatedObjects.programID);
+		shaders->clearAnimatedObjects.SetInt(wx, "wx");
+		shaders->clearAnimatedObjects.SetInt(wy, "wy");
+		shaders->clearAnimatedObjects.SetInt(wz, "wz");
+		StructureDataHolder* data = structureManager->structureList[object->objectType].GetSpecificVariant(object->currentAnimationTick);
+		shaders->clearAnimatedObjects.SetUVec2(data->map.handle, "handle");
+		shaders->clearAnimatedObjects.SetVector3({ object->position.x - data->map.size.x / 2,object->position.y - data->map.size.y / 2,object->position.z - data->map.size.z / 2 }, "renderPosition");
+		shaders->clearAnimatedObjects.Use(data->map.size.x / 4, data->map.size.y / 4, data->map.size.z / 4);
+	}
+	const inline void SetAnimatedObjectData(AnimatedObject* object, StructureManager* structureManager) {
+		Anubis::SwitchShaderStage(shaders->setAnimatedObjects.programID);
+		shaders->setAnimatedObjects.SetInt(wx, "wx");
+		shaders->setAnimatedObjects.SetInt(wy, "wy");
+		shaders->setAnimatedObjects.SetInt(wz, "wz");
+		StructureDataHolder* data = structureManager->structureList[object->objectType].GetSpecificVariant(object->currentAnimationTick);
+		shaders->setAnimatedObjects.SetUVec2(data->map.handle, "handle");
+		shaders->setAnimatedObjects.SetVector3({ object->position.x - data->map.size.x / 2,object->position.y - data->map.size.y / 2,object->position.z - data->map.size.z / 2 }, "renderPosition");
+		shaders->setAnimatedObjects.Use(data->map.size.x / 4, data->map.size.y / 4, data->map.size.z / 4);
 	}
 };
