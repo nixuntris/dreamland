@@ -21,7 +21,7 @@
 bool spawnAnimatedObjects = true;
 const int maxGPUBatch = 1024 * 1024;
 const int maxGrassCount = 1449303 * 2;
-
+const int treeAnimationUpdate = 150;
 class App {
 	Anubis::Window window;
 	Chunk* chunks;
@@ -690,7 +690,7 @@ public:
 							uint16_t type = values[i];
 							SET_VOXEL(dx + x, dy + y, dz + z, 255);
 						}
-						AnimatedObject ao({ (float)dx + nx * 32,(float)dy + 32,(float)dz + nz * 32 }, 5, 0);
+						AnimatedObject ao({ (float)dx + nx * 32,(float)dy + 32,(float)dz + nz * 32 }, treeAnimationUpdate, 0);
 						world.animatedObjects.push_back(ao);
 					}
 				};
@@ -872,19 +872,12 @@ public:
 			for (int x = 0; x < wx; x++) {
 				for (int z = 0; z < wz; z++) {
 					if (world.array[x][z]) {
-						bool neighborsLoaded =
-							x > 0 && x < wx - 1 && z > 0 && z < wz - 1 &&
-							world.array[x - 1][z] && world.array[x + 1][z] && world.array[x][z - 1] && world.array[x][z + 1];
-
-						if (neighborsLoaded || x<=0|| z <=0 || z>=wz || x>=wx) {
-
-							for (int ny = 0; ny < wy; ny++) {
-								int id = ny * (wx * wz) + z * wx + x;
-								if (!world.chunkData[id].updated && world.chunkData[id].voxelCount != 0) {
-									if (world.chunkData[id].voxelCount != 0 && !world.chunkData[id].skipped && !chunks[id].hardwareRasterize) {
-										queue[queueCounter] = { chunks[id].gx,chunks[id].gy,chunks[id].gz };
-										queueCounter++;
-									}
+						for (int ny = 0; ny < wy; ny++) {
+							int id = ny * (wx * wz) + z * wx + x;
+							if (!world.chunkData[id].updated && world.chunkData[id].voxelCount != 0) {
+								if (world.chunkData[id].voxelCount != 0 && !world.chunkData[id].skipped && !chunks[id].hardwareRasterize) {
+									queue[queueCounter] = { chunks[id].gx,chunks[id].gy,chunks[id].gz };
+									queueCounter++;
 								}
 							}
 						}
@@ -1016,24 +1009,32 @@ public:
 			viewPort.RasterizeMeshes(matView, pos, forward, ColorPallete, frame, triangleCount, resolution);
 			trianglesRendered = triangleCount;
 			rasterTimeMs = raster.Stop();
-			std::cout << world.animatedObjects.size() << "\n";
-			for (auto &t : world.animatedObjects) {
+
+			for (auto &t : world.animatedObjects) { 
 
 				viewPort.RenderAnimatedObject(matView, &t, pos, forward, frame, ColorPallete, resolution, &structureManager);
 			}
-			for (auto& t : world.animatedObjects) {
-				t.Update(frame, &structureManager);
+			if (frame % treeAnimationUpdate==0) {
+				std::cout << "Animation frame tick\n";
+				for (auto& t : world.animatedObjects) {
+					t.Update(frame, &structureManager);
+				}
+
+				for (auto& t : world.animatedObjects) {
+					if (t.animationFrameUpdated) {
+						viewPort.SetAnimatedObjectData(&t, &structureManager);
+						t.animationFrameUpdated = false;
+					}
+
+				}
 			}
+			
 			Anubis::GpuTimer grassT;
 			grassT.Start();
 			if (graphicsSettings.grassRender && grass > 0) {
 				viewPort.RenderGrass(matView, pos, forward, frame, resolution, grass);
 			}
 
-			for (auto& t : world.animatedObjects) {
-
-				viewPort.SetAnimatedObjectData(&t, &structureManager);
-			}
 			if (graphicsSettings.secondaryRays) {
 
 				secondaryRays.Start();
@@ -1043,10 +1044,12 @@ public:
 			if (graphicsSettings.renderClouds) {
 				viewPort.RenderClouds(matView, frame, pos, forward, resolution, timeSpeed);
 			}
+			if (frame % treeAnimationUpdate == 0) {
 
-			for (auto& t : world.animatedObjects) {
-				
-				viewPort.ClearAnimatedObjectData(&t, &structureManager);
+				for (auto& t : world.animatedObjects) {
+
+					viewPort.ClearAnimatedObjectData(&t, &structureManager);
+				}
 			}
 			auto grassTimeMs = grassT.Stop();
 			START_TIMER(physicsAllocator)

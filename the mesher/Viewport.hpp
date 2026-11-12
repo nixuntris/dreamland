@@ -172,7 +172,7 @@ struct ViewPort {
 		shaders->clearAnimatedObjects.SetInt(wx, "wx");
 		shaders->clearAnimatedObjects.SetInt(wy, "wy");
 		shaders->clearAnimatedObjects.SetInt(wz, "wz");
-		StructureDataHolder* data = structureManager->structureList[object->objectType].GetSpecificVariant(object->currentAnimationTick);
+		StructureDataHolder* data = structureManager->structureList[object->objectType].GetSpecificVariant(object->oldAnimationTick);
 		shaders->clearAnimatedObjects.SetUVec2(data->map.handle, "handle");
 		shaders->clearAnimatedObjects.SetVector3({ object->position.x - data->map.size.x / 2,object->position.y - data->map.size.y / 2,object->position.z - data->map.size.z / 2 }, "renderPosition");
 		shaders->clearAnimatedObjects.Use(data->map.size.x / 4, data->map.size.y / 4, data->map.size.z / 4);

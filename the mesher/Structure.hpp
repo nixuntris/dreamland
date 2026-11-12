@@ -365,16 +365,19 @@ struct AnimatedObject {
 	int currentAnimationTick;
 	Math::Vector3 position;
 	int objectType;
+	int oldAnimationTick;
+	bool animationFrameUpdated;
 	AnimatedObject(Math::Vector3 position, int animationFrameTick, int object) {
 		this->position = position;
 		this->animationFrameTick = animationFrameTick;
 		this->currentAnimationTick = 2;
+		this->oldAnimationTick = this->currentAnimationTick;
 		this->objectType = object;
+		animationFrameUpdated = true;
 	}
 	void Update(int frame, StructureManager *structureManager) {
-		if (frame % this->animationFrameTick == 0) {
-		//	this->currentAnimationTick++;
-		}//
+		this->oldAnimationTick = this->currentAnimationTick;
+		this->currentAnimationTick++;
 
 		if (currentAnimationTick >= structureManager->structureList[objectType].variants.size()) currentAnimationTick = 0;
 
