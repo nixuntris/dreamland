@@ -301,9 +301,9 @@ auto addSphereVariants = [&](Structure* structure) {
 class StructureManager { //should store all the data but also handle the structure editor and viewer, which it currently doesn't 
 public:
 	int selectedStructure = 0;
-	Anubis::Window* windowHandle;
 	Structure structureList[1024];
 	int structureCount = 0;
+	int choosenVariant = 0;
 	inline void Init() {
 		structureList[0].Create("tree");
 		addTreeVariants(&structureList[0], 24, 48);
@@ -330,8 +330,11 @@ public:
 				ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.2f, 0.55f, 0.9f, 1.0f));
 			}
 			if (ImGui::Button(structureList[i].name.c_str(), ImVec2(-1, 0))) {
+				if (i != selectedStructure) {
+					choosenVariant = 0;
+				}
 				selectedStructure = i;
-				std::cout << i << "\n";
+				
 			}
 			if (selected) ImGui::PopStyleColor();
 			ImGui::PopID();
@@ -353,6 +356,27 @@ public:
 		dl->AddRectFilled(rectMin, rectMax, IM_COL32(30, 30, 36, 255), 6.0f);
 		dl->AddRect(rectMin, rectMax, IM_COL32(80, 80, 90, 255), 6.0f, 0, 2.0f);
 
+		int gridW = structureList[selectedStructure].variants[0]->width;
+		int gridH = structureList[selectedStructure].variants[0]->height;
+		float cellW = avail.x / gridW;
+		float cellH = avail.y / gridH;
+
+		dl->PushClipRect(rectMin, rectMax, true);
+
+		for (int gy = 0; gy < gridH; ++gy) {
+			for (int gx = 0; gx < gridW; ++gx) {
+				const bool even = ((gx + gy) & 1) == 0;
+				ImU32 col = even ? IM_COL32(45, 45, 55, 255)
+					: IM_COL32(60, 60, 72, 255);
+
+				ImVec2 a(rectMin.x + gx * cellW, rectMin.y + gy * cellH);
+				ImVec2 b(rectMin.x + (gx + 1) * cellW, rectMin.y + (gy + 1) * cellH);
+				dl->AddRectFilled(a, b, col);
+			}
+		}
+
+		dl->AddRectFilled({ 0,0 }, { 50,50 }, IM_COL32(255, 255, 255, 255), 0);
+		dl->PopClipRect();
 		ImGui::EndChild();
 
 		ImGui::End();

@@ -60,6 +60,7 @@ uint readVoxelData(ivec3 pos, inout int lod) {
                 }
             }
         }
+        if (r==254 || r==255) return 0;
         return r;
     }
     return 0u;

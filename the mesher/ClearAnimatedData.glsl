@@ -89,7 +89,5 @@ void main()
         }
     }  
     vec3 baseP = renderPosition+voxelId;
-    if (r==255) {
         setVoxelData(ivec3(baseP),0);
-    }
 }

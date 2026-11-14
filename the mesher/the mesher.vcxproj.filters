@@ -66,9 +66,7 @@
     <ClCompile Include="AnubisOpengl.cpp">
       <Filter>Source Files\Abstraction Layer\Opengl</Filter>
     </ClCompile>
-    <ClCompile Include="main.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
+    <ClCompile Include="main.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="SoftwareRasterizer.h">

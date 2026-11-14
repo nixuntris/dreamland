@@ -24,6 +24,7 @@
 const int FACES[6] = { FACE_FRONT,FACE_BACK,FACE_LEFT,FACE_RIGHT,FACE_TOP,FACE_BOTTOM };
 
 struct ChunkData {
+	bool shortenedData = false;
 	bool skipped = false;
 	int lod;
 	Anubis::GPUONLYShortMap fluidShortMap;
@@ -70,6 +71,30 @@ struct World {
 		chunkData.clear();
 		chunkData.reserve(0);
 	}
+
+	uint16_t ReadVoxel(int x, int y, int z) {
+		int chunkX = x / chunkSize;
+		int chunkY = y / chunkSize;
+		int chunkZ = z / chunkSize;
+		int localX = x % chunkSize;
+		int localY = y % chunkSize;
+		int localZ = z % chunkSize;
+		int voxelId = IDX(localX, localY, localZ, chunkSize);
+		int chunkId = chunkY * (wx * wz) + chunkZ * wx + chunkX;
+		if (chunkData[chunkId].lod == 32) {
+			return 1;
+		}
+		if (chunkData[chunkId].voxelCount != 0 && chunkData[chunkId].lod != 32 && chunkData[chunkId].lod != 0) {
+			if (chunkData[chunkId].shortenedData) {
+				return chunkData[chunkId].compressedTerrain[voxelId];
+			}
+			else if (chunkData[chunkId].compressed) {
+				return chunkData[chunkId].palette[voxelId];
+			}
+			return chunkData[chunkId].terrain[voxelId];
+		}
+		return 0;
+	}
 };
 long globalMemUsage = 0;
 long afterGlobalMemUsage = 0;
@@ -101,8 +126,8 @@ public:
 	int endTri;
 	int beginningTri;
 	std::vector<Vector3> grassList;
-	bool shortenedData = false;
 	inline void GeneratePerType(CHUNKTYPE type, ChunkData* chunkData, GenerationData generationData, int gx, int gy, int gz, int lod = 1, bool grass = false) {
+		
 		switch (type) {
 		case DESERT:
 			GenerateDesert(chunkData, generationData, gx, gy, gz, lod, grass);
@@ -281,8 +306,13 @@ public:
 			chunkData->skipped = true;
 			return;
 		}
-		chunkData->terrain = (uint16_t*)MemAlloc(chunkSize * chunkSize * chunkSize * sizeof(uint16_t));
+		
+		//wondering whether it should be a flag or what, i am feeling iffy about directly generating as compressed data, but also at the same time why not?
+		//I want to keep it as simple as possible so that I don't hard code cases but also it's still c++... maybe leave desert more general as it's cheaper?
 
+
+		chunkData->compressedTerrain = (uint8_t*)MemAlloc(chunkSize * chunkSize * chunkSize * sizeof(uint8_t));
+		chunkData->shortenedData = true;
 		for (uint8_t x = 0; x < chunkSize; x += 1) {
 			for (uint8_t z = 0; z < chunkSize; z += 1) {
 				int terrainHeight = generationData.heightMap[x + z * chunkSize];
@@ -290,17 +320,17 @@ public:
 				for (int y = chunkSize - 1; y >= 0; y -= 1) {
 					int worldY = gy * chunkSize + y;
 					if (worldY < terrainHeight - 6) {
-						chunkData->terrain[
+						chunkData->compressedTerrain[
 							IDX(x, y, z, chunkSize)
 						] = 2; // stone
 
 					}
 					else if (worldY < terrainHeight) {
 						if (worldY < 200 + grassLineOffset) {
-							chunkData->terrain[
+							chunkData->compressedTerrain[
 								IDX(x, y, z, chunkSize)
 							] = 5; //dirt
-							if (chunkData->terrain[
+							if (chunkData->compressedTerrain[
 								IDX(x, y + 1, z, chunkSize)
 							] == 0) {
 								if ((x + y + Math::GetRandomValueStreamlinedFast(-1, 1)) % 2 == 0 && grass) grassList.push_back({ (float)x + gx * chunkSize,(float)y + gy * chunkSize,(float)z + gz * chunkSize });
@@ -308,13 +338,13 @@ public:
 						}
 						else if (worldY < 400 + grassLineOffset) {
 
-							chunkData->terrain[
+							chunkData->compressedTerrain[
 								IDX(x, y, z, chunkSize)
 							] = 2; //stone
 
 						}
 						else {
-							chunkData->terrain[
+							chunkData->compressedTerrain[
 								IDX(x, y, z, chunkSize)
 							] = 6; //snow
 
@@ -324,8 +354,6 @@ public:
 				}
 			}
 		}
-
-//		CarveCaves(chunkData, gx, gy, gz, lod);
 	}
 	inline void CarveCaves(ChunkData* chunkData, int gx, int gy, int gz, int lod = 1) {
 		const int baseWX = gx * chunkSize;
@@ -389,51 +417,94 @@ public:
 		}
 	}
 	inline void GenerateLod(ChunkData* chunkData, int gx, int gy, int gz) {
-		
 		voxelCount = 0;
-		for (int i = 0; i < chunkSize * chunkSize * chunkSize; i++) {
-			voxelCount += chunkData->terrain[i] != 0;
-		}
-		chunkData->voxelCount = voxelCount;
-		if (voxelCount == 0) {
-			free(chunkData->terrain);
-			voxelCount = 0;
-			return;
-		}
-		if (lod != 1) {
-			START_TIMER(lod_generation)
-			uint16_t* lodVals = (uint16_t*)MemAlloc(this->size * this->size * this->size * sizeof(uint16_t));
+		if (chunkData->shortenedData || chunkData->compressed) {
+			for (int i = 0; i < chunkSize * chunkSize * chunkSize; i++) {
+				voxelCount += chunkData->compressedTerrain[i] != 0;
+			}
+			chunkData->voxelCount = voxelCount;
+			if (voxelCount == 0) {
+				free(chunkData->compressedTerrain);
+				voxelCount = 0;
+				return;
+			}
+			if (lod != 1) {
+				START_TIMER(lod_generation)
+				uint8_t* lodVals = (uint8_t*)MemAlloc(this->size * this->size * this->size * sizeof(uint8_t));
 
-			for (int x = 0; x < this->size; x++) {
-				for (int z = 0; z < this->size; z++) {
-					for (int y = 0; y < this->size; y++) {
-						for (int cx = 0; cx < this->lod; cx++) {
-							for (int cy = 0; cy < this->lod; cy++) {
-								for (int cz = 0; cz < this->lod; cz++) {
-									if (chunkData->terrain[IDX(x * this->lod + cx, y * this->lod + cy, z * this->lod + cz, chunkSize)] != 0) {
-										lodVals[IDX(x, y, z, this->size)] = chunkData->terrain[IDX(x * this->lod + cx, y * this->lod + cy, z * this->lod + cz, chunkSize)];
-										break;
-										break;
-										break;
+				for (int x = 0; x < this->size; x++) {
+					for (int z = 0; z < this->size; z++) {
+						for (int y = 0; y < this->size; y++) {
+							for (int cx = 0; cx < this->lod; cx++) {
+								for (int cy = 0; cy < this->lod; cy++) {
+									for (int cz = 0; cz < this->lod; cz++) {
+										if (chunkData->compressedTerrain[IDX(x * this->lod + cx, y * this->lod + cy, z * this->lod + cz, chunkSize)] != 0) {
+											lodVals[IDX(x, y, z, this->size)] = chunkData->compressedTerrain[IDX(x * this->lod + cx, y * this->lod + cy, z * this->lod + cz, chunkSize)];
+											break;
+											break;
+											break;
+										}
 									}
 								}
 							}
-						}
 
+						}
 					}
 				}
-			}
-			MemFree(chunkData->terrain);
+				MemFree(chunkData->compressedTerrain);
 
-			chunkData->terrain = lodVals;
+				chunkData->compressedTerrain = lodVals;
+			}
+			chunkData->lod = lod;
+			return;
 		}
-		chunkData->lod = lod;
+		else {
+			for (int i = 0; i < chunkSize * chunkSize * chunkSize; i++) {
+				voxelCount += chunkData->terrain[i] != 0;
+			}
+			chunkData->voxelCount = voxelCount;
+			if (voxelCount == 0) {
+				free(chunkData->terrain);
+				voxelCount = 0;
+				return;
+			}
+			if (lod != 1) {
+				START_TIMER(lod_generation)
+					uint16_t* lodVals = (uint16_t*)MemAlloc(this->size * this->size * this->size * sizeof(uint16_t));
+
+				for (int x = 0; x < this->size; x++) {
+					for (int z = 0; z < this->size; z++) {
+						for (int y = 0; y < this->size; y++) {
+							for (int cx = 0; cx < this->lod; cx++) {
+								for (int cy = 0; cy < this->lod; cy++) {
+									for (int cz = 0; cz < this->lod; cz++) {
+										if (chunkData->terrain[IDX(x * this->lod + cx, y * this->lod + cy, z * this->lod + cz, chunkSize)] != 0) {
+											lodVals[IDX(x, y, z, this->size)] = chunkData->terrain[IDX(x * this->lod + cx, y * this->lod + cy, z * this->lod + cz, chunkSize)];
+											break;
+											break;
+											break;
+										}
+									}
+								}
+							}
+
+						}
+					}
+				}
+				MemFree(chunkData->terrain);
+
+				chunkData->terrain = lodVals;
+			}
+			chunkData->lod = lod;
+		}
+		
 	}
 	inline void Compress(ChunkData* chunkData) {
 
 		if (voxelCount == 0) {
 			return;
 		}
+		if (chunkData->shortenedData) return;
 		chunkData->compressed = false;
 		bool over255 = true;
 		for (int i = 0; i < size * size * size; i++) {
@@ -449,7 +520,7 @@ public:
 				chunkData->compressedTerrain[i] = (uint8_t)chunkData->terrain[i];
 			}
 
-			shortenedData = true;
+			chunkData->shortenedData = true;
 
 			free(chunkData->terrain);
 			chunkData->terrain = NULL;
@@ -510,7 +581,7 @@ public:
 		int id = x + y * size + z * size * size;
 		bool set = false;
 		
-		if (shortenedData) {
+		if (chunkdata->shortenedData) {
 			if (chunkdata->compressedTerrain[id] == 0) {
 				voxelCount++;
 			}
@@ -571,11 +642,11 @@ public:
 				const int dstSize = size / 2;
 				if (dstSize == 0) break;
 
-				const bool srcIsByte = shortenedData || chunkData->compressed;
+				const bool srcIsByte = chunkData->shortenedData || chunkData->compressed;
 
 				auto sampleSource = [&](int sx, int sy, int sz) -> uint16_t {
 					int id = sx + sy * srcSize + sz * srcSize * srcSize;
-					if (shortenedData) {
+					if (chunkData->shortenedData) {
 						return chunkData->compressedTerrain[id];
 					}
 					if (chunkData->compressed) {
@@ -646,7 +717,7 @@ public:
 
 				voxelCount = 0;
 				const int total = dstSize * dstSize * dstSize;
-				if (shortenedData || chunkData->compressed) {
+				if (chunkData->shortenedData || chunkData->compressed) {
 					uint8_t* buf = chunkData->compressedTerrain;
 					for (int i = 0; i < total; i++) voxelCount += (buf[i] != 0);
 				}
@@ -670,7 +741,7 @@ public:
 		if (index<0 || index>size * size * size) return 0;
 		if (chunkData->voxelCount == 0) return 0;
 		if (chunkData->skipped) return 0;
-		if (shortenedData) {
+		if (chunkData->shortenedData) {
 			return chunkData->compressedTerrain[index];;
 
 		}
@@ -694,7 +765,7 @@ public:
 				MemFree(cd->terrain);
 				cd->terrain = NULL;
 			}
-			if (cd->compressedTerrain && (cd->compressed || shortenedData)) {
+			if (cd->compressedTerrain && (cd->compressed || cd->shortenedData)) {
 				MemFree(cd->compressedTerrain);
 				cd->compressedTerrain = NULL;
 			}
@@ -716,7 +787,7 @@ public:
 		cd->voxelCount = 0;
 		cd->updated = false;
 
-		shortenedData = false;
+		cd->shortenedData = false;
 		updated = false;
 		voxelCount = 0;
 		allocatedTriSize = 0;

@@ -6,7 +6,7 @@ struct Particle {
 	Math::Vector3 position;
 	uint32_t color;
 	Math::Vector3 targetPosition;
-	void (*update)(Particle&);
+	void (*update)(Particle&, World*world);
 };
 Math::Vector3 Vector3MoveTowards(Math::Vector3 v, Math::Vector3 target, float maxDistance)
 {
@@ -31,13 +31,18 @@ Math::Vector3 Vector3MoveTowards(Math::Vector3 v, Math::Vector3 target, float ma
 
 	return result;
 }
-void ExampleUpdate(Particle& p) {
-	p.position = Vector3MoveTowards(p.position, p.targetPosition, 3);
-	if (Vector3Distance({ (float)p.position.x, (float)p.position.y,(float)p.position.z }, { (float)p.targetPosition.x,(float)p.targetPosition.y,(float)p.targetPosition.z }) < 1) {
+void ExampleUpdate(Particle& p, World* world) {
+	Math::Vector3 newPosition = Vector3MoveTowards(p.position, p.targetPosition, 3);
+	if (world->ReadVoxel(newPosition.x, newPosition.y, newPosition.z) != 0) {
+	
+	}
+	else if (Vector3Distance({ (float)p.position.x, (float)p.position.y,(float)p.position.z }, { (float)p.targetPosition.x,(float)p.targetPosition.y,(float)p.targetPosition.z }) < 1) {
 		p.targetPosition.x = GetRandomValue(0, wx * 32);
 		p.targetPosition.y = GetRandomValue(150, 250);
 		p.targetPosition.z = GetRandomValue(0, wz * 32);
 	}
+	else p.position = newPosition;
+
 }
 const int MAX_PARTICLES = 1000000;
 const bool DEBUG_FEATURES_ON = true;
@@ -51,7 +56,7 @@ public:
 		particles = new Particle[MAX_PARTICLES];
 	}
 
-	void PushRenderParticle(Math::Vector3 position, Color color, void (*update)(Particle&)) {
+	void PushRenderParticle(Math::Vector3 position, Color color, void (*update)(Particle&, World *world)) {
 		Particle particle;
 		particle.position = position;
 		particle.color = 0;
@@ -108,9 +113,9 @@ public:
 		}
 	}
 
-	void Update() {
+	void Update(World* world) {
 		for (int i = 0; i < renderQueue; i++) {
-			particles[i].update(particles[i]);
+			particles[i].update(particles[i],world);
 		}
 	}
 
